@@ -31,15 +31,23 @@ const safeCall = (fn, ...args) => {
 const logger = {
   debug: (...args) => {
     if (!debugEnabled) return;
+    const payload = { level: 'debug', args, ts: Date.now() };
+    try { if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('app-log', { detail: payload })); } catch (_) {}
     safeCall(console.debug || console.log, ...args);
   },
   info: (...args) => {
+    const payload = { level: 'info', args, ts: Date.now() };
+    try { if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('app-log', { detail: payload })); } catch (_) {}
     safeCall(console.info || console.log, ...args);
   },
   warn: (...args) => {
+    const payload = { level: 'warn', args, ts: Date.now() };
+    try { if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('app-log', { detail: payload })); } catch (_) {}
     safeCall(console.warn, ...args);
   },
   error: (...args) => {
+    const payload = { level: 'error', args, ts: Date.now() };
+    try { if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('app-log', { detail: payload })); } catch (_) {}
     safeCall(console.error, ...args);
   },
 };

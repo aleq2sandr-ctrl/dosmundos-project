@@ -147,7 +147,9 @@ export const saveTranscriptInChunks = async (episodeSlug, lang, transcriptData, 
         try {
           const approxSize = JSON.stringify(compactData).length;
           logger.debug('[transcriptChunkingService] Compact data prepared', { utterances: compactData.utterances.length, textLen: compactData.text.length, approxJsonBytes: approxSize });
-        } catch (_) {}
+        } catch (error) {
+          // Ignore JSON stringify errors for logging purposes
+        }
 
         const { error: compactError } = await supabase
           .from('transcripts')

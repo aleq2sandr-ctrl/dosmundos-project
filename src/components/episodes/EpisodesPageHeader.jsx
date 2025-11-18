@@ -1,7 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
 import { getLocaleString } from '@/lib/locales';
-import { useTelegram } from '@/contexts/TelegramContext';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 
 const EpisodesPageHeader = ({ currentLanguage, onLanguageChange }) => {
@@ -9,7 +7,7 @@ const EpisodesPageHeader = ({ currentLanguage, onLanguageChange }) => {
     <div className="relative flex items-center justify-between mb-6">
       <div className="flex items-center">
         <img
-          src="https://dosmundos.pe/wp-content/uploads/2025/02/logo-5-120x120.png"
+          src="https://silver-lemur-512881.hostingersite.com/wp-content/uploads/2025/02/logo-5-120x120.png"
           alt="Dos Mundos Logo"
           className="w-10 h-10 sm:w-12 sm:h-12 mr-3 rounded-full object-contain shadow-md"
         />

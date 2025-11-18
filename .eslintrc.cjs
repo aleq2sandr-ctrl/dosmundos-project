@@ -2,37 +2,52 @@ module.exports = {
   root: true,
   env: {
     browser: true,
-    es2022: true,
+    es2020: true,
+    node: true
   },
+  extends: [
+    'eslint:recommended',
+    'plugin:react/recommended',
+    'plugin:react/jsx-runtime',
+    'plugin:react-hooks/recommended',
+  ],
+  ignorePatterns: ['dist', '.eslintrc.cjs'],
+  parser: '@babel/eslint-parser',
   parserOptions: {
     ecmaVersion: 'latest',
     sourceType: 'module',
-    ecmaFeatures: { jsx: true },
+    requireConfigFile: false,
+    babelOptions: {
+      presets: ['@babel/preset-react'],
+    },
   },
-  extends: ['eslint:recommended'],
-  plugins: ['react-hooks'],
-  ignorePatterns: ['dist/**', 'node_modules/**', 'public/**', 'uploads/**'],
+  settings: {
+    react: {
+      version: '18.2',
+    },
+  },
   rules: {
-    'no-debugger': 'error',
-    'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^React$' }],
-    'react-hooks/exhaustive-deps': 'off',
+    'no-unused-vars': ['warn', {
+      vars: 'all',
+      args: 'after-used',
+      ignoreRestSiblings: false,
+      varsIgnorePattern: '^React$',
+      argsIgnorePattern: '^_'
+    }],
+    'no-case-declarations': 'error',
+    'no-dupe-class-members': 'error',
+    'no-empty': ['error', { allowEmptyCatch: true }],
   },
   overrides: [
     {
-      files: [
-        'vite.config.js',
-        'tailwind.config.js',
-        'postcss.config.js',
-        '.eslintrc.cjs',
-        'vercel.json',
-        'api/**/*.js',
-        'plugins/**/*.js',
-      ],
-      env: { node: true, browser: false },
-      parserOptions: { sourceType: 'module' },
-      rules: {
-        'no-undef': 'off',
+      files: ['vps-deployment/**/*.js', 'api/**/*.js', 'test-*.js'],
+      env: {
+        node: true,
+        browser: false
       },
-    },
-  ],
+      rules: {
+        'no-undef': 'off' // Allow Node.js globals like process, __dirname
+      }
+    }
+  ]
 };

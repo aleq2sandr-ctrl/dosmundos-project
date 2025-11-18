@@ -11,75 +11,56 @@ const usePlayerInitialization = ({
   playbackRateOptions,
   onPlayerStateChange,
   lastJumpIdProcessedRef,
-  jumpToTime, // Добавляем параметр для проверки активного перехода
+  jumpToTime,
 }) => {
   useEffect(() => {
-    // Проверяем, есть ли активный переход
+    // Инициализация выполняется только при смене эпизода
+    console.log('usePlayerInitialization: Initializing episode', episodeData?.slug);
+    
+    // Проверяем, есть ли активный переход к определенной временной метке
     const hasActiveJump = jumpToTime !== null && jumpToTime !== undefined;
     
-    // Проверяем, не является ли это просто паузой (если audioRef уже имеет src и currentTime)
-    const isJustPause = audioRef.current && 
-                       audioRef.current.src && 
-                       audioRef.current.currentTime > 0 && 
-                       episodeData?.audio_url === audioRef.current.src &&
-                       audioRef.current.readyState > 0; // Аудио уже загружено
+    // Сбрасываем состояния UI (не влияет на аудио напрямую)
+    setActiveQuestionTitleState('');
+    setDurationState(episodeData?.duration || 0);
+    setCurrentPlaybackRateIndex(0);
     
-    // Не сбрасываем состояние воспроизведения, если это просто пауза
-    // И не сбрасываем для новых эпизодов - пусть автозапуск сам решит
-    if (!isJustPause && !episodeData?.audio_url) {
-      setIsPlayingState(false);
-    }
-    
-    // Не сбрасываем currentTime, если есть активный переход или это просто пауза
-    if (!hasActiveJump && !isJustPause) {
+    // Сбрасываем время только если нет активного перехода
+    if (!hasActiveJump) {
       setCurrentTimeState(0);
     }
     
-    setActiveQuestionTitleState('');
-    setDurationState(episodeData?.duration || 0);
-    setCurrentPlaybackRateIndex(0); 
-
+    // НЕ трогаем isPlayingState - пусть usePlayerPlayback управляет автозапуском
+    // НЕ устанавливаем src - это делает usePlayerPlayback для избежания конфликтов
+    
     if (audioRef.current) {
-      // Не сбрасываем currentTime аудио, если есть активный переход или это просто пауза
-      if (!hasActiveJump && !isJustPause) {
-        audioRef.current.currentTime = 0;
-      }
+      // Сбрасываем скорость воспроизведения
       audioRef.current.playbackRate = playbackRateOptions[0].value;
-      if (episodeData?.audio_url) {
-        if (audioRef.current.src !== episodeData.audio_url) {
-          audioRef.current.src = episodeData.audio_url;
-          audioRef.current.load();
-        }
-      } else {
-        audioRef.current.removeAttribute('src');
-        audioRef.current.load(); 
+      
+      // Сбрасываем время только если нет активного перехода
+      if (!hasActiveJump) {
+        audioRef.current.currentTime = 0;
       }
     }
     
-    // Не сбрасываем lastJumpIdProcessedRef, если есть активный переход
-    if (!hasActiveJump && lastJumpIdProcessedRef) {
+    // Сбрасываем lastJumpIdProcessedRef для новых переходов
+    if (lastJumpIdProcessedRef && !hasActiveJump) {
       lastJumpIdProcessedRef.current = null;
     }
     
-    const currentTime = hasActiveJump ? jumpToTime : (isJustPause ? audioRef.current?.currentTime || 0 : 0);
-    // Не устанавливаем isPlaying: false для новых эпизодов - пусть автозапуск сам решит
-    const shouldSetPlaying = !episodeData?.audio_url ? false : undefined;
-    onPlayerStateChange?.({...shouldSetPlaying !== undefined && {isPlaying: shouldSetPlaying}, currentTime, duration: episodeData?.duration || 0, activeQuestionTitle: ''});
+    // Уведомляем родительский компонент об изменениях
+    const currentTime = hasActiveJump ? jumpToTime : 0;
+    onPlayerStateChange?.({
+      currentTime, 
+      duration: episodeData?.duration || 0, 
+      activeQuestionTitle: '',
+      playbackRate: playbackRateOptions[0].value
+    });
   }, [
-      episodeData?.slug, 
-      episodeData?.audio_url, 
-      episodeData?.duration, 
-      audioRef, 
-      setIsPlayingState, 
-      setCurrentTimeState, 
-      setActiveQuestionTitleState, 
-      setDurationState, 
-      setCurrentPlaybackRateIndex, 
-      playbackRateOptions, 
-      onPlayerStateChange,
-      lastJumpIdProcessedRef,
-      jumpToTime
-    ]);
+    episodeData?.slug,
+    episodeData?.duration,
+    jumpToTime
+  ]);
 };
 
 export default usePlayerInitialization;

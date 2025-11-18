@@ -19,13 +19,16 @@ import AddQuestionFromSegmentDialog from '@/components/player/questions_manager_
 import AddQuestionDialog from '@/components/transcript/AddQuestionDialog';
 import { useEditorAuth } from '@/contexts/EditorAuthContext';
 import { saveEditToHistory } from '@/services/editHistoryService';
+import useAudioPrefetch from '@/hooks/player/useAudioPrefetch';
+import storageRouter from '@/lib/storageRouter';
 
 
 const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
-  const { episodeSlug } = useParams(); 
+  const { episodeSlug, lang } = useParams(); 
   const navigate = useNavigate();
   const { toast } = useToast();
   const location = useLocation();
+  const langPrefix = lang || appCurrentLanguage || 'ru';
   const { editor, isAuthenticated, openAuthModal } = useEditorAuth();
   
   // Read language from URL parameter, fallback to app language
@@ -38,16 +41,48 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
     if (urlLanguage && urlLanguage !== appCurrentLanguage) {
       // Update localStorage to persist the language change
       localStorage.setItem('podcastLang', urlLanguage);
-      
-      // Force page reload to update global app state
-      window.location.reload();
+
+      const pathMatch = location.pathname.match(/^\/(ru|es|en|de|fr|pl)(.*)$/);
+      const pathSuffix = pathMatch ? pathMatch[2] : location.pathname;
+      const targetPath = `/${urlLanguage}${pathSuffix || ''}`;
+
+      const nextSearch = new URLSearchParams(location.search);
+      nextSearch.delete('lang');
+      const searchString = nextSearch.toString();
+      const nextUrl = `${targetPath}${searchString ? `?${searchString}` : ''}${location.hash || ''}`;
+
+      if (`${location.pathname}${location.search}${location.hash || ''}` !== nextUrl) {
+        navigate(nextUrl, { replace: true });
+      }
     }
-  }, [urlLanguage, appCurrentLanguage]);
+  }, [urlLanguage, appCurrentLanguage, location.pathname, location.search, location.hash, navigate]);
 
   const audioRef = useRef(null); 
   const [showFloatingControls, setShowFloatingControls] = useState(false);
   const playerControlsContainerRef = useRef(null);
   const [editingQuestion, setEditingQuestion] = useState(null);
+  const [allEpisodesForPrefetch, setAllEpisodesForPrefetch] = useState([]);
+  
+  // Загрузка списка эпизодов для prefetch
+  useEffect(() => {
+    const fetchEpisodesForPrefetch = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('episodes')
+          .select('slug, audio_url, lang, date')
+          .order('date', { ascending: false })
+          .limit(50); // Ограничиваем для производительности
+        
+        if (!error && data) {
+          setAllEpisodesForPrefetch(data);
+        }
+      } catch (error) {
+        console.debug('Failed to fetch episodes for prefetch:', error);
+      }
+    };
+    
+    fetchEpisodesForPrefetch();
+  }, []); // Загружаем один раз при монтировании
 
   const {
     episodeData,
@@ -127,6 +162,14 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
     episodeData?.date,
     episodeData?.lang
   );
+  
+  // Prefetch следующего эпизода для быстрого переключения
+  useAudioPrefetch({
+    currentEpisodeSlug: episodeData?.slug,
+    allEpisodes: allEpisodesForPrefetch,
+    currentLanguage,
+    isOfflineMode
+  });
   
   useEffect(() => {
     const handleScroll = () => {
@@ -432,7 +475,7 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
       <div className="text-center p-8 bg-red-700/30 rounded-lg shadow-xl">
         <h2 className="text-xl font-bold mb-2">{getLocaleString('errorLoadingData', currentLanguage)}</h2>
         <p className="max-w-md mx-auto">{getLocaleString('episodeNotFound', currentLanguage)}</p>
-        <Button onClick={() => navigate('/episodes')} variant="outline" className="mt-4 bg-slate-700/50 hover:bg-slate-600/70 border-slate-600 text-slate-300 hover:text-white">
+        <Button onClick={() => navigate(`/${langPrefix}/episodes`)} variant="outline" className="mt-4 bg-slate-700/50 hover:bg-slate-600/70 border-slate-600 text-slate-300 hover:text-white">
           <ArrowLeft className="mr-2 h-4 w-4" /> {getLocaleString('backToEpisodesShort', currentLanguage)}
         </Button>
       </div>
@@ -444,7 +487,7 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
       <div className="text-center p-8 bg-red-700/30 rounded-lg shadow-xl">
         <h2 className="text-xl font-bold mb-2">{getLocaleString('errorLoadingData', currentLanguage)}</h2>
         <p className="max-w-md mx-auto">{error}</p>
-        <Button onClick={() => navigate('/episodes')} variant="outline" className="mt-4 bg-slate-700/50 hover:bg-slate-600/70 border-slate-600 text-slate-300 hover:text-white">
+        <Button onClick={() => navigate(`/${langPrefix}/episodes`)} variant="outline" className="mt-4 bg-slate-700/50 hover:bg-slate-600/70 border-slate-600 text-slate-300 hover:text-white">
           <ArrowLeft className="mr-2 h-4 w-4" /> {getLocaleString('backToEpisodesShort', currentLanguage)}
         </Button>
       </div>
@@ -476,10 +519,10 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
                 onQuestionSelectJump={handleSeekToTime}
                 audioRef={audioRef} 
                 episodeSlug={playerEpisodeDataMemo.slug}
-                episodeAudioUrl={playerEpisodeDataMemo.audio_url}
+                episodeAudioUrl={storageRouter.getCorrectAudioUrl(playerEpisodeDataMemo)}
                 episodeLang={playerEpisodeDataMemo.lang}
                 episodeDate={playerEpisodeDataMemo.date}
-                navigateBack={() => navigate('/episodes')}
+                navigateBack={() => navigate(`/${langPrefix}/episodes`)}
                 onPlayerStateChange={handlePlayerStateChange}
                 playerControlsContainerRef={playerControlsContainerRef}
                 showTranscript={showTranscriptUI}
@@ -512,7 +555,7 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
             mainPlayerSeekAudio={(time, play) => handleSeekToTime(time, null, play)}
             currentLanguage={currentLanguage}
             episodeLang={playerEpisodeDataMemo.lang || 'all'}
-            episodeAudioUrl={playerEpisodeDataMemo.audio_url}
+            episodeAudioUrl={storageRouter.getCorrectAudioUrl(playerEpisodeDataMemo)}
             jumpToQuestionId={playerEpisodeDataMemo.jumpToQuestionId}
             isBatchAddDisabled={true}
             showTranscript={showTranscriptUI}

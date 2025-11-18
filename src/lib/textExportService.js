@@ -162,10 +162,10 @@ class TextExportService {
   // Генерация полного TXT
   generateFullTXT(transcript, questions, options) {
     let text = '';
-    
+
     // Создаем объединенный массив всех элементов с временными метками
     const allItems = [];
-    
+
     // Добавляем вопросы
     questions.forEach(question => {
       allItems.push({
@@ -175,16 +175,18 @@ class TextExportService {
         text: question.title || ''
       });
     });
-    
+
     // Добавляем сегменты транскрипта
-    transcript.forEach(segment => {
-      allItems.push({
-        type: 'transcript',
-        time: segment.start / 1000,
-        text: segment.text,
-        speaker: segment.speaker
+    if (transcript.utterances) {
+      transcript.utterances.forEach(segment => {
+        allItems.push({
+          type: 'transcript',
+          time: segment.start / 1000,
+          text: segment.text,
+          speaker: segment.speaker
+        });
       });
-    });
+    }
     
     // Сортируем по времени
     allItems.sort((a, b) => a.time - b.time);
@@ -214,10 +216,10 @@ class TextExportService {
   // Генерация полного DOC
   generateFullDOC(transcript, questions, options) {
     let html = '<html><head><meta charset="UTF-8"><title>Транскрипт</title></head><body>';
-    
+
     // Создаем объединенный массив всех элементов с временными метками
     const allItems = [];
-    
+
     // Добавляем вопросы
     questions.forEach(question => {
       allItems.push({
@@ -227,16 +229,18 @@ class TextExportService {
         text: question.title || ''
       });
     });
-    
+
     // Добавляем сегменты транскрипта
-    transcript.forEach(segment => {
-      allItems.push({
-        type: 'transcript',
-        time: segment.start / 1000,
-        text: segment.text,
-        speaker: segment.speaker
+    if (transcript.utterances) {
+      transcript.utterances.forEach(segment => {
+        allItems.push({
+          type: 'transcript',
+          time: segment.start / 1000,
+          text: segment.text,
+          speaker: segment.speaker
+        });
       });
-    });
+    }
     
     // Сортируем по времени
     allItems.sort((a, b) => a.time - b.time);

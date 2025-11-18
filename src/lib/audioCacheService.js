@@ -84,6 +84,12 @@ class AudioCacheService {
       return false;
     }
 
+    // Базовая валидация URL
+    if (!url || typeof url !== 'string' || !url.startsWith('http')) {
+      console.warn('[AudioCache] Invalid URL provided:', url);
+      return false;
+    }
+
     // Проверяем, есть ли уже в кеше
     if (!forceRedownload && await this.isAudioCached(url)) {
       console.log('[AudioCache] Already cached:', url);
@@ -170,47 +176,83 @@ class AudioCacheService {
   }
 
   // Загрузка с отслеживанием прогресса
-  async fetchWithProgress(url, onProgress) {
-    const response = await fetch(url);
-    
-    if (!response.body) {
-      return response;
-    }
+  async fetchWithProgress(url, onProgress, retries = 2) {
+    let lastError;
 
-    const contentLength = response.headers.get('content-length');
-    const total = contentLength ? parseInt(contentLength) : 0;
-    let loaded = 0;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const response = await fetch(url);
 
-    const reader = response.body.getReader();
-    const chunks = [];
+        if (!response.ok) {
+          // Если это не последний attempt, пробуем еще раз
+          if (attempt < retries) {
+            console.warn(`[AudioCache] HTTP ${response.status} for ${url}, retrying (${attempt + 1}/${retries})`);
+            await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1))); // Exponential backoff
+            continue;
+          }
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
 
-    while (true) {
-      const { done, value } = await reader.read();
-      
-      if (done) break;
-      
-      chunks.push(value);
-      loaded += value.length;
-      
-      if (onProgress) {
-        onProgress(loaded, total);
+        if (!response.body) {
+          return response;
+        }
+
+        // Успешно получили response, теперь обрабатываем тело
+        const contentLength = response.headers.get('content-length');
+        const total = contentLength ? parseInt(contentLength) : 0;
+        let loaded = 0;
+
+        const reader = response.body.getReader();
+        const chunks = [];
+
+        while (true) {
+          const { done, value } = await reader.read();
+
+          if (done) break;
+
+          chunks.push(value);
+          loaded += value.length;
+
+          if (onProgress) {
+            onProgress(loaded, total);
+          }
+        }
+
+        // Создаем новый Response из собранных чанков
+        const allChunks = new Uint8Array(loaded);
+        let position = 0;
+        for (const chunk of chunks) {
+          allChunks.set(chunk, position);
+          position += chunk.length;
+        }
+
+        return new Response(allChunks, {
+          status: response.status,
+          statusText: response.statusText,
+          headers: response.headers
+        });
+
+      } catch (error) {
+        lastError = error;
+
+        // Для сетевых ошибок пробуем еще раз
+        if (attempt < retries && (
+          error.message.includes('Failed to fetch') ||
+          error.message.includes('NetworkError') ||
+          error.message.includes('ERR_CONNECTION_RESET') ||
+          error.name === 'TypeError'
+        )) {
+          console.warn(`[AudioCache] Network error for ${url}, retrying (${attempt + 1}/${retries}):`, error.message);
+          await new Promise(resolve => setTimeout(resolve, 2000 * (attempt + 1))); // Longer delay for network issues
+          continue;
+        }
+
+        // Если это последний attempt или не-сетевая ошибка, выбрасываем
+        break;
       }
     }
 
-    // Создаем новый Response из собранных чанков
-    const allChunks = new Uint8Array(loaded);
-    let position = 0;
-    
-    for (const chunk of chunks) {
-      allChunks.set(chunk, position);
-      position += chunk.length;
-    }
-
-    return new Response(allChunks, {
-      status: response.status,
-      statusText: response.statusText,
-      headers: response.headers
-    });
+    throw lastError;
   }
 
   // Управление размером кеша
@@ -485,5 +527,10 @@ class AudioCacheService {
 
 // Создаем единственный экземпляр сервиса
 const audioCacheService = new AudioCacheService();
+
+// Делаем доступным глобально для оптимизации
+if (typeof window !== 'undefined') {
+  window.audioCacheService = audioCacheService;
+}
 
 export default audioCacheService;

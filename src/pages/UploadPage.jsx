@@ -1,25 +1,28 @@
 import React, { useCallback, useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
 import { Button } from '@/components/ui/button';
 import { UploadCloud, Loader2, PlusCircle, ArrowLeft, TestTube, Key, RefreshCw } from 'lucide-react';
-import { getLocaleString } from '@/lib/locales';
+import { getLocaleString, getPluralizedLocaleString } from '@/lib/locales';
 import useFileUploadManager from '@/hooks/useFileUploadManager';
 import UploadManageView from '@/components/uploader/UploadManageView';
 import EmptyUploadState from '@/components/uploader/EmptyUploadState';
 import OverwriteDialog from '@/components/uploader/OverwriteDialog';
 import ConflictDialog from '@/components/uploader/ConflictDialog';
 import UploadQueue from '@/components/uploader/UploadQueue';
-import { testOpenAIConnection } from '@/lib/openAIService';
+import { testOpenAIConnection, generateQuestionsOpenAI } from '@/lib/openAIService';
 import { useToast } from '@/components/ui/use-toast';
 import useTranslationManager from '@/hooks/useTranslationManager';
 import timeOldService from '@/lib/timeOldService';
 import { supabase } from '@/lib/supabaseClient';
 import storageRouter from '@/lib/storageRouter';
 import { startPollingForItem } from '@/services/uploader/transcriptPoller';
+import DevLogPanel from '@/components/DevLogPanel';
 
 const UploadPage = ({ currentLanguage }) => {
   const navigate = useNavigate();
+  const { lang } = useParams();
+  const langPrefix = lang || currentLanguage || 'ru';
   const { toast } = useToast();
   const [isTestingOpenAI, setIsTestingOpenAI] = useState(false);
   const [showApiKeyInput, setShowApiKeyInput] = useState(false);
@@ -90,8 +93,21 @@ const UploadPage = ({ currentLanguage }) => {
   const [transcribingEpisode, setTranscribingEpisode] = useState(null);
   const pollingIntervalsRef = useRef({});
 
+  // State for question generation
+  const [processingQuestionsEpisodes, setProcessingQuestionsEpisodes] = useState(new Set());
+
   // Real transcription function
   const handleStartTranscription = async (episode) => {
+    // Проверяем, что episode существует
+    if (!episode || !episode.slug || !episode.lang) {
+      toast({
+        title: getLocaleString('errorGeneric', currentLanguage),
+        description: 'Данные эпизода недоступны',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     // Use storageRouter to get correct audio URL based on storage_provider
     const audioUrl = storageRouter.getCorrectAudioUrl(episode);
 
@@ -108,8 +124,9 @@ const UploadPage = ({ currentLanguage }) => {
     if (!audioUrl) {
       toast({
         title: getLocaleString('errorGeneric', currentLanguage),
-        description: 'URL аудиофайла не найден',
-        variant: 'destructive'
+        description: 'URL аудиофайла не найден. Проверьте, что файл был загружен.',
+        variant: 'destructive',
+        duration: 5000
       });
       return;
     }
@@ -257,6 +274,7 @@ const UploadPage = ({ currentLanguage }) => {
 
   const handleDeleteTranscript = async (episode) => {
     try {
+      // Удаляем транскрипт из базы данных
       const { error } = await supabase
         .from('transcripts')
         .delete()
@@ -265,7 +283,7 @@ const UploadPage = ({ currentLanguage }) => {
 
       if (error) throw error;
 
-      // Обновляем состояние
+      // Обновляем состояние эпизода - убираем транскрипт
       setEpisodes(prev => prev.map(ep => 
         ep.id === episode.id 
           ? { ...ep, transcript: null }
@@ -274,16 +292,20 @@ const UploadPage = ({ currentLanguage }) => {
 
       toast({
         title: '✅ Транскрипт удален',
-        description: 'Транскрипт успешно удален',
+        description: 'Транскрипт успешно удален. Теперь можно запустить распознавание заново.',
         duration: 3000
       });
+      
+      return true; // Возвращаем успешное завершение
     } catch (error) {
       console.error('Delete transcript error:', error);
       toast({
         title: '❌ Ошибка удаления',
         description: error.message,
-        variant: 'destructive'
+        variant: 'destructive',
+        duration: 5000
       });
+      return false; // Возвращаем ошибку
     }
   };
 
@@ -450,6 +472,18 @@ const UploadPage = ({ currentLanguage }) => {
   const handleGenerateFromText = async (episode) => {
     console.log('Generate questions from text:', episode);
     
+    if (!episode || !episode.slug || !episode.lang) {
+      toast({
+        title: 'Ошибка',
+        description: 'Данные эпизода недоступны',
+        variant: 'destructive',
+        duration: 3000
+      });
+      return;
+    }
+
+    setProcessingQuestionsEpisodes(prev => new Set(prev).add(`${episode.slug}-${episode.lang}`));
+
     try {
       toast({
         title: '🤖 Генерация вопросов',
@@ -457,14 +491,60 @@ const UploadPage = ({ currentLanguage }) => {
         duration: 3000
       });
 
-      // Здесь должна быть логика генерации вопросов через AI
-      // Пока что просто показываем сообщение
-      toast({
-        title: '⚠️ Функция в разработке',
-        description: 'Генерация вопросов через AI будет добавлена в следующей версии',
-        variant: 'default',
+      // Получаем данные транскрипта
+      const { data: transcriptData } = await supabase
+        .from('transcripts')
+        .select('edited_transcript_data')
+        .eq('episode_slug', episode.slug)
+        .eq('lang', episode.lang)
+        .single();
+
+      if (!transcriptData || !transcriptData.edited_transcript_data) {
+        throw new Error('Данные транскрипта не найдены. Убедитесь, что транскрипция завершена.');
+      }
+
+      // Генерируем вопросы через AI
+      const questions = await generateQuestionsOpenAI(
+        transcriptData.edited_transcript_data, 
+        episode.lang, 
+        currentLanguage
+      );
+
+      if (!Array.isArray(questions) || questions.length === 0) {
+        throw new Error('Не удалось сгенерировать вопросы. Попробуйте позже.');
+      }
+
+      // Удаляем старые вопросы
+      await supabase
+        .from('questions')
+        .delete()
+        .eq('episode_slug', episode.slug)
+        .eq('lang', episode.lang);
+      
+      // Подготавливаем вопросы для вставки
+      const questionsToInsert = questions.map((q) => ({
+        episode_slug: episode.slug,
+        lang: episode.lang,
+        title: q.title,
+        time: Number(q.time ?? 0)
+      }));
+
+      // Вставляем новые вопросы
+      await supabase.from('questions').insert(questionsToInsert);
+
+      // Обновляем локальное состояние
+      setEpisodes(prev => prev.map(ep => 
+        ep.slug === episode.slug && ep.lang === episode.lang
+          ? { ...ep, questionsCount: questions.length }
+          : ep
+      ));
+
+      toast({ 
+        title: '✅ Вопросы сгенерированы', 
+        description: `Успешно сгенерировано ${questions.length} вопросов для ${episode.slug} (${episode.lang.toUpperCase()})`,
         duration: 5000
       });
+
     } catch (error) {
       console.error('Error generating questions from text:', error);
       toast({
@@ -472,6 +552,12 @@ const UploadPage = ({ currentLanguage }) => {
         description: `Не удалось сгенерировать вопросы: ${error.message}`,
         variant: 'destructive',
         duration: 5000
+      });
+    } finally {
+      setProcessingQuestionsEpisodes(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(`${episode.slug}-${episode.lang}`);
+        return newSet;
       });
     }
   };
@@ -488,6 +574,9 @@ const UploadPage = ({ currentLanguage }) => {
         description: `Загружаем ${filesToProcess.length} файлов...`,
         duration: 3000
       });
+
+      let successCount = 0;
+      let failCount = 0;
 
       // Обрабатываем каждый файл в очереди
       for (const item of filesToProcess) {
@@ -541,6 +630,7 @@ const UploadPage = ({ currentLanguage }) => {
             uploadProgress: 100,
             uploadComplete: true
           });
+          successCount += 1;
 
           // Получаем настройки для автоматических действий
           let autoSettings = settings;
@@ -619,14 +709,31 @@ const UploadPage = ({ currentLanguage }) => {
             isUploading: false,
             uploadError: error.message
           });
+          failCount += 1;
         }
       }
 
-      toast({
-        title: '✅ Загрузка завершена',
-        description: 'Все файлы успешно загружены',
-        duration: 5000
-      });
+      if (failCount === 0) {
+        toast({
+          title: '✅ Загрузка завершена',
+          description: `Успешно: ${successCount}`,
+          duration: 5000
+        });
+      } else if (successCount === 0) {
+        toast({
+          title: '❌ Загрузка завершилась с ошибками',
+          description: `Все файлы не удалось загрузить (${failCount})`,
+          variant: 'destructive',
+          duration: 7000
+        });
+      } else {
+        toast({
+          title: '⚠️ Загрузка частично завершена',
+          description: `Успешно: ${successCount}, Ошибки: ${failCount}`,
+          variant: 'default',
+          duration: 7000
+        });
+      }
       
     } catch (error) {
       toast({
@@ -918,7 +1025,7 @@ const UploadPage = ({ currentLanguage }) => {
       <div className="flex justify-between items-center mb-6">
         <Button 
           variant="outline" 
-          onClick={() => navigate('/episodes')} 
+          onClick={() => navigate(`/${langPrefix}/episodes`)} 
           className="bg-slate-700 hover:bg-slate-600 border-slate-600 text-slate-300"
         >
           <ArrowLeft className="mr-2 h-4 w-4" /> {getLocaleString('backToEpisodes', currentLanguage)}
@@ -1077,9 +1184,10 @@ const UploadPage = ({ currentLanguage }) => {
             batchTranslateFromLanguage={batchTranslateFromLanguage}
             translatingFrom={translatingFrom}
             translationProgress={translationProgress}
-          isTranscribing={isTranscribing}
-          loadingFromDB={false}
-          generatingFromText={false}
+            isTranscribing={isTranscribing}
+            loadingFromDB={false}
+            generatingFromText={false}
+            processingQuestionsEpisodes={processingQuestionsEpisodes}
           />
         )
       )}
@@ -1105,6 +1213,10 @@ const UploadPage = ({ currentLanguage }) => {
         onConfirm={handleConflictConfirm}
         onCancel={handleConflictCancel}
       />
+      
+      {(import.meta.env.DEV || String(import.meta.env.VITE_DEBUG_PANEL).toLowerCase() === 'true') && (
+        <DevLogPanel initialOpen={false} />
+      )}
     </div>
   );
 };

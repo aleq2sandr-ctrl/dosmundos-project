@@ -16,16 +16,7 @@ const AudioElement = React.memo(({
     }
   }, [playbackRate, audioRef]);
 
-  React.useEffect(() => {
-    if (audioRef.current && episodeAudioUrl) {
-  
-      // Устанавливаем src только если он изменился
-      if (audioRef.current.src !== episodeAudioUrl) {
-        audioRef.current.src = episodeAudioUrl;
-        audioRef.current.load();
-      }
-    }
-  }, [episodeAudioUrl, audioRef]);
+  // Примечание: src управляется в usePlayerPlayback для лучшей координации
 
   const handleError = (e) => {
     console.error('AudioElement error occurred');
@@ -65,20 +56,22 @@ const AudioElement = React.memo(({
   };
 
   const handleCanPlay = () => {
-    
+    console.log('[AudioElement] onCanPlay - audio is ready to play');
   };
 
   const handleLoadStart = () => {
-    
+    console.log('[AudioElement] onLoadStart - started loading audio:', audioRef.current?.src);
   };
 
   const handleLoadedData = () => {
-    
+    console.log('[AudioElement] onLoadedData - data loaded, duration:', audioRef.current?.duration);
   };
 
   return (
     <audio 
       ref={audioRef}
+      autoPlay
+      playsInline
       onTimeUpdate={onTimeUpdate}
       onLoadedMetadata={onLoadedMetadata}
       onEnded={onEnded}

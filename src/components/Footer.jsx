@@ -1,14 +1,25 @@
 import React, { useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { X, History } from 'lucide-react';
 import { getLocaleString } from '@/lib/locales';
 import LanguageSwitcher from './LanguageSwitcher';
 import { UserEditHistory } from './UserEditHistory';
 
-const Footer = ({ currentLanguage, onLanguageChange }) => {
+const Footer = ({ currentLanguage }) => {
+  const navigate = useNavigate();
   const [isEditHistoryOpen, setIsEditHistoryOpen] = useState(false);
+  const location = useLocation();
 
   const handleCloseEditHistory = () => {
     setIsEditHistoryOpen(false);
+  };
+
+  const handleLanguageChange = (langCode) => {
+    localStorage.setItem('podcastLang', langCode);
+    const currentPath = location.pathname;
+    const pathWithoutLang = currentPath.replace(/^\/(ru|es|en|de|fr|pl)/, '') || '/episodes';
+    const newPath = `/${langCode}${pathWithoutLang}`;
+    navigate(newPath, { replace: true });
   };
 
   return (
@@ -31,7 +42,7 @@ const Footer = ({ currentLanguage, onLanguageChange }) => {
           {/* Выбор языка */}
           <LanguageSwitcher 
             currentLanguage={currentLanguage} 
-            onLanguageChange={onLanguageChange}
+            onLanguageChange={handleLanguageChange}
             dropdownPosition="up"
           />
         </div>

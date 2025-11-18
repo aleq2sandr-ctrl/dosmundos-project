@@ -23,6 +23,7 @@ const UploadManageView = ({
   isTranscribing,
   loadingFromDB,
   generatingFromText,
+  processingQuestionsEpisodes = new Set(),
   onRemoveItem,
   availableLanguages = ['es', 'ru', 'en', 'de', 'fr', 'pl']
 }) => {
@@ -287,11 +288,11 @@ const UploadManageView = ({
                     onGenerateFromText={onGenerateFromText}
                     onTranslateFromLanguage={translateEpisode}
                     loadingFromDB={loadingFromDB}
-                    generatingFromText={generatingFromText}
+                    generatingFromText={processingQuestionsEpisodes.has(`${episode?.slug}-${lang}`)}
                     translatingFrom={translatingFrom}
                     episodes={allItems}
                     navigate={navigate}
-                    onRemoveItem={onRemoveItem}
+                    processingQuestionsEpisodes={processingQuestionsEpisodes}
                   />
                 );
               })}

@@ -19,24 +19,70 @@ const usePlayerPlayback = ({
   setShowPlayOverlay // новый пропс
 }) => {
   const playPromiseRef = useRef(null);
+  const isUpdatingPlayStateRef = useRef(false); // Флаг для предотвращения циклов
+  const lastLoadedUrlRef = useRef(''); // Отслеживаем загруженный URL
+  const autoplayPendingRef = useRef(null); // 'play' | 'unmute' | null
+  const firstVisitRef = useRef(typeof window !== 'undefined' ? !localStorage.getItem('autoplaySeen') : false);
   
-  // Защита от быстрых переключений состояния
-  const lastStateChangeRef = useRef(0);
-  const STATE_CHANGE_THROTTLE = 100; // Минимум 100ms между изменениями состояния
-  
-  // Безопасное изменение состояния с защитой от быстрых переключений
-  const safeSetIsPlayingState = (newState) => {
-    const now = Date.now();
-    const timeSinceLastChange = now - lastStateChangeRef.current;
-    
-    if (timeSinceLastChange < STATE_CHANGE_THROTTLE) {
-      logger.debug(`usePlayerPlayback: Throttling state change (${timeSinceLastChange}ms < ${STATE_CHANGE_THROTTLE}ms)`);
-      return;
+  // Унифицированная попытка воспроизведения с обходом autoplay-политики
+  const attemptPlay = async (audioElement) => {
+    try {
+      const p = audioElement.play();
+      await p;
+      return true;
+    } catch (err) {
+      if (err?.name === 'NotAllowedError') {
+        // Пытаемся начать в mute-режиме, затем снять mute
+        try {
+          // Стартуем в mute, оставляем mute до жеста пользователя
+          const prevMuted = audioElement.muted;
+          if (!audioElement.muted) audioElement.muted = true;
+          const p2 = audioElement.play();
+          await p2;
+          // Помечаем, что нужно снять mute при первом жесте пользователя
+          autoplayPendingRef.current = 'unmute';
+          // Если раньше не был mute, вернем громкость по жесту пользователя
+          return true; // уже проигрывается (временно без звука)
+        } catch (err2) {
+          // Не удалось даже в mute — ждем жеста пользователя чтобы попытаться снова
+          autoplayPendingRef.current = 'play';
+          return false;
+        }
+      }
+      return false;
     }
-    
-    lastStateChangeRef.current = now;
-    setIsPlayingState(newState);
-    logger.debug(`usePlayerPlayback: Safe state change to ${newState}`);
+  };
+
+  // Пробуем автоматически снять mute несколькими попытками, чтобы сделать звук без клика
+  const scheduleAutoUnmute = (audioElement) => {
+    const attempts = [150, 400, 1000];
+    attempts.forEach((delay, idx) => {
+      setTimeout(() => {
+        try {
+          if (!audioElement) return;
+          if (!audioElement.muted) return; // уже со звуком
+          audioElement.muted = false;
+          if (!audioElement.paused && !audioElement.muted) {
+            // Успешно включили звук — отмечаем первый визит обработан
+            try { localStorage.setItem('autoplaySeen', '1'); } catch {}
+            firstVisitRef.current = false;
+          } else if (idx === attempts.length - 1 && typeof setShowPlayOverlay === 'function') {
+            // Не удалось — покажем оверлей для жеста
+            setShowPlayOverlay(true);
+          }
+        } catch {}
+      }, delay);
+    });
+  };
+  
+  // Нормализация URL для корректного сравнения
+  const normalizeUrl = (url) => {
+    if (!url) return '';
+    try {
+      return new URL(url, window.location.href).href;
+    } catch {
+      return url;
+    }
   };
 
   useEffect(() => {
@@ -89,24 +135,25 @@ const usePlayerPlayback = ({
       
       if (isReady) {
         // Аудио готово - сразу продолжаем воспроизведение
-        if (playAfterJump && wasPlaying) {
+        if (playAfterJump || wasPlaying) {
           // Дополнительная проверка: убеждаемся что аудио действительно на паузе
           if (audioRef.current.paused) {
-            playPromiseRef.current = audioRef.current.play();
-            playPromiseRef.current?.then(() => {
-              safeSetIsPlayingState(true);
+            playPromiseRef.current = attemptPlay(audioRef.current);
+            playPromiseRef.current?.then((ok) => {
+              if (!ok) return; 
+              setIsPlayingState(true);
               onPlayerStateChange?.({ isPlaying: true });
             }).catch(e => {
               if (e.name === 'NotAllowedError' && typeof setShowPlayOverlay === 'function') setShowPlayOverlay(true);
               if (e.name !== 'AbortError') console.error("Error playing after jump:", e);
-              safeSetIsPlayingState(false);
+              setIsPlayingState(false);
               onPlayerStateChange?.({ isPlaying: false });
             }).finally(() => {
               isSeekingRef.current = false;
             });
           } else {
             // Аудио уже воспроизводится - просто обновляем состояние
-            safeSetIsPlayingState(true);
+            setIsPlayingState(true);
             onPlayerStateChange?.({ isPlaying: true });
             isSeekingRef.current = false;
           }
@@ -124,24 +171,25 @@ const usePlayerPlayback = ({
         const onSeeked = () => {
           audioRef.current?.removeEventListener('seeked', onSeeked);
           
-          if (playAfterJump && wasPlaying) {
+          if (playAfterJump || wasPlaying) {
             // Дополнительная проверка перед воспроизведением
             if (audioRef.current.paused) {
-              playPromiseRef.current = audioRef.current.play();
-              playPromiseRef.current?.then(() => {
-                safeSetIsPlayingState(true);
+              playPromiseRef.current = attemptPlay(audioRef.current);
+              playPromiseRef.current?.then((ok) => {
+                if (!ok) return;
+                setIsPlayingState(true);
                 onPlayerStateChange?.({ isPlaying: true });
               }).catch(e => {
                 if (e.name === 'NotAllowedError' && typeof setShowPlayOverlay === 'function') setShowPlayOverlay(true);
                 if (e.name !== 'AbortError') console.error("Error playing after jump:", e);
-                safeSetIsPlayingState(false);
+                setIsPlayingState(false);
                 onPlayerStateChange?.({ isPlaying: false });
               }).finally(() => {
                 isSeekingRef.current = false;
               });
             } else {
               // Аудио уже воспроизводится
-              safeSetIsPlayingState(true);
+              setIsPlayingState(true);
               onPlayerStateChange?.({ isPlaying: true });
               isSeekingRef.current = false;
             }
@@ -150,7 +198,7 @@ const usePlayerPlayback = ({
             if (!audioRef.current.paused) {
               audioRef.current.pause();
             }
-            safeSetIsPlayingState(false);
+            setIsPlayingState(false);
             onPlayerStateChange?.({ isPlaying: false });
             isSeekingRef.current = false;
           }
@@ -176,248 +224,260 @@ const usePlayerPlayback = ({
   }, [jumpToTime, playAfterJump, jumpId]);
 
 
+  // Синхронизация команды play/pause с аудио элементом (React state -> Audio)
   useEffect(() => {
-    if (audioRef.current && !isSeekingRef.current) {
-      // Убираем дублирующий автозапуск - он будет в отдельном useEffect
-      if (isPlayingState && episodeData?.audio_url) {
-        if (audioRef.current.src !== episodeData.audio_url) {
-           audioRef.current.src = episodeData.audio_url;
-           audioRef.current.load();
-        }
-        if (audioRef.current.paused) {
-            if (playPromiseRef.current) {
-                playPromiseRef.current.catch(() => {});
-            }
-            playPromiseRef.current = audioRef.current.play();
-            playPromiseRef.current?.then(() => {
-              // no-op
-            }).catch(error => {
-              if (error.name !== 'AbortError') {
-                  console.error("Playback error:", error);
-                  toast({
-                  title: getLocaleString('playbackErrorTitle', currentLanguage),
-                  description: getLocaleString('playbackErrorDescription', currentLanguage),
-                  variant: "destructive",
-                  });
-              }
-              safeSetIsPlayingState(false);
-              onPlayerStateChange?.({isPlaying: false});
-            });
-        }
-      } else if (!isPlayingState) {
-        // Если состояние воспроизведения false, убеждаемся что аудио на паузе
-        if (!audioRef.current.paused) {
-            audioRef.current.pause();
-        }
-      }
-    }
-  }, [isPlayingState, episodeData?.audio_url, jumpToTime]);
+    const audioElement = audioRef.current;
+    if (!audioElement || isSeekingRef.current || isUpdatingPlayStateRef.current) return;
 
-  // Синхронизация состояния с реальным состоянием аудио элемента
+    // Если состояние изменилось на "играет", но аудио на паузе - запускаем
+    if (isPlayingState && audioElement.paused) {
+      logger.debug('usePlayerPlayback: State says playing but audio paused, resuming playback');
+      
+      if (playPromiseRef.current) {
+        playPromiseRef.current.catch(() => {});
+      }
+      
+      playPromiseRef.current = attemptPlay(audioElement);
+      playPromiseRef.current?.then((ok) => {
+        if (!ok) return;
+        logger.debug('usePlayerPlayback: Resume playback successful');
+      }).catch(error => {
+        if (error.name !== 'AbortError') {
+          console.error("usePlayerPlayback: Resume playback error:", error);
+          toast({
+            title: getLocaleString('playbackErrorTitle', currentLanguage),
+            description: getLocaleString('playbackErrorDescription', currentLanguage),
+            variant: "destructive",
+          });
+        }
+        // Обновляем состояние с защитой от цикла
+        isUpdatingPlayStateRef.current = true;
+        setIsPlayingState(false);
+        onPlayerStateChange?.({isPlaying: false});
+        setTimeout(() => { isUpdatingPlayStateRef.current = false; }, 50);
+      });
+    } 
+    // Если состояние изменилось на "пауза", но аудио играет - ставим на паузу
+    else if (!isPlayingState && !audioElement.paused) {
+      logger.debug('usePlayerPlayback: State says paused but audio playing, pausing');
+      audioElement.pause();
+    }
+  }, [isPlayingState]);
+
+  // Синхронизация состояния с реальным состоянием аудио элемента (Audio -> React state)
   useEffect(() => {
     const audioElement = audioRef.current;
     if (!audioElement) return;
 
     const handlePlay = () => {
       logger.debug('usePlayerPlayback: Audio play event, syncing state');
-      if (!isPlayingState) {
-        safeSetIsPlayingState(true);
+      if (!isPlayingState && !isUpdatingPlayStateRef.current) {
+        isUpdatingPlayStateRef.current = true;
+        setIsPlayingState(true);
         onPlayerStateChange?.({ isPlaying: true });
+        setTimeout(() => { isUpdatingPlayStateRef.current = false; }, 50);
       }
     };
 
     const handlePause = () => {
       logger.debug('usePlayerPlayback: Audio pause event, syncing state');
-      if (isPlayingState) {
-        safeSetIsPlayingState(false);
+      if (isPlayingState && !isUpdatingPlayStateRef.current) {
+        isUpdatingPlayStateRef.current = true;
+        setIsPlayingState(false);
         onPlayerStateChange?.({ isPlaying: false });
+        setTimeout(() => { isUpdatingPlayStateRef.current = false; }, 50);
       }
     };
 
     const handleEnded = () => {
       logger.debug('usePlayerPlayback: Audio ended event, syncing state');
-      if (isPlayingState) {
-        safeSetIsPlayingState(false);
+      if (isPlayingState && !isUpdatingPlayStateRef.current) {
+        isUpdatingPlayStateRef.current = true;
+        setIsPlayingState(false);
         onPlayerStateChange?.({ isPlaying: false });
+        setTimeout(() => { isUpdatingPlayStateRef.current = false; }, 50);
       }
-    };
-
-    // Дополнительная синхронизация при загрузке (только если есть рассинхронизация)
-    const handleLoadedData = () => {
-      logger.debug('usePlayerPlayback: Audio loaded, checking state sync');
-      
-      // Небольшая задержка чтобы дать время автозапуску сработать
-      setTimeout(() => {
-        if (audioElement.paused && isPlayingState) {
-          logger.debug('usePlayerPlayback: Fixing state sync - audio paused but state says playing');
-          safeSetIsPlayingState(false);
-          onPlayerStateChange?.({ isPlaying: false });
-        } else if (!audioElement.paused && !isPlayingState) {
-          logger.debug('usePlayerPlayback: Fixing state sync - audio playing but state says paused');
-          safeSetIsPlayingState(true);
-          onPlayerStateChange?.({ isPlaying: true });
-        }
-      }, 50); // 50ms задержка
     };
 
     audioElement.addEventListener('play', handlePlay);
     audioElement.addEventListener('pause', handlePause);
     audioElement.addEventListener('ended', handleEnded);
-    audioElement.addEventListener('loadeddata', handleLoadedData);
+
+    // Если был NotAllowedError и есть намерение воспроизвести (например, play=true),
+    // пробуем один раз запустить при первом пользовательском взаимодействии
+    const handleFirstUserGesture = () => {
+      if (autoplayPendingRef.current === 'play') {
+        autoplayPendingRef.current = null;
+        attemptPlay(audioElement).catch(() => {});
+      } else if (autoplayPendingRef.current === 'unmute') {
+        autoplayPendingRef.current = null;
+        try {
+          audioElement.muted = false;
+          if (audioElement.paused) {
+            attemptPlay(audioElement).catch(() => {});
+          }
+        } catch {}
+      }
+      window.removeEventListener('pointerdown', handleFirstUserGesture, true);
+      window.removeEventListener('click', handleFirstUserGesture, true);
+      window.removeEventListener('keydown', handleFirstUserGesture, true);
+      window.removeEventListener('touchstart', handleFirstUserGesture, true);
+      window.removeEventListener('wheel', handleFirstUserGesture, true);
+    };
+    window.addEventListener('pointerdown', handleFirstUserGesture, true);
+    window.addEventListener('click', handleFirstUserGesture, true);
+    window.addEventListener('keydown', handleFirstUserGesture, true);
+    window.addEventListener('touchstart', handleFirstUserGesture, true);
+    window.addEventListener('wheel', handleFirstUserGesture, { capture: true, passive: true });
 
     return () => {
       audioElement.removeEventListener('play', handlePlay);
       audioElement.removeEventListener('pause', handlePause);
       audioElement.removeEventListener('ended', handleEnded);
-      audioElement.removeEventListener('loadeddata', handleLoadedData);
+      window.removeEventListener('pointerdown', handleFirstUserGesture, true);
+      window.removeEventListener('click', handleFirstUserGesture, true);
+      window.removeEventListener('keydown', handleFirstUserGesture, true);
+      window.removeEventListener('touchstart', handleFirstUserGesture, true);
+      window.removeEventListener('wheel', handleFirstUserGesture, true);
     };
   }, [audioRef, isPlayingState, setIsPlayingState, onPlayerStateChange]);
 
-  // Автоматический старт воспроизведения при загрузке нового эпизода
+  // Единственный эффект автозапуска при смене эпизода
   useEffect(() => {
-    if (audioRef.current && episodeData?.audio_url && !isSeekingRef.current) {
-      // Если это новый эпизод (src изменился), запускаем воспроизведение
-      if (audioRef.current.src !== episodeData.audio_url) {
-        audioRef.current.src = episodeData.audio_url;
-        audioRef.current.load();
-        
-        // Ждем загрузки метаданных перед воспроизведением
-        const handleCanPlay = () => {
-          audioRef.current?.removeEventListener('canplay', handleCanPlay);
-          logger.debug('usePlayerPlayback: canplay event fired, checking for jump', { jumpToTime, playAfterJump });
-          
-          // Если есть активный переход, выполняем его после загрузки
-          if (jumpToTime !== null && jumpToTime !== undefined && !lastJumpIdProcessedRef?.current) {
-            logger.debug('usePlayerPlayback: Performing delayed jump after canplay', { jumpToTime, playAfterJump });
-            const time = parseFloat(jumpToTime);
-            if (!isNaN(time)) {
-              audioRef.current.currentTime = time;
-              if (playAfterJump && audioRef.current.paused) {
-                playPromiseRef.current = audioRef.current.play();
-                playPromiseRef.current?.then(() => {
-                  logger.debug('usePlayerPlayback: Delayed jump playback started');
-                  safeSetIsPlayingState(true);
-                  onPlayerStateChange?.({ isPlaying: true });
-                }).catch(error => {
-                  if (error.name === 'NotAllowedError' && typeof setShowPlayOverlay === 'function') setShowPlayOverlay(true);
-                  if (error.name !== 'AbortError') {
-                    console.error("Delayed jump play error:", error);
-                  }
-                });
-              }
-            }
-          } else {
-            // Автозапуск для нового эпизода - всегда пытаемся запустить
-            logger.debug('usePlayerPlayback: Auto-starting playback for new episode');
-            playPromiseRef.current = audioRef.current.play();
-            playPromiseRef.current?.then(() => {
-              logger.debug('usePlayerPlayback: Auto-playback started successfully');
-              safeSetIsPlayingState(true);
-              onPlayerStateChange?.({ isPlaying: true });
-            }).catch(error => {
-              if (error.name === 'NotAllowedError' && typeof setShowPlayOverlay === 'function') setShowPlayOverlay(true);
-              if (error.name !== 'AbortError') {
-                console.log("Auto-play blocked by browser (this is normal):", error.message);
-              }
-              // Не устанавливаем состояние в false при блокировке автозапуска
-            });
-          }
-        };
-        
-        audioRef.current.addEventListener('canplay', handleCanPlay);
-      }
-    }
-  }, [episodeData?.audio_url, isPlayingState, jumpToTime, playAfterJump]);
-
-  // Дополнительный автозапуск при загрузке нового эпизода
-  useEffect(() => {
-    if (audioRef.current && episodeData?.audio_url && !isSeekingRef.current) {
-      // Проверяем, что это действительно новый эпизод
-      const isNewEpisode = audioRef.current.src !== episodeData.audio_url;
+    if (!audioRef.current || !episodeData?.audio_url || isSeekingRef.current) return;
+    
+    const audioElement = audioRef.current;
+    const newUrl = episodeData.audio_url;
+    const normalizedNewUrl = normalizeUrl(newUrl);
+    const normalizedCurrentUrl = normalizeUrl(audioElement.src);
+    
+    // Проверяем, изменился ли URL эпизода (с нормализацией для точного сравнения)
+    const isNewEpisode = normalizedCurrentUrl !== normalizedNewUrl && normalizedNewUrl !== lastLoadedUrlRef.current;
+    
+    if (isNewEpisode) {
+      logger.debug('usePlayerPlayback: New episode detected', { 
+        newUrl: normalizedNewUrl, 
+        currentUrl: normalizedCurrentUrl 
+      });
       
-      if (isNewEpisode) {
-        logger.debug('usePlayerPlayback: New episode detected, setting up auto-play');
-        
-        // Устанавливаем src и загружаем
-        audioRef.current.src = episodeData.audio_url;
-        audioRef.current.load();
-        
-        // Ждем готовности и запускаем только один раз
-        const handleAutoPlay = () => {
-          audioRef.current?.removeEventListener('canplay', handleAutoPlay);
-          
-          // Дополнительная проверка чтобы избежать конфликтов
-          if (audioRef.current && !audioRef.current.paused) {
-            logger.debug('usePlayerPlayback: Audio already playing, skipping auto-play');
-            return;
-          }
-          
-          logger.debug('usePlayerPlayback: Auto-playing new episode');
-          
-          const playPromise = audioRef.current.play();
-          playPromise?.then(() => {
-            logger.debug('usePlayerPlayback: New episode auto-play successful');
-            safeSetIsPlayingState(true);
-            onPlayerStateChange?.({ isPlaying: true });
-          }).catch(error => {
-            if (error.name === 'NotAllowedError') {
-              logger.debug('usePlayerPlayback: New episode auto-play blocked by browser');
-              if (typeof setShowPlayOverlay === 'function') setShowPlayOverlay(true);
-            } else if (error.name !== 'AbortError') {
-              console.error("New episode auto-play error:", error);
-            }
-          });
-        };
-        
-        audioRef.current.addEventListener('canplay', handleAutoPlay);
-      }
-    }
-  }, [episodeData?.slug]); // Срабатывает только при смене эпизода
-
-  // Автозапуск при первоначальной загрузке эпизода
-  useEffect(() => {
-    if (audioRef.current && episodeData?.audio_url && !isSeekingRef.current) {
-      // Проверяем что это первый запуск (нет предыдущего src)
-      const isFirstLoad = !audioRef.current.src || audioRef.current.src === '';
+      console.log('[usePlayerPlayback] Setting new audio URL:', newUrl);
       
-      if (isFirstLoad) {
-        logger.debug('usePlayerPlayback: First load detected, setting up auto-play');
-        
-        // Устанавливаем src и загружаем
-        audioRef.current.src = episodeData.audio_url;
-        audioRef.current.load();
-        
-        // Ждем готовности и запускаем
-        const handleFirstAutoPlay = () => {
-          audioRef.current?.removeEventListener('canplay', handleFirstAutoPlay);
-          
-          // Дополнительная проверка чтобы избежать конфликтов
-          if (audioRef.current && !audioRef.current.paused) {
-            logger.debug('usePlayerPlayback: Audio already playing on first load, skipping auto-play');
-            return;
-          }
-          
-          logger.debug('usePlayerPlayback: Auto-playing on first load');
-          
-          const playPromise = audioRef.current.play();
-          playPromise?.then(() => {
-            logger.debug('usePlayerPlayback: First load auto-play successful');
-            safeSetIsPlayingState(true);
-            onPlayerStateChange?.({ isPlaying: true });
-          }).catch(error => {
-            if (error.name === 'NotAllowedError') {
-              logger.debug('usePlayerPlayback: First load auto-play blocked by browser');
-              if (typeof setShowPlayOverlay === 'function') setShowPlayOverlay(true);
-            } else if (error.name !== 'AbortError') {
-              console.error("First load auto-play error:", error);
-            }
-          });
-        };
-        
-        audioRef.current.addEventListener('canplay', handleFirstAutoPlay);
+      // Запоминаем загруженный URL
+      lastLoadedUrlRef.current = normalizedNewUrl;
+      
+      // Устанавливаем новый src
+      audioElement.src = newUrl;
+      console.log('[usePlayerPlayback] audio.src set to:', audioElement.src);
+      audioElement.load();
+      console.log('[usePlayerPlayback] Called audio.load()');
+      
+      // Обновляем время последнего доступа в кеше для приоритизации
+      if (typeof window !== 'undefined' && window.audioCacheService) {
+        window.audioCacheService.updateLastAccessed(newUrl).catch(err => {
+          logger.debug('usePlayerPlayback: Failed to update cache access time', err);
+        });
       }
+      
+      // На первом визите принудительно включаем mute, чтобы обойти блокировку
+      if (firstVisitRef.current) {
+        try { audioElement.muted = true; } catch {}
+      }
+
+      // Создаем обработчики для быстрого автозапуска
+      let autoplayAttempted = false;
+      
+      // Обработчик для быстрого старта (как только метаданные загружены)
+      const handleLoadedMetadata = () => {
+        audioElement.removeEventListener('loadedmetadata', handleLoadedMetadata);
+        
+        if (autoplayAttempted) return;
+        autoplayAttempted = true;
+        
+        logger.debug('usePlayerPlayback: Metadata loaded, attempting quick autoplay');
+        
+        // Проверяем, не начало ли уже воспроизводиться
+        if (!audioElement.paused) {
+          logger.debug('usePlayerPlayback: Already playing, skipping autoplay');
+          isUpdatingPlayStateRef.current = true;
+          setIsPlayingState(true);
+          onPlayerStateChange?.({ isPlaying: true });
+          setTimeout(() => { isUpdatingPlayStateRef.current = false; }, 50);
+          return;
+        }
+        
+        // Пытаемся запустить воспроизведение сразу
+        const playPromise = attemptPlay(audioElement);
+        playPromise?.then((ok) => {
+          if (!ok) return;
+          logger.debug('usePlayerPlayback: Quick autoplay successful');
+          isUpdatingPlayStateRef.current = true;
+          setIsPlayingState(true);
+          onPlayerStateChange?.({ isPlaying: true });
+          setTimeout(() => { isUpdatingPlayStateRef.current = false; }, 50);
+          // Пытаемся автоматически включить звук, если запустили в mute
+          if (firstVisitRef.current || autoplayPendingRef.current === 'unmute') {
+            scheduleAutoUnmute(audioElement);
+          }
+        }).catch(error => {
+          if (error.name === 'NotAllowedError') {
+            logger.debug('usePlayerPlayback: Autoplay blocked by browser - user interaction required');
+            if (typeof setShowPlayOverlay === 'function') setShowPlayOverlay(true);
+          } else if (error.name !== 'AbortError') {
+            console.error("usePlayerPlayback: Autoplay error:", error);
+          }
+          // Не обновляем состояние при блокировке автозапуска
+        });
+      };
+      
+      // Fallback обработчик если loadedmetadata не сработал
+      const handleCanPlay = () => {
+        audioElement.removeEventListener('canplay', handleCanPlay);
+        
+        if (autoplayAttempted) return;
+        autoplayAttempted = true;
+        
+        logger.debug('usePlayerPlayback: Can play event, attempting autoplay');
+        
+        if (!audioElement.paused) {
+          logger.debug('usePlayerPlayback: Already playing, skipping autoplay');
+          isUpdatingPlayStateRef.current = true;
+          setIsPlayingState(true);
+          onPlayerStateChange?.({ isPlaying: true });
+          setTimeout(() => { isUpdatingPlayStateRef.current = false; }, 50);
+          return;
+        }
+        
+        const playPromise = attemptPlay(audioElement);
+        playPromise?.then((ok) => {
+          if (!ok) return;
+          logger.debug('usePlayerPlayback: Fallback autoplay successful');
+          isUpdatingPlayStateRef.current = true;
+          setIsPlayingState(true);
+          onPlayerStateChange?.({ isPlaying: true });
+          setTimeout(() => { isUpdatingPlayStateRef.current = false; }, 50);
+          if (firstVisitRef.current || autoplayPendingRef.current === 'unmute') {
+            scheduleAutoUnmute(audioElement);
+          }
+        }).catch(error => {
+          if (error.name === 'NotAllowedError') {
+            logger.debug('usePlayerPlayback: Fallback autoplay blocked');
+            if (typeof setShowPlayOverlay === 'function') setShowPlayOverlay(true);
+          } else if (error.name !== 'AbortError') {
+            console.error("usePlayerPlayback: Fallback autoplay error:", error);
+          }
+        });
+      };
+      
+      audioElement.addEventListener('loadedmetadata', handleLoadedMetadata, { once: true });
+      audioElement.addEventListener('canplay', handleCanPlay, { once: true });
+      
+      // Cleanup функция для удаления обработчиков, если компонент размонтируется
+      return () => {
+        audioElement.removeEventListener('loadedmetadata', handleLoadedMetadata);
+        audioElement.removeEventListener('canplay', handleCanPlay);
+      };
     }
-  }, [episodeData?.audio_url]); // Срабатывает при загрузке аудио URL
+  }, [episodeData?.slug, episodeData?.audio_url]); // Зависим только от slug и audio_url
 
 };
 

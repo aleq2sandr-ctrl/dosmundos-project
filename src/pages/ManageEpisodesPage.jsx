@@ -1,5 +1,5 @@
 import React, { useCallback, useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -31,6 +31,8 @@ import LanguageCard from '@/components/manage/LanguageCard';
  */
 const ManageEpisodesPage = ({ currentLanguage }) => {
   const navigate = useNavigate();
+  const { lang } = useParams();
+  const langPrefix = lang || currentLanguage || 'ru';
   const {
     filesToProcess,
     isProcessingAll,
@@ -65,7 +67,7 @@ const ManageEpisodesPage = ({ currentLanguage }) => {
     <div className="container mx-auto p-4 max-w-6xl bg-slate-800/70 rounded-xl shadow-2xl border border-slate-700/50">
       <Button 
         variant="outline" 
-        onClick={() => navigate('/episodes')} 
+        onClick={() => navigate(`/${langPrefix}/episodes`)} 
         className="mb-6 bg-slate-700 hover:bg-slate-600 border-slate-600 text-slate-300"
       >
         <ArrowLeft className="mr-2 h-4 w-4" /> {getLocaleString('backToEpisodes', currentLanguage)}
@@ -894,13 +896,20 @@ const EpisodeManagementSection = ({ currentLanguage }) => {
     setLoadingQuestionsFromDB(prev => new Set(prev).add(`${episode.slug}-${episode.lang}`));
 
     try {
-      // Используем сервис timeOldService для извлечения вопросов
-      const questions = await timeOldService.loadQuestionsFromTimeOld(episode.slug, episode.lang);
+      // Подготавливаем объект эпизода для метода
+      const episodeData = {
+        episodeSlug: episode.slug,
+        lang: episode.lang,
+        parsedDate: episode.slug // slug используется как дата (формат YYYY-MM-DD)
+      };
+
+      // Используем правильный метод для загрузки и сохранения
+      const result = await timeOldService.loadAndSaveQuestionsForEpisode(episodeData);
 
       // Обновляем локальное состояние
       setEpisodes(prev => prev.map(ep =>
         ep.slug === episode.slug && ep.lang === episode.lang
-          ? { ...ep, questionsCount: questions.length }
+          ? { ...ep, questionsCount: result.questionsCount }
           : ep
       ));
 
@@ -912,7 +921,7 @@ const EpisodeManagementSection = ({ currentLanguage }) => {
 
       toast({
         title: getLocaleString('questionsLoaded', currentLanguage),
-        description: getPluralizedLocaleString('questionsLoadedFromDB', currentLanguage, questions.length)
+        description: result.message || getPluralizedLocaleString('questionsLoadedFromDB', currentLanguage, result.questionsCount)
       });
 
     } catch (error) {
@@ -1989,7 +1998,7 @@ const EpisodeManagementSection = ({ currentLanguage }) => {
                 <PenLine className="h-6 w-6 mr-2" />Delete Transcript?
               </AlertDialogTitle>
               <AlertDialogDescription className="text-slate-300">
-                Are you sure you want to delete the transcript for episode "{episodeToDeleteTranscript?.slug}" ({episodeToDeleteTranscript?.lang.toUpperCase()})? 
+                Are you sure you want to delete the transcript for episode &quot;{episodeToDeleteTranscript?.slug}&quot; ({episodeToDeleteTranscript?.lang.toUpperCase()})? 
                 The transcript will be deleted and transcription will start again.
                 <br/><span className="font-semibold text-yellow-400 mt-2 block">{getLocaleString('actionIrreversible', currentLanguage)}</span>
               </AlertDialogDescription>
@@ -2138,7 +2147,7 @@ const EpisodeLanguageCard = ({
                 <div
                   className="text-xs text-purple-300 truncate cursor-pointer hover:text-purple-200 hover:underline max-w-[100px]"
                   title={`Open episode: ${episode.slug}`}
-                  onClick={() => navigate(`/episode/${episode.slug}?lang=${episode.lang}`)}
+                  onClick={() => navigate(`/${episode.lang}/episode/${episode.slug}`)}
                 >
                   {episode.slug}
                 </div>
@@ -2147,7 +2156,7 @@ const EpisodeLanguageCard = ({
                   variant="ghost"
                   onClick={(e) => {
                     e.stopPropagation();
-                    window.open(`/episode/${episode.slug}?lang=${episode.lang}`, '_blank');
+                    window.open(`/${episode.lang}/episode/${episode.slug}`, '_blank');
                   }}
                   className="h-5 w-5 p-0 text-purple-400 hover:text-purple-300 hover:bg-purple-500/20"
                   title={getLocaleString('openInNewWindow', currentLanguage)}

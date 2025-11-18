@@ -134,19 +134,31 @@ class OfflineDataService {
   // Получение транзакции
   async getTransaction(storeNames, mode = 'readonly') {
     try {
+      // Если уже используем fallback хранилище, возвращаем null
+      if (this.useFallback) {
+        console.log('Using fallback storage');
+        return null;
+      }
+
       // Если база данных не инициализирована или закрыта, инициализируем её
       if (!this.db || this.db.readyState !== 'open') {
         console.log('🔄 Initializing or reinitializing database...');
-        await this.init();
+        const initResult = await this.init();
+
+        // Если init() вернул null, значит перешли на fallback
+        if (initResult === null) {
+          console.log('Using fallback storage after initialization');
+          return null;
+        }
       }
 
       // Проверяем успешность инициализации
       if (!this.db || this.db.readyState !== 'open') {
-        if (this.useFallback) {
-          console.log('Using fallback storage');
-          return null;
-        }
-        throw new Error('Database not initialized properly');
+        console.warn('Database not available after initialization, switching to fallback storage');
+        this.useFallback = true;
+        this.db = null;
+        console.log('Using fallback storage');
+        return null;
       }
 
       // Проверяем, что все хранилища существуют

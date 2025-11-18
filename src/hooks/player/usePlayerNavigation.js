@@ -80,7 +80,7 @@ const usePlayerNavigation = ({
         return; 
       }
     }
-  }, [internalQuestions, currentTimeState, audioRef, onQuestionSelectJump, currentLanguage, toast]);
+  }, [internalQuestions, currentTimeState, isPlayingState, onQuestionSelectJump, currentLanguage, toast]);
 
   const seekAudio = useCallback((time, playAfterSeek = false) => {
      onQuestionSelectJump(time, null, playAfterSeek);

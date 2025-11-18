@@ -17,7 +17,6 @@ const InstantEpisodesPage = ({ currentLanguage, onLanguageChange }) => {
   const [episodeQuestionsCount, setEpisodeQuestionsCount] = useState({});
 
   const [availableYears, setAvailableYears] = useState([]);
-  const [availableMonths, setAvailableMonths] = useState([]);
   const [selectedYear, setSelectedYear] = useState(null);
   const [selectedMonth, setSelectedMonth] = useState(null);
 
@@ -101,10 +100,17 @@ const InstantEpisodesPage = ({ currentLanguage, onLanguageChange }) => {
     setLoading(true);
     
     try {
+      console.log('🔍 [InstantEpisodesPage] Загрузка данных из Supabase...');
       const { data: episodesData, error: episodesError } = await supabase
         .from('episodes')
         .select('slug, title, lang, audio_url, duration, date, created_at, file_has_lang_suffix, r2_object_key, r2_bucket_name')
         .order('date', { ascending: false });
+
+      console.log('📊 [InstantEpisodesPage] Результат запроса episodes:', { 
+        dataCount: episodesData?.length || 0, 
+        error: episodesError,
+        data: episodesData?.slice(0, 3) // Первые 3 записи для проверки
+      });
 
       if (episodesError) throw episodesError;
       
@@ -112,6 +118,11 @@ const InstantEpisodesPage = ({ currentLanguage, onLanguageChange }) => {
         .from('questions')
         .select('episode_slug, id, title, lang, time')
         .order('time', { ascending: true }); 
+      
+      console.log('📊 [InstantEpisodesPage] Результат запроса questions:', { 
+        dataCount: questionsData?.length || 0, 
+        error: questionsError
+      });
       
       if (questionsError) throw questionsError;
 
@@ -161,19 +172,28 @@ const InstantEpisodesPage = ({ currentLanguage, onLanguageChange }) => {
   const loadQuestionsInBackground = async (episodesList) => {
     try {
       const allQuestions = [];
-      
+
       for (const episode of episodesList) {
         for (const lang of ['ru', 'es', 'en', 'de', 'fr', 'pl']) {
-          const cachedQuestions = await cacheIntegration.loadPlayerPageData(episode.slug, currentLanguage);
+          const cachedQuestions = await cacheIntegration.loadPlayerPageData(episode.slug, lang);
           if (cachedQuestions.questions) {
             allQuestions.push(...cachedQuestions.questions);
           }
         }
       }
       
+      // Убираем дубликаты вопросов (по id + lang + episode_slug)
+      const uniqueQuestions = allQuestions.filter((question, index, self) =>
+        index === self.findIndex(q =>
+          q.id === question.id &&
+          q.lang === question.lang &&
+          q.episode_slug === question.episode_slug
+        )
+      );
+
       // Обновляем счетчики вопросов
-      updateQuestionsCount(episodesList, allQuestions);
-      setAllQuestions(allQuestions);
+      updateQuestionsCount(episodesList, uniqueQuestions);
+      setAllQuestions(uniqueQuestions);
       
       console.log('✅ Background questions loaded:', allQuestions.length);
     } catch (err) {
@@ -202,14 +222,22 @@ const InstantEpisodesPage = ({ currentLanguage, onLanguageChange }) => {
 
   // Мгновенная загрузка данных - сначала показываем интерфейс, потом подгружаем данные
   const loadDataInstantly = useCallback(async () => {
-    console.log('🚀 Instant loading started - showing UI immediately');
+    console.log('🚀 [InstantEpisodesPage] Instant loading started - showing UI immediately');
+    console.log('🌐 [InstantEpisodesPage] Current language:', currentLanguage);
     
     try {
       // Сначала пытаемся загрузить из кэша мгновенно
+      console.log('📦 [InstantEpisodesPage] Проверка кэша...');
       const cachedData = await cacheIntegration.loadEpisodesPageData(currentLanguage);
       
+      console.log('📦 [InstantEpisodesPage] Результат кэша:', {
+        hasData: !!cachedData,
+        episodesCount: cachedData?.episodes?.length || 0,
+        questionsCount: cachedData?.questions?.length || 0
+      });
+      
       if (cachedData && cachedData.episodes.length > 0) {
-        console.log('📦 Using cached data instantly:', cachedData.episodes.length);
+        console.log('📦 [InstantEpisodesPage] Using cached data instantly:', cachedData.episodes.length);
         await processEpisodesData(cachedData.episodes, true);
         
         // Загружаем свежие данные в фоне
@@ -218,11 +246,11 @@ const InstantEpisodesPage = ({ currentLanguage, onLanguageChange }) => {
       }
 
       // Если кэша нет, показываем пустой интерфейс и загружаем в фоне
-      console.log('🔄 No cache found, loading fresh data in background');
+      console.log('🔄 [InstantEpisodesPage] No cache found, loading fresh data in background');
       loadFreshData();
       
     } catch (err) {
-      console.error('❌ Error in instant loading:', err);
+      console.error('❌ [InstantEpisodesPage] Error in instant loading:', err);
       // Не показываем ошибку пользователю - просто логируем
     }
   }, [currentLanguage, loadFreshData, loadFreshDataInBackground, processEpisodesData]);
@@ -244,16 +272,35 @@ const InstantEpisodesPage = ({ currentLanguage, onLanguageChange }) => {
         // Используем стабильную функцию для избежания бесконечных ререндеров
         loadFreshDataInBackground();
       })
-      .subscribe();
+      .subscribe((status, err) => {
+        if (err) {
+          console.debug('Realtime subscription error:', err.message);
+        }
+      });
 
     return () => {
-      supabase.removeChannel(channel);
+      try {
+        supabase.removeChannel(channel);
+      } catch (error) {
+        console.debug('Error removing channel:', error.message);
+      }
     };
   }, [loadDataInstantly, loadFreshDataInBackground]);
 
-  // Фильтрация по месяцам
+  // Перезагрузка данных при смене языка
   useEffect(() => {
-    if (selectedYear) {
+    if (hasInitialized.current) {
+      // Сбрасываем фильтры по времени при смене языка
+      setSelectedYear(null);
+      setSelectedMonth(null);
+      // Перезагружаем данные мгновенно для нового языка
+      loadDataInstantly();
+    }
+  }, [currentLanguage, loadDataInstantly]);
+
+  // Фильтрация по месяцам - используем useMemo для избежания бесконечных ререндеров
+  const availableMonths = useMemo(() => {
+    if (selectedYear && episodes.length > 0) {
       const months = new Set();
       episodes.forEach(ep => {
         if (ep.date && new Date(ep.date).getFullYear().toString() === selectedYear) {
@@ -261,12 +308,10 @@ const InstantEpisodesPage = ({ currentLanguage, onLanguageChange }) => {
         }
       });
       const sortedMonths = Array.from(months).sort((a,b) => a - b);
-      setAvailableMonths(sortedMonths.map(m => ({ value: (m + 1).toString(), labelKey: monthLabels[m] })));
-    } else {
-      setAvailableMonths([]);
-      setSelectedMonth(null);
+      return sortedMonths.map(m => ({ value: (m + 1).toString(), labelKey: monthLabels[m] }));
     }
-  }, [selectedYear, episodes, monthLabels]);
+    return [];
+  }, [selectedYear, episodes.length, monthLabels]);
   
   const handleResetFilters = () => {
     setSelectedYear(null);

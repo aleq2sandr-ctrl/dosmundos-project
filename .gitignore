@@ -2,9 +2,10 @@
 node_modules/
 dist/
 build/
-.vercel/
 .env
-.env.*
+.env.local
+.env.*.local
+!.env.example
 
 # System & IDE
 .DS_Store
@@ -58,6 +59,25 @@ Searches/
 # Cursor/Editor
 .cursor/
 
+# Migration data
+supabase-export/
+migration-scripts/node_modules/
+vps-deployment/node_modules/
+vps-deployment/.env
+vps-deployment/logs/
+
+# Archive and temp files
+docs-archive/
+temp-scripts/
+api-archive/
+src/lib/deprecated/
+src/pages/deprecated/
+
+# Credentials (IMPORTANT!)
+SUPABASE_CREDENTIALS.txt
+*CREDENTIALS*.txt
+*_CREDENTIALS.txt
+
 # Other
 *.bak
 *.old
@@ -79,4 +99,3 @@ AndroidStudioProjects/
 uploads/
 depcheck-result.json
 eslint-report.json
-.vercel

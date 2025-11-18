@@ -1,254 +1,141 @@
-import { supabase } from '@/lib/supabaseClient';
+// Упрощённый conflictChecker - без проверки конфликтов S3/Hostinger
+// Старая версия перемещена в deprecated/
 
-class ConflictChecker {
-  /**
-   * Проверяет конфликты для файла в очереди
-   * @param {Object} fileItem - Элемент файла из очереди
-   * @returns {Promise<Object>} Информация о конфликтах
-   */
-  async checkFileConflicts(fileItem) {
-    const { episodeSlug, lang, r2ObjectKey } = fileItem;
-    
-    const conflicts = {
+import { supabase } from '@/lib/supabaseClient';
+import storageRouter from '@/lib/storageRouter';
+
+/**
+ * Проверка конфликтов имён файлов (упрощённая версия)
+ */
+export const checkForConflicts = async (filename) => {
+  // В упрощённой версии просто возвращаем что конфликтов нет
+  // Файлы автоматически переименовываются на сервере при загрузке
+  return {
+    hasConflict: false,
+    suggestedName: filename
+  };
+};
+
+/**
+ * Проверка существования файла
+ */
+export const fileExists = async (filename) => {
+  try {
+    const res = await storageRouter.checkFileExists(filename);
+    return !!res.exists;
+  } catch (_e) {
+    return false;
+  }
+};
+
+/**
+ * Проверка существования файла в хранилище
+ */
+export const checkFileExistsInStorage = async (fileKey) => {
+  try {
+    const fileInfo = await storageRouter.getFileInfo(fileKey);
+    return {
+      exists: true,
+      url: fileInfo.url,
+      size: fileInfo.size,
+      source: 'storage'
+    };
+  } catch (error) {
+    return {
+      exists: false,
+      url: null,
+      size: null,
+      source: null
+    };
+  }
+};
+
+/**
+ * Проверка конфликтов файла (файл и БД)
+ */
+export const checkFileConflicts = async (item) => {
+  const { episodeSlug, lang, file } = item;
+  
+  if (!episodeSlug) {
+    return {
       hasFileConflict: false,
       hasDBConflict: false,
-      fileConflict: null,
-      dbConflict: null,
-      overwriteOptions: {
-        overwriteServerFile: false,
-        overwriteEpisodeInfo: false,
-        overwriteTranscript: false,
-        overwriteQuestions: false
-      }
+      dbConflict: null
     };
-
-    try {
-      // 1. Проверяем конфликт с файловым хранилищем
-      if (r2ObjectKey) {
-        const fileInfo = await this.checkFileExistsInStorage(r2ObjectKey);
-        if (fileInfo.exists) {
-          conflicts.hasFileConflict = true;
-          conflicts.fileConflict = {
-            type: 'file',
-            message: `Файл уже существует в ${fileInfo.source === 'database' ? 'БД' : 'Hostinger'}`,
-            r2ObjectKey: r2ObjectKey,
-            url: fileInfo.url,
-            source: fileInfo.source,
-            size: fileInfo.size
-          };
-        }
-      }
-
-      // 2. Проверяем конфликты с базой данных
-      const dbConflicts = await this.checkDBConflicts(episodeSlug, lang);
-      if (dbConflicts.hasConflicts) {
-        conflicts.hasDBConflict = true;
-        conflicts.dbConflict = dbConflicts;
-      }
-
-      return conflicts;
-    } catch (error) {
-      console.error('Error checking conflicts:', error);
-      throw error;
-    }
   }
 
-  /**
-   * Проверяет существование файла в хранилище
-   * @param {string} r2ObjectKey - Ключ файла в R2
-   * @returns {Promise<Object>} { exists: boolean, url: string, size: number }
-   */
-  async checkFileExistsInStorage(r2ObjectKey) {
-    try {
-      // Сначала проверяем через существующий эпизод в БД
-      const { data: episodeData, error: episodeError } = await supabase
-        .from('episodes')
-        .select('r2_object_key, audio_url')
-        .eq('r2_object_key', r2ObjectKey)
-        .maybeSingle();
-
-      if (episodeError) {
-        console.warn('Error checking file existence in DB:', episodeError);
-      }
-
-      if (episodeData) {
-        return {
-          exists: true,
-          url: episodeData.audio_url,
-          source: 'database',
-          size: null // Размер не хранится в БД
-        };
-      }
-
-      // Если не найден в БД, проверяем напрямую в R2/Hostinger
-      try {
-        const r2Service = await import('@/lib/r2Service');
-        const fileInfo = await r2Service.default.checkFileExists(r2ObjectKey);
-        
-        if (fileInfo.exists) {
-          return {
-            exists: true,
-            url: fileInfo.url,
-            source: 'hostinger',
-            size: fileInfo.size
-          };
-        }
-      } catch (r2Error) {
-        console.warn('Error checking file in Hostinger:', r2Error);
-      }
-
-      return {
-        exists: false,
-        url: null,
-        source: 'none',
-        size: null
-      };
-    } catch (error) {
-      console.error('Error checking file in storage:', error);
-      return {
-        exists: false,
-        url: null,
-        source: 'error',
-        size: null
-      };
+  const conflicts = {
+    // Больше не проверяем существование файла на сервере — сервер сам переименует при необходимости
+    hasFileConflict: false,
+    hasDBConflict: false,
+    dbConflict: {
+      episode: { exists: false },
+      transcript: { exists: false },
+      questions: { exists: false }
     }
-  }
+  };
 
-  /**
-   * Проверяет конфликты с базой данных
-   * @param {string} episodeSlug - Slug эпизода
-   * @param {string} lang - Язык
-   * @returns {Promise<Object>}
-   */
-  async checkDBConflicts(episodeSlug, lang) {
-    const conflicts = {
-      hasConflicts: false,
-      episode: null,
-      transcript: null,
-      questions: null
-    };
+  try {
+    // Проверка существования эпизода в БД
+    const { data: episode, error: episodeError } = await supabase
+      .from('episodes')
+      .select('slug, lang')
+      .eq('slug', episodeSlug)
+      .eq('lang', lang)
+      .maybeSingle();
 
-    try {
-      // Проверяем эпизод
-      const { data: episode, error: episodeError } = await supabase
-        .from('episodes')
-        .select('*')
-        .eq('slug', episodeSlug)
+    if (!episodeError && episode) {
+      conflicts.hasDBConflict = true;
+      conflicts.dbConflict.episode.exists = true;
+    }
+
+    // Проверка существования транскрипта
+    if (conflicts.hasDBConflict) {
+      const { data: transcript, error: transcriptError } = await supabase
+        .from('transcripts')
+        .select('episode_slug, lang')
+        .eq('episode_slug', episodeSlug)
         .eq('lang', lang)
         .maybeSingle();
 
-      if (episodeError) {
-        console.warn('Error checking episode conflict:', episodeError);
-        return conflicts;
+      if (!transcriptError && transcript) {
+        conflicts.dbConflict.transcript.exists = true;
       }
 
-      if (episode) {
-        conflicts.hasConflicts = true;
-        conflicts.episode = {
-          exists: true,
-          title: episode.title,
-          date: episode.date,
-          audio_url: episode.audio_url
-        };
+      // Проверка существования вопросов
+      const { data: questions, error: questionsError } = await supabase
+        .from('questions')
+        .select('id')
+        .eq('episode_slug', episodeSlug)
+        .eq('lang', lang)
+        .limit(1);
 
-        // Проверяем транскрипт
-        const { data: transcript, error: transcriptError } = await supabase
-          .from('transcripts')
-          .select('status, updated_at')
-          .eq('episode_slug', episodeSlug)
-          .eq('lang', lang)
-          .maybeSingle();
-
-        if (!transcriptError && transcript) {
-          conflicts.transcript = {
-            exists: true,
-            status: transcript.status,
-            updated_at: transcript.updated_at
-          };
-        }
-
-        // Проверяем вопросы
-        const { data: questions, error: questionsError } = await supabase
-          .from('questions')
-          .select('id')
-          .eq('episode_slug', episodeSlug)
-          .eq('lang', lang);
-
-        if (!questionsError && questions && questions.length > 0) {
-          conflicts.questions = {
-            exists: true,
-            count: questions.length
-          };
-        }
-      }
-
-      return conflicts;
-    } catch (error) {
-      console.error('Error checking DB conflicts:', error);
-      return conflicts;
-    }
-  }
-
-  /**
-   * Генерирует сообщение о конфликтах для пользователя
-   * @param {Object} conflicts - Информация о конфликтах
-   * @returns {string}
-   */
-  generateConflictMessage(conflicts) {
-    const messages = [];
-
-    if (conflicts.hasFileConflict) {
-      messages.push('📁 Файл уже существует в хранилище');
-    }
-
-    if (conflicts.hasDBConflict) {
-      const db = conflicts.dbConflict;
-      if (db.episode?.exists) {
-        messages.push('🗃️ Эпизод уже существует в БД');
-      }
-      if (db.transcript?.exists) {
-        messages.push('📝 Транскрипт уже существует');
-      }
-      if (db.questions?.exists) {
-        messages.push(`❓ Вопросы уже существуют (${db.questions.count})`);
+      if (!questionsError && questions && questions.length > 0) {
+        conflicts.dbConflict.questions.exists = true;
       }
     }
 
-    return messages.length > 0 ? messages.join('\n') : null;
-  }
-
-  /**
-   * Определяет рекомендуемые настройки замены на основе конфликтов
-   * @param {Object} conflicts - Информация о конфликтах
-   * @returns {Object}
-   */
-  getRecommendedOverwriteSettings(conflicts) {
-    const settings = {
-      overwriteServerFile: false,
-      overwriteEpisodeInfo: false,
-      overwriteTranscript: false,
-      overwriteQuestions: false
+    return conflicts;
+  } catch (error) {
+    console.warn('Error checking conflicts:', error);
+    // В случае ошибки возвращаем пустые конфликты
+    return {
+      hasFileConflict: false,
+      hasDBConflict: false,
+      dbConflict: {
+        episode: { exists: false },
+        transcript: { exists: false },
+        questions: { exists: false }
+      }
     };
-
-    if (conflicts.hasFileConflict) {
-      settings.overwriteServerFile = true;
-    }
-
-    if (conflicts.hasDBConflict) {
-      const db = conflicts.dbConflict;
-      if (db.episode?.exists) {
-        settings.overwriteEpisodeInfo = true;
-      }
-      if (db.transcript?.exists) {
-        settings.overwriteTranscript = true;
-      }
-      if (db.questions?.exists) {
-        settings.overwriteQuestions = true;
-      }
-    }
-
-    return settings;
   }
-}
+};
 
-export default new ConflictChecker();
+export default {
+  checkForConflicts,
+  fileExists,
+  checkFileExistsInStorage,
+  checkFileConflicts
+};
+
+

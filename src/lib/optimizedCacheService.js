@@ -87,7 +87,34 @@ class OptimizedCacheService {
           }
           break;
         case 'episodes':
-          await offlineDataService.saveEpisode(enhancedData);
+          // Специальная обработка для кэша всех эпизодов
+          if (key === 'all' && Array.isArray(data)) {
+            // Сохраняем каждый эпизод отдельно
+            for (const episode of data) {
+              if (episode && episode.slug) {
+                const episodeData = {
+                  ...episode,
+                  cache_metadata: {
+                    type,
+                    key: episode.slug,
+                    priority,
+                    cached_at: Date.now(),
+                    ttl: strategy.ttl,
+                    access_count: userInteraction ? 10 : 1,
+                    last_accessed: Date.now(),
+                    user_interaction: userInteraction
+                  }
+                };
+                await offlineDataService.saveEpisode(episodeData);
+              }
+            }
+          } else if (data && (data.slug || key !== 'all')) {
+            // Обычный случай: сохраняем один эпизод
+            await offlineDataService.saveEpisode(enhancedData);
+          } else {
+            logger.warn(`[OptimizedCache] Invalid episode data for key ${key}`);
+            return false;
+          }
           break;
         default:
           logger.warn(`[OptimizedCache] Unsupported cache type: ${type}`);
@@ -130,17 +157,44 @@ class OptimizedCacheService {
 
       // Получаем данные в зависимости от типа
       switch (type) {
-        case 'transcript':
+        case 'transcript': {
           const [episodeSlug, lang] = key.split(':');
           cachedData = await offlineDataService.getTranscript(episodeSlug, lang);
           break;
-        case 'questions':
+        }
+        case 'questions': {
           const [qEpisodeSlug, qLang] = key.split(':');
           cachedData = await offlineDataService.getQuestions(qEpisodeSlug, qLang);
           break;
-        case 'episodes':
-          cachedData = await offlineDataService.getEpisode(key);
+        }
+        case 'episodes': {
+          // Специальная обработка для получения всех эпизодов
+          if (key === 'all') {
+            cachedData = await offlineDataService.getAllEpisodes();
+            // Проверяем TTL для массива эпизодов
+            if (cachedData && cachedData.length > 0) {
+              // Если хотя бы один эпизод устарел, возвращаем null
+              const now = Date.now();
+              const strategy = this.cacheStrategies['episodes'];
+              const hasExpired = cachedData.some(ep => {
+                const metadata = ep.cache_metadata;
+                if (metadata && metadata.ttl) {
+                  return now - metadata.cached_at > metadata.ttl;
+                }
+                return false;
+              });
+              if (hasExpired) {
+                logger.debug(`[OptimizedCache] Cache expired for ${type}:${key}`);
+                return null;
+              }
+              return cachedData;
+            }
+            return cachedData;
+          } else {
+            cachedData = await offlineDataService.getEpisode(key);
+          }
           break;
+        }
         default:
           logger.warn(`[OptimizedCache] Unsupported get type: ${type}`);
           return null;
@@ -305,7 +359,7 @@ class OptimizedCacheService {
       const storeName = this.getStoreName(type);
       const transaction = await offlineDataService.getTransaction([storeName]);
       if (!transaction) {
-        logger.warn(`[OptimizedCache] Could not create transaction for ${type} cache management`);
+        logger.debug(`[OptimizedCache] Could not create transaction for ${type} cache management (using fallback storage)`);
         return;
       }
       const store = transaction.objectStore(storeName);
@@ -356,7 +410,12 @@ class OptimizedCacheService {
           const itemsToDelete = sortedItems.slice(0, items.length - targetSize);
 
           if (itemsToDelete.length > 0) {
-            const deleteTransaction = offlineDataService.getTransaction([storeName], 'readwrite');
+            const deleteTransaction = await offlineDataService.getTransaction([storeName], 'readwrite');
+            if (!deleteTransaction) {
+              logger.debug(`[OptimizedCache] Could not create delete transaction for ${type}`);
+              resolve();
+              return;
+            }
             const deleteStore = deleteTransaction.objectStore(storeName);
 
             for (const item of itemsToDelete) {
@@ -379,7 +438,7 @@ class OptimizedCacheService {
         request.onerror = () => reject(request.error);
       });
     } catch (error) {
-      logger.error(`[OptimizedCache] Failed to manage cache size for ${type}:`, error);
+      logger.debug(`[OptimizedCache] Cache size management skipped for ${type}:`, error.message);
     }
   }
 
@@ -441,53 +500,75 @@ class OptimizedCacheService {
         const storeName = this.getStoreName(type);
         const transaction = await offlineDataService.getTransaction([storeName]);
         if (!transaction) {
-          logger.warn(`[OptimizedCache] Could not create transaction for ${type} stats`);
+          logger.debug(`[OptimizedCache] Could not create transaction for ${type} stats (using fallback storage)`);
+          stats[type] = {
+            itemCount: 0,
+            maxItems: strategy.maxSize,
+            expiredCount: 0,
+            totalAccessCount: 0,
+            userInteractionCount: 0,
+            estimatedSize: 0,
+            utilizationPercent: 0
+          };
           continue;
         }
         const store = transaction.objectStore(storeName);
         
-        const typeStats = await new Promise((resolve, reject) => {
-          const request = store.getAll();
-          request.onsuccess = () => {
-            const items = request.result;
-            const now = Date.now();
-            
-            let totalSize = 0;
-            let expiredCount = 0;
-            let accessCount = 0;
-            let userInteractionCount = 0;
-            
-            items.forEach(item => {
-              totalSize += this.estimateItemSize(item);
+        try {
+          const typeStats = await new Promise((resolve, reject) => {
+            const request = store.getAll();
+            request.onsuccess = () => {
+              const items = request.result;
+              const now = Date.now();
               
-              const metadata = item.cache_metadata;
-              if (metadata) {
-                accessCount += metadata.access_count || 0;
+              let totalSize = 0;
+              let expiredCount = 0;
+              let accessCount = 0;
+              let userInteractionCount = 0;
+              
+              items.forEach(item => {
+                totalSize += this.estimateItemSize(item);
                 
-                if (metadata.user_interaction) {
-                  userInteractionCount++;
+                const metadata = item.cache_metadata;
+                if (metadata) {
+                  accessCount += metadata.access_count || 0;
+                  
+                  if (metadata.user_interaction) {
+                    userInteractionCount++;
+                  }
+                  
+                  if (metadata.ttl && now - metadata.cached_at > metadata.ttl) {
+                    expiredCount++;
+                  }
                 }
-                
-                if (metadata.ttl && now - metadata.cached_at > metadata.ttl) {
-                  expiredCount++;
-                }
-              }
-            });
-            
-            resolve({
-              itemCount: items.length,
-              maxItems: strategy.maxSize,
-              expiredCount,
-              totalAccessCount: accessCount,
-              userInteractionCount,
-              estimatedSize: totalSize,
-              utilizationPercent: Math.round((items.length / strategy.maxSize) * 100)
-            });
+              });
+              
+              resolve({
+                itemCount: items.length,
+                maxItems: strategy.maxSize,
+                expiredCount,
+                totalAccessCount: accessCount,
+                userInteractionCount,
+                estimatedSize: totalSize,
+                utilizationPercent: Math.round((items.length / strategy.maxSize) * 100)
+              });
+            };
+            request.onerror = () => reject(request.error);
+          });
+          
+          stats[type] = typeStats;
+        } catch (error) {
+          logger.debug(`[OptimizedCache] Error getting stats for ${type}:`, error.message);
+          stats[type] = {
+            itemCount: 0,
+            maxItems: strategy.maxSize,
+            expiredCount: 0,
+            totalAccessCount: 0,
+            userInteractionCount: 0,
+            estimatedSize: 0,
+            utilizationPercent: 0
           };
-          request.onerror = () => reject(request.error);
-        });
-        
-        stats[type] = typeStats;
+        }
       }
       
       return stats;
@@ -515,44 +596,48 @@ class OptimizedCacheService {
         const storeName = this.getStoreName(type);
         const transaction = await offlineDataService.getTransaction([storeName], 'readwrite');
         if (!transaction) {
-          logger.warn(`[OptimizedCache] Could not create transaction for ${type} cleanup`);
+          logger.debug(`[OptimizedCache] Could not create transaction for ${type} cleanup (using fallback storage)`);
           continue;
         }
         const store = transaction.objectStore(storeName);
         
-        await new Promise((resolve, reject) => {
-          const request = store.getAll();
-          request.onsuccess = () => {
-            const items = request.result;
-            let expiredCount = 0;
-            
-            items.forEach(item => {
-              const metadata = item.cache_metadata;
-              if (metadata && metadata.ttl) {
-                const isExpired = Date.now() - metadata.cached_at > metadata.ttl;
-                if (isExpired) {
-                  const key = this.getItemKey(type, item);
-                  if (key) {
-                    store.delete(key);
-                    this.userInteractionData.delete(`${type}:${key}`);
-                    expiredCount++;
+        try {
+          await new Promise((resolve, reject) => {
+            const request = store.getAll();
+            request.onsuccess = () => {
+              const items = request.result;
+              let expiredCount = 0;
+              
+              items.forEach(item => {
+                const metadata = item.cache_metadata;
+                if (metadata && metadata.ttl) {
+                  const isExpired = Date.now() - metadata.cached_at > metadata.ttl;
+                  if (isExpired) {
+                    const key = this.getItemKey(type, item);
+                    if (key) {
+                      store.delete(key);
+                      this.userInteractionData.delete(`${type}:${key}`);
+                      expiredCount++;
+                    }
                   }
                 }
+              });
+              
+              if (expiredCount > 0) {
+                logger.debug(`[OptimizedCache] Cleaned ${expiredCount} expired items from ${type} cache`);
               }
-            });
-            
-            if (expiredCount > 0) {
-              logger.debug(`[OptimizedCache] Cleaned ${expiredCount} expired items from ${type} cache`);
-            }
-            resolve();
-          };
-          request.onerror = () => reject(request.error);
-        });
+              resolve();
+            };
+            request.onerror = () => reject(request.error);
+          });
+        } catch (error) {
+          logger.debug(`[OptimizedCache] Cleanup error for ${type}:`, error.message);
+        }
       }
       
       logger.debug('[OptimizedCache] Cleanup completed');
     } catch (error) {
-      logger.error('[OptimizedCache] Cleanup failed:', error);
+      logger.debug('[OptimizedCache] Cleanup skipped:', error.message);
     }
   }
 }

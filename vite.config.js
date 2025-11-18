@@ -122,10 +122,19 @@ window.fetch = function(...args) {
 				contentType.includes('text/html') ||
 				contentType.includes('application/xhtml+xml');
 
-			if (!response.ok && !isDocumentResponse) {
+			// Silence expected non-OK responses for lightweight probe endpoints
+			// Example: /api/upload/info/:filename returns 404 when a file doesn't exist (this is OK)
+			const requestUrl = response.url;
+			const shouldSilence =
+				typeof requestUrl === 'string' &&
+				(
+					requestUrl.includes('/api/upload/info/') ||
+					requestUrl.includes('/api/assemblyai/status')
+				);
+
+			if (!response.ok && !isDocumentResponse && !shouldSilence) {
 					const responseClone = response.clone();
 					const errorFromRes = await responseClone.text();
-					const requestUrl = response.url;
 					console.error(\`Fetch error from \${requestUrl}: \${errorFromRes}\`);
 			}
 
@@ -176,11 +185,6 @@ const addTransformIndexHtml = {
 	},
 };
 
-// Limit noisy warnings and error filtering to development only
-if (isDev) {
-    console.warn = () => {};
-}
-
 const logger = createLogger()
 const loggerError = logger.error
 
@@ -217,9 +221,11 @@ export default defineConfig({
 		allowedHosts: true,
 		proxy: {
 			'/api': {
-				target: 'http://localhost:3000',
-				changeOrigin: false,
-				secure: false,
+				// Route dev requests to local backend or VPS depending on env
+				// Example to use VPS: set VITE_DEV_API_PROXY_TARGET=https://your-vps-host
+				target: process.env.VITE_DEV_API_PROXY_TARGET || 'http://localhost:3000',
+				changeOrigin: true,
+				secure: false
 			}
 		}
 	},
@@ -249,5 +255,10 @@ export default defineConfig({
 			]
 		},
 		outDir: 'dist'
+	},
+	test: {
+		globals: true,
+		environment: 'jsdom',
+		setupFiles: './src/test/setup.js'
 	}
 });

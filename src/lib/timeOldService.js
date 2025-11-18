@@ -51,9 +51,32 @@ class TimeOldService {
         return true;
       }
 
+      // Дедупликация входного массива на случай повторной загрузки
+      const normalize = (s) => (s || '').trim().toLowerCase();
+      const seen = new Set();
+      const deduped = [];
+      for (const q of questions) {
+        const key = `${normalize(q.title)}|${Math.round(Number(q.time || 0))}|${q.lang}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          deduped.push(q);
+        }
+      }
+
+      // Удаляем существующие вопросы для эпизода и языка перед вставкой
+      const episodeSlug = deduped[0]?.episode_slug;
+      const lang = deduped[0]?.lang;
+      if (episodeSlug && lang) {
+        await supabase
+          .from('questions')
+          .delete()
+          .eq('episode_slug', episodeSlug)
+          .eq('lang', lang);
+      }
+
       const { error } = await supabase
         .from('questions')
-        .insert(questions);
+        .insert(deduped);
 
       if (error) {
         throw new Error(`Ошибка сохранения вопросов: ${error.message}`);

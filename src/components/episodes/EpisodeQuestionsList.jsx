@@ -1,11 +1,13 @@
 
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { HelpCircle } from 'lucide-react';
 import { getLocaleString } from '@/lib/locales';
 
 const EpisodeQuestionsList = React.memo(({ questions, episodeSlug, currentLanguage, updateTimestamp }) => {
   const navigate = useNavigate();
+  const { lang } = useParams();
+  const langPrefix = lang || currentLanguage || 'ru';
 
   if (!questions || questions.length === 0) {
     return (
@@ -16,7 +18,7 @@ const EpisodeQuestionsList = React.memo(({ questions, episodeSlug, currentLangua
   }
 
   const handleQuestionClick = (questionId) => {
-    navigate(`/episode/${episodeSlug}#question-${questionId}&play=true`);
+    navigate(`/${langPrefix}/episode/${episodeSlug}#question-${questionId}&play=true`);
   };
 
   // Сортируем вопросы по времени как fallback
@@ -29,8 +31,8 @@ const EpisodeQuestionsList = React.memo(({ questions, episodeSlug, currentLangua
       </div>
       <ul className="space-y-1.5 overflow-hidden pl-2 border-l-2 border-purple-500/20 animate-fade-in">
         {sortedQuestions.map(question => (
-          <li 
-            key={question.id}
+          <li
+            key={`${question.id}-${question.lang || 'unknown'}-${episodeSlug}`}
             className="animate-slide-in-left"
           >
             <button 

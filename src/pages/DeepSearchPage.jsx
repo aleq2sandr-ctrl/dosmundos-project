@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useSearchParams, Link, useNavigate } from 'react-router-dom';
+import { useSearchParams, Link, useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -31,21 +31,21 @@ const HighlightedText = ({ text, highlightParts }) => {
   );
 };
 
-const SearchResultItem = ({ item, searchTerm, type, episodeTitle }) => {
+const SearchResultItem = ({ item, searchTerm, type, episodeTitle, langPrefix }) => {
   const Icon = type === 'question' ? MessageSquare : FileText;
   let displayTitle = '';
   let linkTarget = '';
 
   if (type === 'question') {
     displayTitle = `${item.questionTitle} (${episodeTitle})`;
-    linkTarget = `/episode/${item.episodeSlug}#question-${item.questionId}&play=true`;
+    linkTarget = `/${langPrefix}/episode/${item.episodeSlug}#question-${item.questionId}&play=true`;
   } else { // textInEpisode
     if (item.questionContext) {
       displayTitle = `${getLocaleString('question', item.currentLanguage)}: ${item.questionContext} (${episodeTitle})`;
     } else {
       displayTitle = `(${episodeTitle})`; 
     }
-    linkTarget = `/episode/${item.episodeSlug}#segment-${item.segmentStart}&play=true`;
+    linkTarget = `/${langPrefix}/episode/${item.episodeSlug}#segment-${item.segmentStart}&play=true`;
   }
   
   const textToHighlight = type === 'question' ? item.questionTitle : item.segmentText;
@@ -81,6 +81,8 @@ const SearchResultItem = ({ item, searchTerm, type, episodeTitle }) => {
 const DeepSearchPage = ({ currentLanguage }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { lang } = useParams();
+  const langPrefix = lang || currentLanguage || 'ru';
   const initialQuery = searchParams.get('query') || '';
   
   const [searchTerm, setSearchTerm] = useState(initialQuery);
@@ -258,7 +260,7 @@ const DeepSearchPage = ({ currentLanguage }) => {
     <div className="container mx-auto p-2 sm:p-4 max-w-2xl">
       <Button 
         variant="outline" 
-        onClick={() => navigate('/episodes')} 
+        onClick={() => navigate(`/${langPrefix}/episodes`)} 
         className="mb-6 bg-slate-700 hover:bg-slate-600 border-slate-600 text-slate-300"
       >
         <ArrowLeft className="mr-2 h-4 w-4" /> {getLocaleString('backToEpisodes', currentLanguage)}
@@ -324,7 +326,8 @@ const DeepSearchPage = ({ currentLanguage }) => {
               <SearchResultItem 
                 key={item.id} 
                 item={item} 
-                searchTerm={searchTerm} 
+                searchTerm={searchTerm}
+                langPrefix={langPrefix} 
                 type={item.type}
                 episodeTitle={episodeTitlesMap[item.episodeSlug] || item.episodeSlug}
               />

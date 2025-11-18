@@ -159,75 +159,32 @@ export const processSingleItem = async ({
       }
     }
     
-    if (!skipUpload && (!userConfirmedOverwriteGlobal || !workerFileUrl)) {
-      const fileExistsInR2 = await storageRouter.checkFileExists(file.name);
-      if (fileExistsInR2.exists && !userConfirmedOverwriteGlobal) {
-        // Trigger dialog also when only server file exists
-        const userConfirmedDialog = await openOverwriteDialog(itemData);
-        if (!userConfirmedDialog) {
-          updateItemState(itemData.id, { isUploading: false, uploadError: getLocaleString('uploadCancelledEpisodeExists', currentLanguage) });
-          return { success: false, requiresDialog: true };
-        }
-        if (typeof userConfirmedDialog === 'object') {
-          userOverwriteChoices = userConfirmedDialog;
-        }
-        // Treat as overwrite flow
-        userConfirmedOverwriteGlobal = true;
+    // Выбираем, загружать ли файл на сервер
+    const overwriteChoices = userOverwriteChoices || null;
+    const shouldUpload =
+      !skipUpload &&
+      (
+        !workerFileUrl || // Нет готового URL (например, новая запись)
+        (overwriteChoices && overwriteChoices.overwriteServerFile) // Пользователь выбрал пере-заливку файла
+      );
 
-        if (userOverwriteChoices && userOverwriteChoices.overwriteServerFile) {
-          const { fileUrl: uploadedUrl, fileKey: uploadedKey, bucketName: uploadedBucket } = await storageRouter.uploadFile(
-            file,
-            (progress, details) => updateItemState(itemData.id, { 
-              uploadProgress: progress,
-              uploadProgressDetails: details
-            }),
-            currentLanguage,
-            file.name 
-          );
-          workerFileUrl = uploadedUrl;
-          r2FileKey = uploadedKey;
-          bucketNameUsed = uploadedBucket;
-        } else {
-          workerFileUrl = fileExistsInR2.fileUrl;
-          r2FileKey = file.name.replace(/\s+/g, '_'); 
-          bucketNameUsed = fileExistsInR2.bucketName;
-          updateItemState(itemData.id, { uploadProgress: 100 }); 
-          toast({ title: getLocaleString('fileAlreadyInR2Title', currentLanguage), description: getLocaleString('fileAlreadyInR2Desc', currentLanguage, { fileName: file.name }), variant: "info" });
-        }
-      } else {
-        const { fileUrl: uploadedUrl, fileKey: uploadedKey, bucketName: uploadedBucket } = await storageRouter.uploadFile(
-          file,
-          (progress, details) => updateItemState(itemData.id, { 
-            uploadProgress: progress,
-            uploadProgressDetails: details
-          }),
-          currentLanguage,
-          file.name 
-        );
-        workerFileUrl = uploadedUrl;
-        r2FileKey = uploadedKey;
-        bucketNameUsed = uploadedBucket;
-      }
+    if (shouldUpload) {
+      const { fileUrl: uploadedUrl, fileKey: uploadedKey, bucketName: uploadedBucket } = await storageRouter.uploadFile(
+        file,
+        (progress, details) => updateItemState(itemData.id, { 
+          uploadProgress: progress,
+          uploadProgressDetails: details
+        }),
+        currentLanguage,
+        file.name 
+      );
+      workerFileUrl = uploadedUrl;
+      r2FileKey = uploadedKey;
+      bucketNameUsed = uploadedBucket;
     } else if (userConfirmedOverwriteGlobal && workerFileUrl) {
-       // Respect overwriteServerFile choice even when episode existed in DB
-       const choices = userOverwriteChoices || { overwriteServerFile: false };
-       if (choices.overwriteServerFile) {
-         const { fileUrl: uploadedUrl, fileKey: uploadedKey, bucketName: uploadedBucket } = await storageRouter.uploadFile(
-           file,
-           (progress, details) => updateItemState(itemData.id, { 
-             uploadProgress: progress,
-             uploadProgressDetails: details
-           }),
-           currentLanguage,
-           file.name 
-         );
-         workerFileUrl = uploadedUrl;
-         r2FileKey = uploadedKey;
-         bucketNameUsed = uploadedBucket;
-       } else {
-         updateItemState(itemData.id, { uploadProgress: 100 });
-         toast({ title: getLocaleString('usingExistingR2FileTitle', currentLanguage), description: getLocaleString('usingExistingR2FileDesc', currentLanguage, { fileName: r2FileKey }), variant: "info" });
-       }
+      // Пользователь решил не перезаписывать серверный файл — используем существующий URL
+      updateItemState(itemData.id, { uploadProgress: 100 });
+      toast({ title: getLocaleString('usingExistingR2FileTitle', currentLanguage), description: getLocaleString('usingExistingR2FileDesc', currentLanguage, { fileName: r2FileKey || 'existing' }), variant: "info" });
     }
     
     if (userConfirmedOverwriteGlobal) {
@@ -277,7 +234,7 @@ export const processSingleItem = async ({
       audio_url: workerFileUrl,
       r2_object_key: r2FileKey,
       r2_bucket_name: bucketNameUsed,
-      storage_provider: bucketNameUsed === 'hostinger' ? 'hostinger' : 'r2',
+      storage_provider: bucketNameUsed === 'hostinger' ? 'hostinger' : (bucketNameUsed === 'vps' ? 'vps' : 'r2'),
       hostinger_file_key: bucketNameUsed === 'hostinger' ? r2FileKey : null,
       duration: Math.round(duration || 0),
       file_has_lang_suffix: itemData.fileHasLangSuffix,

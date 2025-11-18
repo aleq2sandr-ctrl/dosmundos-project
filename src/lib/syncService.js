@@ -91,21 +91,6 @@ class SyncService {
     }
   }
 
-  // Подписка на изменения сетевого состояния
-  onNetworkChange(callback) {
-    this.networkListeners.push(callback);
-    return () => {
-      this.networkListeners = this.networkListeners.filter(cb => cb !== callback);
-    };
-  }
-
-  // Подписка на события синхронизации
-  onSyncChange(callback) {
-    this.syncListeners.push(callback);
-    return () => {
-      this.syncListeners = this.syncListeners.filter(cb => cb !== callback);
-    };
-  }
 
   // Уведомление слушателей сетевых событий
   notifyNetworkListeners(isOnline) {
@@ -129,35 +114,6 @@ class SyncService {
     });
   }
 
-  // Уведомление слушателей о изменении сети
-  notifyNetworkListeners(isOnline) {
-    this.networkListeners.forEach(callback => {
-      try {
-        callback(isOnline);
-      } catch (error) {
-        logger.error('[Sync] Network listener error:', error);
-      }
-    });
-  }
-
-  // Уведомление слушателей о синхронизации
-  notifySyncListeners(event, data = {}) {
-    this.syncListeners.forEach(callback => {
-      try {
-        callback(event, data);
-      } catch (error) {
-        logger.error('[Sync] Sync listener error:', error);
-      }
-    });
-  }
-
-  // Получение статуса сети
-  getNetworkStatus() {
-    return {
-      isOnline: this.isOnline,
-      syncInProgress: this.syncInProgress
-    };
-  }
 
   // Сохранение данных с автоматической синхронизацией
   async saveData(type, data, operation = 'update') {
@@ -238,7 +194,7 @@ class SyncService {
                 console.warn('[Sync] Invalid episode data:', serverData);
               }
               break;
-            case 'transcript':
+            case 'transcript': {
               // Проверяем и исправляем данные транскрипта перед сохранением
               if (serverData && typeof serverData === 'object') {
                 // Убеждаемся, что у транскрипта есть необходимые поля
@@ -257,6 +213,7 @@ class SyncService {
                 await offlineDataService.saveTranscript(validTranscript);
               }
               break;
+            }
             case 'questions':
               // Проверяем, что вопросы - это массив
               if (Array.isArray(serverData)) {
@@ -332,7 +289,7 @@ class SyncService {
   // Загрузка данных с сервера
   async loadDataFromServer(type, params) {
     switch (type) {
-      case 'episode':
+      case 'episode': {
         const { data: episodeData, error: episodeError } = await supabase
           .from('episodes')
           .select('*')
@@ -347,8 +304,9 @@ class SyncService {
         } else {
           throw new Error('Invalid episode data received from server');
         }
+      }
 
-      case 'transcript':
+      case 'transcript': {
         const { data: transcriptData, error: transcriptError } = await supabase
           .from('transcripts')
           .select('id, episode_slug, lang, status, created_at, updated_at, edited_transcript_data')
@@ -380,8 +338,9 @@ class SyncService {
         }
         
         return transcriptData;
+      }
 
-      case 'questions':
+      case 'questions': {
         const { data: questionsData, error: questionsError } = await supabase
           .from('questions')
           .select('*')
@@ -401,8 +360,9 @@ class SyncService {
         }
         
         return questionsData || [];
+      }
 
-      case 'episodes':
+      case 'episodes': {
         const { data: episodesData, error: episodesError } = await supabase
           .from('episodes')
           .select('*')
@@ -418,6 +378,7 @@ class SyncService {
         }
         
         return episodesData || [];
+      }
 
       default:
         throw new Error(`Unknown load type: ${type}`);
@@ -427,7 +388,7 @@ class SyncService {
   // Синхронизация транскрипта с сервером
   async syncTranscriptToServer(data, operation) {
     switch (operation) {
-      case 'update':
+      case 'update': {
         // Проверяем корректность ID
         if (!isCompatibleWithDatabase(data)) {
           throw new Error(`Invalid transcript ID: ${data.id}. ID must be a valid integer.`);
@@ -467,14 +428,16 @@ class SyncService {
           }
         }
         break;
+      }
 
-      case 'create':
+      case 'create': {
         const { error: createError } = await supabase
           .from('transcripts')
           .insert(data);
-        
+
         if (createError) throw createError;
         break;
+      }
 
       default:
         throw new Error(`Unknown transcript operation: ${operation}`);
@@ -485,24 +448,25 @@ class SyncService {
   async syncQuestionsToServer(data, operation) {
     switch (operation) {
       case 'update':
-      case 'create':
+      case 'create': {
         // Удаляем существующие вопросы и создаем новые
         const { error: deleteError } = await supabase
           .from('questions')
           .delete()
           .eq('episode_slug', data.episodeSlug)
           .eq('lang', data.lang);
-        
+
         if (deleteError) throw deleteError;
 
         if (data.questions && data.questions.length > 0) {
           const { error: insertError } = await supabase
             .from('questions')
             .insert(data.questions);
-          
+
           if (insertError) throw insertError;
         }
         break;
+      }
 
       default:
         throw new Error(`Unknown questions operation: ${operation}`);
@@ -512,22 +476,24 @@ class SyncService {
   // Синхронизация эпизода с сервером
   async syncEpisodeToServer(data, operation) {
     switch (operation) {
-      case 'update':
+      case 'update': {
         const { error: updateError } = await supabase
           .from('episodes')
           .update(data)
           .eq('slug', data.slug);
-        
+
         if (updateError) throw updateError;
         break;
+      }
 
-      case 'create':
+      case 'create': {
         const { error: createError } = await supabase
           .from('episodes')
           .insert(data);
-        
+
         if (createError) throw createError;
         break;
+      }
 
       default:
         throw new Error(`Unknown episode operation: ${operation}`);

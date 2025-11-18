@@ -8,7 +8,7 @@ import { AlertCircle, CheckCircle, LogIn } from 'lucide-react';
 import { getLocaleString } from '@/lib/locales';
 
 export const EditorAuthModal = ({ isOpen, onClose, onSuccess, currentLanguage }) => {
-  const { login, isAuthenticated } = useEditorAuth();
+  const { login } = useEditorAuth();
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState('');

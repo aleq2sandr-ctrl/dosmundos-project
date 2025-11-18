@@ -1,7 +1,11 @@
 import React from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { RussianFlag, SpanishFlag, USFlag, GermanFlag, FrenchFlag, PolishFlag } from './ui/flags';
 
 const FooterLanguageSwitcher = ({ currentLanguage, onLanguageChange }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  
   const languages = [
     { code: 'ru', name: "RU", Flag: RussianFlag },
     { code: 'es', name: "ES", Flag: SpanishFlag },
@@ -13,8 +17,20 @@ const FooterLanguageSwitcher = ({ currentLanguage, onLanguageChange }) => {
 
   const handleLanguageChange = (langCode) => {
     localStorage.setItem('podcastLang', langCode);
-    onLanguageChange(langCode);
-    window.location.reload();
+    
+    // Получаем текущий путь без языкового префикса
+    const currentPath = location.pathname;
+    const pathWithoutLang = currentPath.replace(/^\/(ru|es|en|de|fr|pl)/, '') || '/episodes';
+    
+    // Создаем новый путь с новым языком
+    const newPath = `/${langCode}${pathWithoutLang}`;
+    
+    // Навигируем на новый путь
+    navigate(newPath, { replace: true });
+    
+    if (onLanguageChange) {
+      onLanguageChange(langCode);
+    }
   };
 
   return (

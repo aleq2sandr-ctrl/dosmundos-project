@@ -21,6 +21,18 @@ const SmartQuestionButton = ({
   const getQuestionOptions = () => {
     const options = [];
 
+    // 0. Если вопросы уже есть - показываем опцию редактирования и управления
+    if (episode.questionsCount > 0) {
+      options.push({
+        type: 'manage',
+        text: `📝 Управление (${episode.questionsCount})`,
+        available: true,
+        loading: false,
+        icon: <HelpCircle className="h-3 w-3 mr-1" />,
+        action: 'manage'
+      });
+    }
+
     // 1. Извлечение из базы данных timeOld (ТОЛЬКО если есть данные)
     if (canLoadFromDB(episode)) {
       options.push({
@@ -110,7 +122,10 @@ const SmartQuestionButton = ({
           size="sm"
           variant="outline"
           onClick={() => {
-            if (option.action === 'loadFromDB') {
+            if (option.action === 'manage') {
+              // Перенаправляем на плеер для управления вопросами
+              window.location.href = `/${episode.lang}/episode/${episode.slug}?edit=questions`;
+            } else if (option.action === 'loadFromDB') {
               onLoadFromDB(episode);
             } else if (option.action === 'generateFromText') {
               onGenerateFromText(episode);
@@ -120,7 +135,9 @@ const SmartQuestionButton = ({
           }}
           disabled={option.loading || !option.available}
           className={`h-8 px-2 text-xs ${
-            option.type === 'from_db'
+            option.type === 'manage'
+              ? 'bg-amber-600/20 border-amber-500 text-amber-300 hover:bg-amber-600/40 hover:text-amber-200'
+              : option.type === 'from_db'
               ? 'bg-blue-600/20 border-blue-500 text-blue-300 hover:bg-blue-600/40 hover:text-blue-200'
               : option.type === 'from_text'
               ? 'bg-purple-600/20 border-purple-500 text-purple-300 hover:bg-purple-600/40 hover:text-purple-200'

@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabaseClient';
 import logger from '@/lib/logger';
 import { getLocaleString } from '@/lib/locales';
 import r2Service from '@/lib/r2Service';
+import { getCorrectAudioUrl } from '@/lib/storageRouter';
 import { getFullTextFromUtterances } from '@/hooks/transcript/transcriptProcessingUtils';
 
 // Utility function to check if a file exists on Archive.org
@@ -211,6 +212,25 @@ const useEpisodeData = (episodeSlug, currentLanguage, toast) => {
       if (questionsError) throw questionsError;
       
       let fetchedQuestions = data || [];
+      
+      // Дедупликация вопросов: сначала по содержимому (title+time), затем по id
+      const normalize = (s) => (s || '').trim().toLowerCase();
+      const seenByContent = new Set();
+      const byContent = [];
+      for (const q of fetchedQuestions) {
+        const key = `${normalize(q.title)}|${Math.round(Number(q.time || 0))}`;
+        if (!seenByContent.has(key)) {
+          seenByContent.add(key);
+          byContent.push(q);
+        }
+      }
+
+      const byId = new Map();
+      for (const q of byContent) {
+        if (!byId.has(q.id)) byId.set(q.id, q);
+      }
+      fetchedQuestions = Array.from(byId.values());
+      
       const hasIntro = fetchedQuestions.some(q => q.is_intro && q.time === 0);
 
       if (!hasIntro) {
@@ -256,7 +276,8 @@ const useEpisodeData = (episodeSlug, currentLanguage, toast) => {
       }
       
 
-      const finalAudioUrl = r2Service.getCompatibleUrl(
+      // Используем getCorrectAudioUrl для проксирования Hostinger URL через /api/proxy-audio
+      const finalAudioUrl = getCorrectAudioUrl(episode) || r2Service.getCompatibleUrl(
         episode.audio_url,
         episode.r2_object_key,
         episode.r2_bucket_name

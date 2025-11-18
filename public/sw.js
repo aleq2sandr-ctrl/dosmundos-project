@@ -1,7 +1,9 @@
-const CACHE_NAME = 'podcast-app-v1';
-const STATIC_CACHE = 'static-v1';
-const DYNAMIC_CACHE = 'dynamic-v1';
-const AUDIO_CACHE = 'audio-v1';
+// Версия кеша - обновляется при каждом деплое для принудительного обновления
+// IMPORTANT: Измените эту версию при каждом деплое, чтобы очистить старые кеши
+const CACHE_VERSION = 'v20251113-012920';
+const STATIC_CACHE = 'static-' + CACHE_VERSION;
+const DYNAMIC_CACHE = 'dynamic-' + CACHE_VERSION;
+const AUDIO_CACHE = 'audio-' + CACHE_VERSION;
 
 // Ресурсы для кеширования при установке
 const STATIC_ASSETS = [
@@ -27,22 +29,22 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
-  console.log('[SW] Activating...');
+  console.log('[SW] Activating with new cache version:', CACHE_VERSION);
   event.waitUntil(
     Promise.all([
-      // Очистка старых кешей
+      // Агрессивная очистка ВСЕХ старых кешей при обновлении версии
       caches.keys().then(cacheNames => {
         return Promise.all(
           cacheNames.map(cacheName => {
-            if (cacheName !== STATIC_CACHE && 
-                cacheName !== DYNAMIC_CACHE && 
-                cacheName !== AUDIO_CACHE) {
+            // Удаляем все кеши, которые не соответствуют текущей версии
+            if (!cacheName.includes(CACHE_VERSION)) {
               console.log('[SW] Deleting old cache:', cacheName);
               return caches.delete(cacheName);
             }
           })
         );
       }),
+      // Принудительно активируем новый SW сразу
       self.clients.claim()
     ])
   );
@@ -51,6 +53,13 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
+
+  // Исключаем API endpoints - они должны проходить напрямую без перехвата
+  // Это предотвращает ошибки при сетевых сбоях и позволяет fallback механизму работать
+  if (isApiRequest(request)) {
+    // Пропускаем обработку - запрос пройдет напрямую к серверу
+    return;
+  }
 
   // Обработка аудиофайлов
   if (isAudioRequest(request)) {
@@ -84,9 +93,45 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
+// Проверка, является ли запрос к API (должен проходить напрямую без перехвата)
+function isApiRequest(request) {
+  const url = new URL(request.url);
+  
+  // Проверяем по пути
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/upload')) {
+    return true;
+  }
+  
+  // Проверяем по домену API
+  if (url.hostname.includes('api.dosmundos.pe')) {
+    return true;
+  }
+  
+  // Проверяем по полному URL (для backup endpoints)
+  const apiPatterns = [
+    '/api/upload',
+    '/api/upload/info/',
+    '/api/upload/files',
+    '/api/assemblyai',
+    '/api/proxy-audio'
+  ];
+  
+  return apiPatterns.some(pattern => url.pathname.includes(pattern));
+}
+
 // Проверка, является ли запрос аудиофайлом
 function isAudioRequest(request) {
   const url = new URL(request.url);
+  
+  // Исключаем API эндпоинты информации о файлах (могут заканчиваться на .mp3, но это не аудио)
+  if (url.pathname.includes('/upload/info/')) {
+    return false;
+  }
+  
+  // Исключаем все API запросы
+  if (isApiRequest(request)) {
+    return false;
+  }
   
   // Проверяем по расширению файла
   const audioExtensions = ['.mp3', '.wav', '.m4a', '.aac', '.ogg', '.webm'];
@@ -105,7 +150,9 @@ function isAudioRequest(request) {
   // Проверяем по домену (для наших аудиофайлов)
   const isAudioDomain = url.hostname.includes('srvstatic.kz') || 
                        url.hostname.includes('archive.org') ||
-                       url.hostname.includes('r2.dev');
+                       url.hostname.includes('r2.dev') ||
+                       url.hostname.includes('silver-lemur-512881.hostingersite.com') ||
+                       url.hostname.includes('darkviolet-caterpillar-781686.hostingersite.com');
   
   return isAudioDestination || hasAudioExtension || acceptsAudio || hasAudioParam || isAudioDomain;
 }
@@ -127,17 +174,46 @@ function isStaticAsset(request) {
          url.pathname.endsWith('.jpeg');
 }
 
-// Обработка аудио запросов с кешированием
+// Обработка аудио запросов с кешированием и поддержкой Range requests
 async function handleAudioRequest(request) {
+  const url = new URL(request.url);
+  
+  // Если это Hostinger аудио, перенаправляем на прокси
+  if (url.hostname.includes('silver-lemur-512881.hostingersite.com') || 
+      url.hostname.includes('darkviolet-caterpillar-781686.hostingersite.com')) {
+    const encodedUrl = encodeURIComponent(url.toString());
+    const proxyUrl = `/api/proxy-audio?url=${encodedUrl}`;
+    console.log('[SW] Redirecting Hostinger audio to proxy:', proxyUrl);
+    
+    // Создаем новый запрос к прокси
+    const proxyRequest = new Request(proxyUrl, {
+      method: 'GET',
+      headers: request.headers
+    });
+    
+    // Отправляем через fetch, который НЕ будет перехвачен (так как это same-origin)
+    return fetch(proxyRequest);
+  }
+  
   const cache = await caches.open(AUDIO_CACHE);
   const cachedResponse = await cache.match(request);
 
+  // Проверяем, является ли это Range request
+  const rangeHeader = request.headers.get('range');
+
   if (cachedResponse) {
     console.log('[SW] Serving audio from cache:', request.url);
-    // Убеждаемся, что кешированный ответ имеет правильные заголовки
+    
+    // Если это Range request, обрабатываем его специально
+    if (rangeHeader) {
+      return handleRangeRequest(cachedResponse, rangeHeader);
+    }
+    
+    // Обычный запрос - возвращаем полный ответ
     const headers = new Headers(cachedResponse.headers);
     headers.set('Content-Type', 'audio/mpeg');
     headers.set('Cache-Control', 'public, max-age=31536000');
+    headers.set('Accept-Ranges', 'bytes');
     
     return new Response(cachedResponse.body, {
       status: cachedResponse.status,
@@ -153,17 +229,80 @@ async function handleAudioRequest(request) {
     if (response.ok && response.status === 200) {
       // Проверяем размер кеша перед добавлением
       await manageCacheSize(cache, response.clone());
-      await cache.put(request, response.clone());
-      console.log('[SW] Audio cached:', request.url);
+      
+      // Кешируем только полный ответ (не Range responses)
+      if (!rangeHeader) {
+        await cache.put(request, response.clone());
+        console.log('[SW] Audio cached:', request.url);
+      }
     }
     
     return response;
   } catch (error) {
     console.log('[SW] Audio fetch failed, checking cache:', error);
+    
+    // Если есть кеш, пытаемся обработать Range request из кеша
+    if (cachedResponse && rangeHeader) {
+      return handleRangeRequest(cachedResponse, rangeHeader);
+    }
+    
     return cachedResponse || new Response('Audio not available offline', { 
       status: 503,
       headers: { 'Content-Type': 'text/plain' }
     });
+  }
+}
+
+// Обработка Range requests для поддержки перемотки в кешированном аудио
+async function handleRangeRequest(response, rangeHeader) {
+  try {
+    // Получаем полное содержимое из кеша
+    const arrayBuffer = await response.clone().arrayBuffer();
+    const fullSize = arrayBuffer.byteLength;
+    
+    // Парсим Range заголовок (формат: "bytes=start-end")
+    const rangeMatch = rangeHeader.match(/bytes=(\d+)-(\d*)/);
+    if (!rangeMatch) {
+      console.warn('[SW] Invalid range header:', rangeHeader);
+      return response;
+    }
+    
+    const start = parseInt(rangeMatch[1], 10);
+    const end = rangeMatch[2] ? parseInt(rangeMatch[2], 10) : fullSize - 1;
+    
+    // Проверяем валидность диапазона
+    if (start >= fullSize || end >= fullSize || start > end) {
+      return new Response(null, {
+        status: 416,
+        headers: {
+          'Content-Range': `bytes */${fullSize}`,
+          'Content-Type': 'audio/mpeg'
+        }
+      });
+    }
+    
+    // Вырезаем нужный диапазон
+    const slice = arrayBuffer.slice(start, end + 1);
+    const sliceSize = slice.byteLength;
+    
+    console.log(`[SW] Serving range ${start}-${end}/${fullSize} from cache`);
+    
+    // Возвращаем partial content с правильными заголовками
+    return new Response(slice, {
+      status: 206, // Partial Content
+      statusText: 'Partial Content',
+      headers: {
+        'Content-Type': 'audio/mpeg',
+        'Content-Length': sliceSize.toString(),
+        'Content-Range': `bytes ${start}-${end}/${fullSize}`,
+        'Accept-Ranges': 'bytes',
+        'Cache-Control': 'public, max-age=31536000'
+      }
+    });
+  } catch (error) {
+    console.error('[SW] Error handling range request:', error);
+    // Возвращаем полный ответ в случае ошибки
+    return response;
   }
 }
 
@@ -211,33 +350,56 @@ async function handleSupabaseRequest(request) {
   }
 }
 
-// Обработка статических ресурсов
+// Обработка статических ресурсов - сеть сначала для обновленных файлов
 async function handleStaticRequest(request) {
   const cache = await caches.open(STATIC_CACHE);
-  const cachedResponse = await cache.match(request);
-
-  if (cachedResponse) {
-    return cachedResponse;
-  }
-
+  
   try {
-    const response = await fetch(request);
-    if (response.ok) {
-      await cache.put(request, response.clone());
+    // Пытаемся загрузить из сети сначала (для получения обновленных файлов)
+    const networkResponse = await fetch(request, { cache: 'no-cache' });
+    
+    if (networkResponse.ok) {
+      // Кешируем обновленный ответ
+      await cache.put(request, networkResponse.clone());
+      return networkResponse;
     }
-    return response;
+    
+    // Если сеть недоступна, используем кеш
+    const cachedResponse = await cache.match(request);
+    if (cachedResponse) {
+      return cachedResponse;
+    }
+    
+    return networkResponse;
   } catch (error) {
-    return cachedResponse || new Response('Resource not available offline', { status: 503 });
+    // Если сеть недоступна, используем кеш
+    const cachedResponse = await cache.match(request);
+    if (cachedResponse) {
+      return cachedResponse;
+    }
+    return new Response('Resource not available offline', { status: 503 });
   }
 }
 
-// Обработка навигационных запросов
+// Обработка навигационных запросов - сеть сначала
 async function handleNavigationRequest(request) {
+  const cache = await caches.open(STATIC_CACHE);
+  
   try {
-    const response = await fetch(request);
-    return response;
+    // Всегда пытаемся загрузить свежую версию HTML
+    const networkResponse = await fetch(request, { cache: 'no-cache' });
+    
+    if (networkResponse.ok) {
+      // Обновляем кеш
+      await cache.put(request, networkResponse.clone());
+      return networkResponse;
+    }
+    
+    // Fallback на кеш если сеть недоступна
+    const cachedIndex = await cache.match('/index.html');
+    return cachedIndex || networkResponse;
   } catch (error) {
-    const cache = await caches.open(STATIC_CACHE);
+    // Fallback на кеш при ошибке сети
     const cachedIndex = await cache.match('/index.html');
     return cachedIndex || new Response('App not available offline', { status: 503 });
   }

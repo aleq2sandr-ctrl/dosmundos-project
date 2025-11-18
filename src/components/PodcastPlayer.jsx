@@ -43,6 +43,8 @@ const PodcastPlayer = ({
   isOfflineMode = false
  }) => {
   
+  console.log('[PodcastPlayer] Rendered with episodeAudioUrl:', episodeAudioUrl);
+  
   const { toast } = useToast();
   const { isAuthenticated, openAuthModal } = useEditorAuth();
   const internalQuestions = episodeData?.questions || [];
@@ -67,6 +69,7 @@ const PodcastPlayer = ({
   const isSeekingRef = useRef(false);
   const lastJumpIdProcessedRef = useRef(null);
   const [skipEmptySegments, setSkipEmptySegments] = useState(false);
+  const [showAutoplayOverlay, setShowAutoplayOverlay] = useState(false);
 
   const langForContent = episodeData?.lang === 'all' ? currentLanguage : episodeData?.lang;
 
@@ -90,6 +93,7 @@ const PodcastPlayer = ({
     onPlayerStateChange, lastJumpIdProcessedRef, 
     jumpToTime: episodeData?.jumpToTime, jumpId: episodeData?.jumpId,
     playAfterJump: episodeData?.playAfterJump, setCurrentTimeState,
+    setShowPlayOverlay: setShowAutoplayOverlay,
   });
 
   const { handleTimeUpdate, handleLoadedMetadata } = usePlayerTimeUpdates({
@@ -128,36 +132,6 @@ const PodcastPlayer = ({
       onPlayerStateChange?.({ playbackRate: rateValue });
     }
   }, [setCurrentPlaybackRateIndex, audioRef, onPlayerStateChange]);
-
-  // Дополнительная гарантия автозапуска (только если основной не сработал)
-  useEffect(() => {
-    if (episodeData?.audio_url && audioRef.current && !isPlayingState) {
-      // Ждем немного дольше, чтобы основной автозапуск успел сработать
-      const fallbackTimer = setTimeout(() => {
-        if (audioRef.current && !isPlayingState && episodeData?.audio_url) {
-          console.log('PodcastPlayer: Fallback auto-play attempt');
-          
-          // Проверяем готовность аудио
-          if (audioRef.current.readyState >= audioRef.current.HAVE_METADATA) {
-            const playPromise = audioRef.current.play();
-            playPromise?.then(() => {
-              console.log('PodcastPlayer: Fallback auto-play successful');
-              setIsPlayingState(true);
-              onPlayerStateChange?.({ isPlaying: true });
-            }).catch(error => {
-              if (error.name === 'NotAllowedError') {
-                console.log('PodcastPlayer: Fallback auto-play blocked by browser');
-              } else if (error.name !== 'AbortError') {
-                console.error('PodcastPlayer: Fallback auto-play error:', error);
-              }
-            });
-          }
-        }
-      }, 500); // 500ms задержка для fallback
-
-      return () => clearTimeout(fallbackTimer);
-    }
-  }, [episodeData?.audio_url, episodeData?.slug]); // Срабатывает при смене эпизода
 
   useEffect(() => {
     if(typeof window !== 'undefined'){
@@ -265,6 +239,28 @@ const PodcastPlayer = ({
             }
           }}
         />
+
+        {showAutoplayOverlay && (
+          <div
+            className="absolute inset-0 z-20 flex items-center justify-center rounded-xl bg-slate-900/70 backdrop-blur-sm cursor-pointer"
+            onClick={() => {
+              try {
+                if (audioRef.current) {
+                  audioRef.current.muted = false;
+                  audioRef.current.play()?.then(() => {
+                    setIsPlayingState(true);
+                    onPlayerStateChange?.({ isPlaying: true });
+                    setShowAutoplayOverlay(false);
+                  }).catch(() => {});
+                }
+              } catch {}
+            }}
+          >
+            <div className="px-4 py-2 rounded-lg bg-slate-800/80 border border-slate-700 text-slate-100 text-sm">
+              {getLocaleString('tapToUnmuteAndPlay', currentLanguage) || 'Нажмите, чтобы включить звук и начать воспроизведение'}
+            </div>
+          </div>
+        )}
         
         <PlayerUIControls 
           activeQuestionTitle={activeQuestionTitleState}

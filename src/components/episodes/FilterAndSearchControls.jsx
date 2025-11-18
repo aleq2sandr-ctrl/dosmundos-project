@@ -1,11 +1,13 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Search } from 'lucide-react';
 import { getLocaleString } from '@/lib/locales';
 import CustomSelect from '@/components/ui/CustomSelect';
 
 const FilterAndSearchControls = ({ years, months, selectedYear, setSelectedYear, selectedMonth, setSelectedMonth, currentLanguage }) => {
   const navigate = useNavigate();
+  const { lang } = useParams();
+  const langPrefix = lang || currentLanguage || 'ru';
 
   // Подготавливаем опции для годов
   const yearOptions = [
@@ -43,7 +45,7 @@ const FilterAndSearchControls = ({ years, months, selectedYear, setSelectedYear,
           />
         </div>
         <button 
-          onClick={() => navigate('/deep-search')} 
+          onClick={() => navigate(`/${langPrefix}/deep-search`)} 
           className="w-full sm:w-auto bg-purple-600/10 hover:bg-purple-700/20 border-purple-500/50 text-purple-300 hover:text-purple-200 font-semibold shadow-md hover:shadow-lg transition-all duration-300 h-9 rounded-lg flex items-center justify-center gap-1.5 px-3 text-xs sm:text-sm border"
           title={getLocaleString('navigateToDeepSearch', currentLanguage)}
         >

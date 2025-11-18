@@ -1,9 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { RussianFlag, SpanishFlag, USFlag, GermanFlag, FrenchFlag, PolishFlag } from './ui/flags';
 
 const LanguageSwitcher = ({ currentLanguage, onLanguageChange, dropdownPosition = 'down' }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const navigate = useNavigate();
+  const location = useLocation();
   
   const languages = [
     { code: 'ru', name: "RU", fullName: "Русский", Flag: RussianFlag },
@@ -27,19 +30,22 @@ const LanguageSwitcher = ({ currentLanguage, onLanguageChange, dropdownPosition 
       // Закрываем dropdown
       setIsOpen(false);
       
-      // Вызываем callback для обновления состояния и ждем его выполнения
+      // Получаем текущий путь без языкового префикса
+      const currentPath = location.pathname;
+      const pathWithoutLang = currentPath.replace(/^\/(ru|es|en|de|fr|pl)/, '') || '/episodes';
+      
+      // Создаем новый путь с новым языком
+      const newPath = `/${langCode}${pathWithoutLang}`;
+      
+      // Навигируем на новый путь
+      navigate(newPath, { replace: true });
+      
+      // Вызываем callback если есть
       if (onLanguageChange) {
         onLanguageChange(langCode);
       }
-
-      // Перезагружаем страницу после небольшой задержки
-      setTimeout(() => {
-        window.location.reload();
-      }, 100);
     } catch (error) {
       console.error('Error changing language:', error);
-      // Если что-то пошло не так, все равно перезагружаем страницу
-      window.location.reload();
     }
   };
 

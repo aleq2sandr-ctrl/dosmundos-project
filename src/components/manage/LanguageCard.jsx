@@ -22,6 +22,8 @@ const LanguageCard = ({
   // Функции управления транскрипцией
   onStartTranscription,
   onDeleteTranscript,
+  onDownloadSRT, // Добавлен пропс для скачивания SRT
+  onProcessWithAI, // Добавлен пропс для обработки через AI
   isTranscribing,
   // Функции управления вопросами
   onLoadFromDB,
@@ -30,6 +32,7 @@ const LanguageCard = ({
   loadingFromDB,
   generatingFromText,
   translatingFrom,
+  processingQuestionsEpisodes,
   // Функции перевода
   onTranslateFromSpanish,
   onTranslateFromRussian,
@@ -76,7 +79,7 @@ const LanguageCard = ({
               <div
                 className="text-xs text-purple-300 truncate cursor-pointer hover:text-purple-200 hover:underline max-w-[100px]"
                 title={`Open episode: ${episode.slug}`}
-                onClick={() => navigate(`/episode/${episode.slug}?lang=${episode.lang}`)}
+                onClick={() => navigate(`/${episode.lang}/episode/${episode.slug}`)}
               >
                 {episode.slug}
               </div>
@@ -85,7 +88,7 @@ const LanguageCard = ({
                 variant="ghost"
                 onClick={(e) => {
                   e.stopPropagation();
-                  window.open(`/episode/${episode.slug}?lang=${episode.lang}`, '_blank');
+                  window.open(`/${episode.lang}/episode/${episode.slug}`, '_blank');
                 }}
                 className="h-5 w-5 p-0 text-purple-400 hover:text-purple-300 hover:bg-purple-500/20"
                 title={getLocaleString('openInNewWindow', currentLanguage)}
@@ -146,6 +149,8 @@ const LanguageCard = ({
               episode={episode}
               onStartTranscription={onStartTranscription}
               onDeleteTranscript={onDeleteTranscript}
+              onDownloadSRT={onDownloadSRT}
+              onProcessWithAI={onProcessWithAI}
               isTranscribing={isTranscribing}
               currentLanguage={currentLanguage}
             />
@@ -164,7 +169,7 @@ const LanguageCard = ({
                 onGenerateFromText={onGenerateFromText}
                 onTranslateFromLanguage={onTranslateFromLanguage}
                 loadingFromDB={loadingFromDB}
-                generatingFromText={generatingFromText}
+                generatingFromText={processingQuestionsEpisodes?.has(`${episode?.slug}-${episode?.lang}`)}
                 translatingFrom={translatingFrom}
                 currentLanguage={currentLanguage}
               />

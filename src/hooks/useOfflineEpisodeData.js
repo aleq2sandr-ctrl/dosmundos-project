@@ -194,6 +194,24 @@ const useOfflineEpisodeData = (episodeSlug, currentLanguage, toast) => {
         q.lang === langForQuestions
       );
       
+      // Дедупликация вопросов: по содержимому (title+time) и по id
+      const normalize = (s) => (s || '').trim().toLowerCase();
+      const seenByContent = new Set();
+      const byContent = [];
+      for (const q of fetchedQuestions) {
+        const key = `${normalize(q.title)}|${Math.round(Number(q.time || 0))}`;
+        if (!seenByContent.has(key)) {
+          seenByContent.add(key);
+          byContent.push(q);
+        }
+      }
+
+      const byId = new Map();
+      for (const q of byContent) {
+        if (!byId.has(q.id)) byId.set(q.id, q);
+      }
+      fetchedQuestions = Array.from(byId.values());
+      
       // Добавляем виртуальное введение, если его нет
       const hasIntro = fetchedQuestions.some(q => q.is_intro && q.time === 0);
       if (!hasIntro) {
