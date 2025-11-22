@@ -158,12 +158,34 @@ jobs:
             sudo rm -rf /var/cache/nginx/* 2>/dev/null || true
             sudo find /var/cache/nginx -type f -delete 2>/dev/null || true
             
+            echo "Testing Nginx configuration..."
+            sudo nginx -t
+            
             echo "Reloading Nginx..."
             sudo systemctl reload nginx || sudo service nginx reload || sudo nginx -s reload || true
             
             echo "Checking Nginx status..."
             sudo systemctl status nginx --no-pager -l || sudo service nginx status || true
             echo "Nginx reloaded successfully"
+            
+      - name: Test deployment info file
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            echo "Testing .deployment-info file access..."
+            if [ -f "${{ secrets.VPS_PATH }}/.deployment-info" ]; then
+              echo "File exists on server:"
+              cat "${{ secrets.VPS_PATH }}/.deployment-info"
+              echo ""
+              echo "Testing HTTP access (should work if Nginx is configured correctly):"
+              curl -s http://localhost/.deployment-info || echo "HTTP test failed (this is OK if HTTPS is required)"
+            else
+              echo "WARNING: .deployment-info file not found!"
+            fi
             
       - name: Cleanup archive from runner
         if: always()

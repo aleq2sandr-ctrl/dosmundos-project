@@ -12,7 +12,11 @@ echo ""
 
 # Проверка информации о деплое
 echo "2. Информация о последнем деплое:"
-ssh root@72.61.186.175 "cat /var/www/dosmundos/dist/.deployment-info 2>/dev/null || echo 'Файл .deployment-info не найден'"
+echo "   Проверка на сервере:"
+ssh root@72.61.186.175 "cat /var/www/dosmundos/dist/.deployment-info 2>/dev/null || echo 'Файл .deployment-info не найден на сервере'"
+echo ""
+echo "   Проверка через HTTP (должен быть доступен напрямую):"
+curl -s https://dosmundos.pe/.deployment-info 2>&1 | head -5 || echo "Не удалось получить файл через HTTP"
 echo ""
 
 # Проверка статуса Nginx

@@ -47,6 +47,8 @@ cat /var/www/dosmundos/dist/.deployment-info
 
 ### Шаг 5: Проверьте конфигурацию Nginx
 
+**ВАЖНО:** Nginx должен быть настроен так, чтобы отдавать статические файлы (включая `.deployment-info`) напрямую, минуя React Router.
+
 ```bash
 # Проверьте конфигурацию
 sudo nginx -t
@@ -56,9 +58,22 @@ sudo cat /etc/nginx/sites-enabled/dosmundos.pe
 # или
 sudo cat /etc/nginx/conf.d/dosmundos.pe.conf
 
+# Убедитесь, что в конфигурации есть правило для .deployment-info:
+# location ~ ^/(\.deployment-info|sw\.js|vite\.svg|_redirects)$ {
+#     try_files $uri =404;
+#     add_header Cache-Control "no-cache, no-store, must-revalidate";
+# }
+
+# Если правила нет, добавьте его (см. nginx-config-example.conf)
+
 # Перезагрузите Nginx вручную
 sudo systemctl reload nginx
 ```
+
+**Если файл `.deployment-info` не доступен:**
+1. Убедитесь, что файл существует: `ls -la /var/www/dosmundos/dist/.deployment-info`
+2. Проверьте права доступа: `chmod 644 /var/www/dosmundos/dist/.deployment-info`
+3. Убедитесь, что в конфигурации Nginx есть правило для статических файлов (см. `nginx-config-example.conf`)
 
 ### Шаг 6: Очистите кеш
 
