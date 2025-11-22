@@ -246,8 +246,22 @@ export const getCorrectAudioUrl = (episode) => {
   
   if (!finalUrl) return null;
 
+  // Если URL содержит старый прокси, извлекаем оригинальный URL
+  if (finalUrl.includes('/api/proxy-audio')) {
+    try {
+      // Обрабатываем как полный URL или относительный
+      const urlString = finalUrl.startsWith('http') ? finalUrl : `https://dosmundos.pe${finalUrl}`;
+      const urlObj = new URL(urlString);
+      const originalUrl = urlObj.searchParams.get('url');
+      if (originalUrl) {
+        finalUrl = decodeURIComponent(originalUrl);
+      }
+    } catch (e) {
+      console.warn('Failed to parse proxy URL:', finalUrl);
+    }
+  }
+
   // Возвращаем прямой URL.
-  // Ранее здесь была логика проксирования для Hostinger, но мы её убрали по требованию.
   return finalUrl;
 };
 

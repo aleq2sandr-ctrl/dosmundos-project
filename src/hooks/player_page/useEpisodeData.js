@@ -276,7 +276,7 @@ const useEpisodeData = (episodeSlug, currentLanguage, toast) => {
       }
       
 
-      // Используем getCorrectAudioUrl для проксирования Hostinger URL через /api/proxy-audio
+      // Получаем прямой URL аудио
       const finalAudioUrl = getCorrectAudioUrl(episode) || r2Service.getCompatibleUrl(
         episode.audio_url,
         episode.r2_object_key,

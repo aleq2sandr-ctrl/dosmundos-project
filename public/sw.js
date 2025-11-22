@@ -147,11 +147,6 @@ function isAudioRequest(request) {
   if (url.hostname.includes('hostingersite.com')) {
     return false;
   }
-  
-  // Явно включаем proxy-audio
-  if (url.pathname.includes('/api/proxy-audio')) {
-    return true;
-  }
 
   // Исключаем API эндпоинты информации о файлах (могут заканчиваться на .mp3, но это не аудио)
   if (url.pathname.includes('/upload/info/')) {
