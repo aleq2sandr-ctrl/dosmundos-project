@@ -112,8 +112,7 @@ function isApiRequest(request) {
     '/api/upload',
     '/api/upload/info/',
     '/api/upload/files',
-    '/api/assemblyai',
-    '/api/proxy-audio'
+    '/api/assemblyai'
   ];
   
   return apiPatterns.some(pattern => url.pathname.includes(pattern));
