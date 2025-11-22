@@ -228,43 +228,27 @@ export const checkFileExists = async (filename) => {
 /**
  * Возвращает корректный URL аудио для эпизода с учетом провайдера хранения
  * - Если в БД уже сохранен абсолютный audio_url:
- *   - Для Hostinger URL: проксируем через VPS API
- *   - Для VPS URL: возвращаем как есть (он уже полный или относительный)
+ *   - Для Hostinger URL: проксируем через VPS API (так как нет CORS заголовков)
+ *   - Для VPS URL: возвращаем как есть
  * - Fallback: если есть r2_object_key — собираем URL из публичной базы на VPS
  */
 export const getCorrectAudioUrl = (episode) => {
   if (!episode) return null;
   
-  if (episode.audio_url && typeof episode.audio_url === 'string') {
-    // Если в БД по старой логике сохранён прокси-URL вида /api/proxy-audio?url=ENCODED
-    // — попробуем извлечь и вернуть исходный URL (Hostinger или любой другой)
-    try {
-      const audioStr = episode.audio_url;
-      const proxyMatch = audioStr.match(/[?&]url=([^&]+)/);
-      if (audioStr.includes('/api/proxy-audio') && proxyMatch && proxyMatch[1]) {
-        try {
-          const decoded = decodeURIComponent(proxyMatch[1]);
-          return decoded;
-        } catch (e) {
-          // Если декодирование не прошло, падаем через и вернём оригинальную строку
-          console.warn('[storageRouter] Failed to decode stored proxy url, returning raw:', e);
-          return audioStr;
-        }
-      }
-    } catch (e) {
-      console.warn('[storageRouter] Error while parsing audio_url:', e);
-    }
+  let finalUrl = null;
 
-    // По умолчанию возвращаем как есть
-    return episode.audio_url;
-  }
-  
-  if (episode.r2_object_key && typeof episode.r2_object_key === 'string') {
+  if (episode.audio_url && typeof episode.audio_url === 'string') {
+    finalUrl = episode.audio_url;
+  } else if (episode.r2_object_key && typeof episode.r2_object_key === 'string') {
     // Fallback: используем публичную базу на VPS, где лежат аудиофайлы
-    return `${AUDIO_PUBLIC_BASE}/${encodeURIComponent(episode.r2_object_key)}`;
+    finalUrl = `${AUDIO_PUBLIC_BASE}/${encodeURIComponent(episode.r2_object_key)}`;
   }
   
-  return null;
+  if (!finalUrl) return null;
+
+  // Возвращаем прямой URL.
+  // Ранее здесь была логика проксирования для Hostinger, но мы её убрали по требованию.
+  return finalUrl;
 };
 
 // Экспорт по умолчанию

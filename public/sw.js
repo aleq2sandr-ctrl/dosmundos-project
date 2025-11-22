@@ -1,6 +1,6 @@
 // Версия кеша - обновляется при каждом деплое для принудительного обновления
 // IMPORTANT: Измените эту версию при каждом деплое, чтобы очистить старые кеши
-const CACHE_VERSION = 'v20251113-012920';
+const CACHE_VERSION = 'v20251123-121500';
 const STATIC_CACHE = 'static-' + CACHE_VERSION;
 const DYNAMIC_CACHE = 'dynamic-' + CACHE_VERSION;
 const AUDIO_CACHE = 'audio-' + CACHE_VERSION;
@@ -54,10 +54,24 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
+  // Explicitly bypass /ping requests
+  if (url.pathname.includes('/ping')) {
+    return;
+  }
+
   // Исключаем API endpoints - они должны проходить напрямую без перехвата
   // Это предотвращает ошибки при сетевых сбоях и позволяет fallback механизму работать
   if (isApiRequest(request)) {
     // Пропускаем обработку - запрос пройдет напрямую к серверу
+    return;
+  }
+
+  // Исключаем Hostinger и другие внешние аудио-домены из обработки Service Worker'ом
+  // Это критично для CORS запросов, которые могут падать в fetch() внутри SW
+  if (url.hostname.includes('hostingersite.com') || 
+      url.hostname.includes('srvstatic.kz') || 
+      url.hostname.includes('archive.org') ||
+      url.hostname.includes('r2.dev')) {
     return;
   }
 
@@ -88,7 +102,11 @@ self.addEventListener('fetch', (event) => {
   // Стратегия "сеть сначала" для остального
   event.respondWith(
     fetch(request).catch(() => {
-      return caches.match(request);
+      return caches.match(request).then(response => {
+        if (response) return response;
+        // Если нет в кеше и сети, возвращаем 404 или fallback, чтобы не падать с TypeError
+        return new Response('Not found', { status: 404, statusText: 'Not Found' });
+      });
     })
   );
 });
@@ -112,7 +130,8 @@ function isApiRequest(request) {
     '/api/upload',
     '/api/upload/info/',
     '/api/upload/files',
-    '/api/assemblyai'
+    '/api/assemblyai',
+    '/ping'
   ];
   
   return apiPatterns.some(pattern => url.pathname.includes(pattern));
@@ -121,7 +140,19 @@ function isApiRequest(request) {
 // Проверка, является ли запрос аудиофайлом
 function isAudioRequest(request) {
   const url = new URL(request.url);
+
+  // Исключаем Hostinger из обработки Service Worker'ом.
+  // Пусть браузер сам обрабатывает потоковое воспроизведение и кеширование.
+  // Это решает проблемы с CORS, Range requests и переполнением памяти в SW.
+  if (url.hostname.includes('hostingersite.com')) {
+    return false;
+  }
   
+  // Явно включаем proxy-audio
+  if (url.pathname.includes('/api/proxy-audio')) {
+    return true;
+  }
+
   // Исключаем API эндпоинты информации о файлах (могут заканчиваться на .mp3, но это не аудио)
   if (url.pathname.includes('/upload/info/')) {
     return false;
@@ -149,9 +180,7 @@ function isAudioRequest(request) {
   // Проверяем по домену (для наших аудиофайлов)
   const isAudioDomain = url.hostname.includes('srvstatic.kz') || 
                        url.hostname.includes('archive.org') ||
-                       url.hostname.includes('r2.dev') ||
-                       url.hostname.includes('silver-lemur-512881.hostingersite.com') ||
-                       url.hostname.includes('darkviolet-caterpillar-781686.hostingersite.com');
+                       url.hostname.includes('r2.dev');
   
   return isAudioDestination || hasAudioExtension || acceptsAudio || hasAudioParam || isAudioDomain;
 }
@@ -173,16 +202,15 @@ function isStaticAsset(request) {
          url.pathname.endsWith('.jpeg');
 }
 
-// Обработка аудио запросов с кешированием и поддержкой Range requests
+  // Обработка аудио запросов с кешированием и поддержкой Range requests
 async function handleAudioRequest(request) {
   const url = new URL(request.url);
   
-  // Ранее мы перенаправляли Hostinger аудио на /api/proxy-audio.
-  // Прямое воспроизведение Hostinger аудио теперь поддерживается, поэтому
-  // не выполняем редирект на прокси — используем оригинальный URL.
+  // Создаем "чистый" ключ для кеша (без Range заголовков и прочего)
+  const cacheKey = new Request(url.toString());
   
   const cache = await caches.open(AUDIO_CACHE);
-  const cachedResponse = await cache.match(request);
+  const cachedResponse = await cache.match(cacheKey);
 
   // Проверяем, является ли это Range request
   const rangeHeader = request.headers.get('range');
@@ -212,13 +240,15 @@ async function handleAudioRequest(request) {
     console.log('[SW] Fetching audio from network:', request.url);
     const response = await fetch(request);
     
-    if (response.ok && response.status === 200) {
+    // Кешируем только успешные ответы, не opaque (status 0) и не partial (206)
+    if (response.ok && response.status === 200 && response.type !== 'opaque') {
       // Проверяем размер кеша перед добавлением
       await manageCacheSize(cache, response.clone());
       
-      // Кешируем только полный ответ (не Range responses)
-      if (!rangeHeader) {
-        await cache.put(request, response.clone());
+      // Кешируем только полный ответ (не Range responses) и только GET запросы
+      if (!rangeHeader && request.method === 'GET') {
+        // Используем чистый ключ для сохранения
+        await cache.put(cacheKey, response.clone());
         console.log('[SW] Audio cached:', request.url);
       }
     }
@@ -227,19 +257,15 @@ async function handleAudioRequest(request) {
   } catch (error) {
     console.log('[SW] Audio fetch failed, checking cache:', error);
     
-    // Если есть кеш, пытаемся обработать Range request из кеша
-    if (cachedResponse && rangeHeader) {
-      return handleRangeRequest(cachedResponse, rangeHeader);
-    }
+    // Если есть кеш (возможно найденный по другому ключу?), пытаемся обработать Range request из кеша
+    // Но мы уже проверили cachedResponse выше.
     
-    return cachedResponse || new Response('Audio not available offline', { 
+    return new Response('Audio not available offline', { 
       status: 503,
       headers: { 'Content-Type': 'text/plain' }
     });
   }
-}
-
-// Обработка Range requests для поддержки перемотки в кешированном аудио
+}// Обработка Range requests для поддержки перемотки в кешированном аудио
 async function handleRangeRequest(response, rangeHeader) {
   try {
     // Получаем полное содержимое из кеша
@@ -345,8 +371,10 @@ async function handleStaticRequest(request) {
     const networkResponse = await fetch(request, { cache: 'no-cache' });
     
     if (networkResponse.ok) {
-      // Кешируем обновленный ответ
-      await cache.put(request, networkResponse.clone());
+      // Кешируем обновленный ответ только для GET запросов
+      if (request.method === 'GET') {
+        await cache.put(request, networkResponse.clone());
+      }
       return networkResponse;
     }
     
