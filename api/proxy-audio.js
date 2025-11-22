@@ -3,6 +3,15 @@
 // Работает с Vercel/Netlify serverless functions
 
 export default async function handler(req, res) {
+  // Обрабатываем CORS preflight запросы
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Range');
+    res.status(200).end();
+    return;
+  }
+
   // Только GET запросы
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -40,7 +49,8 @@ export default async function handler(req, res) {
     // Заголовки для запроса к Hostinger
     const fetchHeaders = {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      'Accept-Encoding': 'identity'
+      'Accept-Encoding': 'identity',
+      'Accept': 'audio/*'
     };
     
     // Если клиент запрашивает Range, передаём его на Hostinger
@@ -92,27 +102,20 @@ export default async function handler(req, res) {
 
     console.log('[ProxyAudio] Streaming audio to client, status:', response.status, 'content-type:', contentType);
 
-    // Для Vercel/Netlify serverless functions используем потоковую передачу через ReadableStream
-    const reader = response.body.getReader();
-    
-    // Читаем данные порциями и отправляем клиенту
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-          res.end();
-          break;
-        }
-        // Отправляем chunk данных
-        res.write(Buffer.from(value));
-      }
-    } catch (streamError) {
-      console.error('[ProxyAudio] Error reading stream:', streamError);
-      if (!res.headersSent) {
-        res.status(500).send('Error streaming audio');
-      } else {
-        res.end();
-      }
+    // Добавляем CORS заголовки
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Range');
+    res.setHeader('Cross-Origin-Resource-Sharing', 'true');
+
+    // Простой способ: используем pipe вместо ReadableStream
+    // response.body это Node.js ReadableStream, а не Fetch API
+    if (response.body && typeof response.body.pipe === 'function') {
+      response.body.pipe(res);
+    } else {
+      // Fallback для случаев когда body недоступен как stream
+      const buffer = await response.arrayBuffer();
+      res.end(Buffer.from(buffer));
     }
     
   } catch (error) {
