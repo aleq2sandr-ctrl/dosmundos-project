@@ -236,18 +236,7 @@ export const getCorrectAudioUrl = (episode) => {
   if (!episode) return null;
   
   if (episode.audio_url && typeof episode.audio_url === 'string') {
-    // Если это Hostinger домен, проксируем через VPS API
-    if (episode.audio_url.includes('silver-lemur-512881.hostingersite.com') || 
-        episode.audio_url.includes('darkviolet-caterpillar-781686.hostingersite.com')) {
-      // Проксируем через VPS, чтобы избежать проблем с CORS и доступом
-      const encodedUrl = encodeURIComponent(episode.audio_url);
-      return `/api/proxy-audio?url=${encodedUrl}`;
-    }
-    // Если это VPS URL (начинается с /files или https://dosmundos.pe)
-    if (episode.audio_url.startsWith('/files/') || episode.audio_url.includes('dosmundos.pe/files/')) {
-      return episode.audio_url;
-    }
-    // Для других абсолютных URL (http/https)
+    // Всегда возвращаем прямой URL, прокси не нужен
     return episode.audio_url;
   }
   
