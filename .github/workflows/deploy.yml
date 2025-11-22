@@ -24,6 +24,15 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Validate deploy secrets
+        run: |
+          echo "Checking required deploy secrets..."
+          if [ -z "${{ secrets.VPS_HOST }}" ]; then echo "ERROR: secret VPS_HOST is missing"; exit 1; fi
+          if [ -z "${{ secrets.VPS_USER }}" ]; then echo "ERROR: secret VPS_USER is missing"; exit 1; fi
+          if [ -z "${{ secrets.VPS_SSH_KEY }}" ]; then echo "ERROR: secret VPS_SSH_KEY is missing"; exit 1; fi
+          if [ -z "${{ secrets.VPS_PORT }}" ]; then echo "WARNING: secret VPS_PORT is missing - defaulting to 22"; fi
+          if [ -z "${{ secrets.VPS_PATH }}" ]; then echo "ERROR: secret VPS_PATH is missing"; exit 1; fi
+
       - name: Create target directory on VPS (if missing)
         uses: appleboy/ssh-action@v1.0.3
         with:
