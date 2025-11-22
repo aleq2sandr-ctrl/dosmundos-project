@@ -23,6 +23,12 @@ jobs:
 
       - name: Build
         run: npm run build
+        
+      - name: Add deployment timestamp
+        run: |
+          echo "Deployment timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)" > dist/.deployment-info
+          echo "Git commit: ${{ github.sha }}" >> dist/.deployment-info
+          echo "Git branch: ${{ github.ref_name }}" >> dist/.deployment-info
 
       - name: Create target directory on VPS (if missing)
         uses: appleboy/ssh-action@v1.0.3
@@ -53,13 +59,8 @@ jobs:
         run: |
           cd dist
           tar -czf ../deploy.tar.gz .
-          
-      - name: Cleanup archive after deployment
-        if: always()
-        run: |
-          rm -f deploy.tar.gz
 
-      - name: Upload and extract dist to VPS
+      - name: Upload archive to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -69,7 +70,7 @@ jobs:
           source: "deploy.tar.gz"
           target: "/tmp/"
 
-      - name: Extract files on VPS
+      - name: Cleanup old files and extract new deployment
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -77,11 +78,47 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
           script: |
-            mkdir -p ${{ secrets.VPS_PATH }}
-            cd ${{ secrets.VPS_PATH }}
+            set -e
+            echo "=== Starting deployment ==="
+            DEPLOY_PATH="${{ secrets.VPS_PATH }}"
+            mkdir -p "$DEPLOY_PATH"
+            
+            # Show current state
+            echo "Current directory contents:"
+            ls -lah "$DEPLOY_PATH" | head -10 || echo "Directory is empty or doesn't exist"
+            
+            # Remove old files (except backup directories)
+            echo "Removing old files (keeping backups)..."
+            cd "$DEPLOY_PATH"
+            find . -mindepth 1 -maxdepth 1 ! -name 'backup-*' -exec rm -rf {} \; || true
+            
+            # Verify archive exists
+            if [ ! -f "/tmp/deploy.tar.gz" ]; then
+              echo "ERROR: Archive /tmp/deploy.tar.gz not found!"
+              exit 1
+            fi
+            
+            # Extract new files
+            echo "Extracting new files..."
             tar -xzf /tmp/deploy.tar.gz
-            rm /tmp/deploy.tar.gz
-            echo "Files extracted successfully"
+            
+            # Clean up archive
+            rm -f /tmp/deploy.tar.gz
+            
+            # Verify extraction
+            if [ ! -f "$DEPLOY_PATH/index.html" ]; then
+              echo "ERROR: index.html not found after extraction!"
+              exit 1
+            fi
+            
+            # List deployed files
+            echo "=== Deployed files ==="
+            ls -lah "$DEPLOY_PATH" | head -20
+            echo ""
+            echo "=== Deployment info ==="
+            cat "$DEPLOY_PATH/.deployment-info" 2>/dev/null || echo "No deployment info file"
+            echo ""
+            echo "Deployment completed successfully!"
 
       - name: Set correct permissions
         uses: appleboy/ssh-action@v1.0.3
@@ -109,7 +146,7 @@ jobs:
             echo "Deployment verified: index.html exists"
             ls -lah ${{ secrets.VPS_PATH }} | head -10
 
-      - name: Reload Nginx
+      - name: Clear Nginx cache and reload
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -117,5 +154,18 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
           script: |
-            sudo systemctl reload nginx || sudo service nginx reload || true
+            echo "Clearing Nginx cache..."
+            sudo rm -rf /var/cache/nginx/* 2>/dev/null || true
+            sudo find /var/cache/nginx -type f -delete 2>/dev/null || true
+            
+            echo "Reloading Nginx..."
+            sudo systemctl reload nginx || sudo service nginx reload || sudo nginx -s reload || true
+            
+            echo "Checking Nginx status..."
+            sudo systemctl status nginx --no-pager -l || sudo service nginx status || true
             echo "Nginx reloaded successfully"
+            
+      - name: Cleanup archive from runner
+        if: always()
+        run: |
+          rm -f deploy.tar.gz
