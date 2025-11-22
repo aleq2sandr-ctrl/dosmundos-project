@@ -178,22 +178,9 @@ function isStaticAsset(request) {
 async function handleAudioRequest(request) {
   const url = new URL(request.url);
   
-  // Если это Hostinger аудио, перенаправляем на прокси
-  if (url.hostname.includes('silver-lemur-512881.hostingersite.com') || 
-      url.hostname.includes('darkviolet-caterpillar-781686.hostingersite.com')) {
-    const encodedUrl = encodeURIComponent(url.toString());
-    const proxyUrl = `/api/proxy-audio?url=${encodedUrl}`;
-    console.log('[SW] Redirecting Hostinger audio to proxy:', proxyUrl);
-    
-    // Создаем новый запрос к прокси
-    const proxyRequest = new Request(proxyUrl, {
-      method: 'GET',
-      headers: request.headers
-    });
-    
-    // Отправляем через fetch, который НЕ будет перехвачен (так как это same-origin)
-    return fetch(proxyRequest);
-  }
+  // Ранее мы перенаправляли Hostinger аудио на /api/proxy-audio.
+  // Прямое воспроизведение Hostinger аудио теперь поддерживается, поэтому
+  // не выполняем редирект на прокси — используем оригинальный URL.
   
   const cache = await caches.open(AUDIO_CACHE);
   const cachedResponse = await cache.match(request);

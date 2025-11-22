@@ -236,7 +236,26 @@ export const getCorrectAudioUrl = (episode) => {
   if (!episode) return null;
   
   if (episode.audio_url && typeof episode.audio_url === 'string') {
-    // Всегда возвращаем прямой URL, прокси не нужен
+    // Если в БД по старой логике сохранён прокси-URL вида /api/proxy-audio?url=ENCODED
+    // — попробуем извлечь и вернуть исходный URL (Hostinger или любой другой)
+    try {
+      const audioStr = episode.audio_url;
+      const proxyMatch = audioStr.match(/[?&]url=([^&]+)/);
+      if (audioStr.includes('/api/proxy-audio') && proxyMatch && proxyMatch[1]) {
+        try {
+          const decoded = decodeURIComponent(proxyMatch[1]);
+          return decoded;
+        } catch (e) {
+          // Если декодирование не прошло, падаем через и вернём оригинальную строку
+          console.warn('[storageRouter] Failed to decode stored proxy url, returning raw:', e);
+          return audioStr;
+        }
+      }
+    } catch (e) {
+      console.warn('[storageRouter] Error while parsing audio_url:', e);
+    }
+
+    // По умолчанию возвращаем как есть
     return episode.audio_url;
   }
   
