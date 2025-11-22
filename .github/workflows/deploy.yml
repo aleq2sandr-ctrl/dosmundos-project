@@ -34,23 +34,88 @@ jobs:
           script: |
             mkdir -p ${{ secrets.VPS_PATH }}
 
-      - name: Upload dist to VPS
+      - name: Backup current deployment (optional)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            if [ -d "${{ secrets.VPS_PATH }}" ]; then
+              BACKUP_DIR="/var/www/dosmundos/backup-$(date +%Y%m%d-%H%M%S)"
+              mkdir -p "$BACKUP_DIR"
+              cp -r "${{ secrets.VPS_PATH }}"/* "$BACKUP_DIR/" 2>/dev/null || true
+              echo "Backup created at $BACKUP_DIR"
+            fi
+
+      - name: Create deployment archive
+        run: |
+          cd dist
+          tar -czf ../deploy.tar.gz .
+          
+      - name: Cleanup archive after deployment
+        if: always()
+        run: |
+          rm -f deploy.tar.gz
+
+      - name: Upload and extract dist to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
-          source: "dist/*"
-          target: ${{ secrets.VPS_PATH }}
-          strip_components: 0
+          source: "deploy.tar.gz"
+          target: "/tmp/"
 
-      # Optional: reload web server if needed
-      # - name: Reload Nginx
-      #   uses: appleboy/ssh-action@v1.0.3
-      #   with:
-      #     host: ${{ secrets.VPS_HOST }}
-      #     username: ${{ secrets.VPS_USER }}
-      #     key: ${{ secrets.VPS_SSH_KEY }}
-      #     port: ${{ secrets.VPS_PORT }}
-      #     script: sudo systemctl reload nginx
+      - name: Extract files on VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            mkdir -p ${{ secrets.VPS_PATH }}
+            cd ${{ secrets.VPS_PATH }}
+            tar -xzf /tmp/deploy.tar.gz
+            rm /tmp/deploy.tar.gz
+            echo "Files extracted successfully"
+
+      - name: Set correct permissions
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            chmod -R 755 ${{ secrets.VPS_PATH }}
+            chown -R www-data:www-data ${{ secrets.VPS_PATH }} || chown -R nginx:nginx ${{ secrets.VPS_PATH }} || true
+
+      - name: Verify deployment
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            if [ ! -f "${{ secrets.VPS_PATH }}/index.html" ]; then
+              echo "ERROR: index.html not found after deployment!"
+              exit 1
+            fi
+            echo "Deployment verified: index.html exists"
+            ls -lah ${{ secrets.VPS_PATH }} | head -10
+
+      - name: Reload Nginx
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            sudo systemctl reload nginx || sudo service nginx reload || true
+            echo "Nginx reloaded successfully"
