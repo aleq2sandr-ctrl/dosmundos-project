@@ -52,9 +52,14 @@ const usePlayerPlayback = ({
         } catch (err2) {
           // Не удалось даже в mute — ждем жеста пользователя чтобы попытаться снова
           autoplayPendingRef.current = 'play';
+          if (typeof setShowPlayOverlay === 'function') {
+             console.log('[usePlayerPlayback] Autoplay blocked, showing overlay');
+             setShowPlayOverlay(true);
+          }
           return false;
         }
       }
+      console.error('[usePlayerPlayback] Play error:', err);
       return false;
     }
   };
@@ -156,7 +161,7 @@ const usePlayerPlayback = ({
               setIsPlayingState(true);
               onPlayerStateChange?.({ isPlaying: true });
             }).catch(e => {
-              if (e.name === 'NotAllowedError' && typeof setShowPlayOverlay === 'function') setShowPlayOverlay(true);
+              // NotAllowedError handled in attemptPlay
               if (e.name !== 'AbortError') console.error("Error playing after jump:", e);
               setIsPlayingState(false);
               onPlayerStateChange?.({ isPlaying: false });
@@ -192,7 +197,7 @@ const usePlayerPlayback = ({
                 setIsPlayingState(true);
                 onPlayerStateChange?.({ isPlaying: true });
               }).catch(e => {
-                if (e.name === 'NotAllowedError' && typeof setShowPlayOverlay === 'function') setShowPlayOverlay(true);
+                // NotAllowedError handled in attemptPlay
                 if (e.name !== 'AbortError') console.error("Error playing after jump:", e);
                 setIsPlayingState(false);
                 onPlayerStateChange?.({ isPlaying: false });
@@ -234,7 +239,7 @@ const usePlayerPlayback = ({
                     onPlayerStateChange?.({ isPlaying: true });
                   }
                }).catch(e => {
-                  if (e.name === 'NotAllowedError' && typeof setShowPlayOverlay === 'function') setShowPlayOverlay(true);
+                  // NotAllowedError handled in attemptPlay
                });
             }
           }
@@ -468,10 +473,8 @@ const usePlayerPlayback = ({
             scheduleAutoUnmute(audioElement);
           }
         }).catch(error => {
-          if (error.name === 'NotAllowedError') {
-            logger.debug('usePlayerPlayback: Autoplay blocked by browser - user interaction required');
-            if (typeof setShowPlayOverlay === 'function') setShowPlayOverlay(true);
-          } else if (error.name !== 'AbortError') {
+          // Note: NotAllowedError is now handled inside attemptPlay
+          if (error.name !== 'AbortError') {
             console.error("usePlayerPlayback: Autoplay error:", error);
           }
           // Не обновляем состояние при блокировке автозапуска

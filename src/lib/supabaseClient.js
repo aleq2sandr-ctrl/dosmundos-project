@@ -40,7 +40,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       // Для self-hosted Supabase всегда добавляем apikey в заголовках
       ...(isSelfHosted && {
         'apikey': supabaseAnonKey,
-        'Authorization': `Bearer ${supabaseAnonKey}`
+        'Authorization': `Bearer ${supabaseAnonKey}`,
+        // Add connection headers to prevent HTTP/2 issues
+        'Connection': 'keep-alive',
+        'User-Agent': 'DosMundos-Podcast-App/1.0'
       })
     }
   },
@@ -65,14 +68,25 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       delete headers['content-profile'];
       delete headers['Content-Profile'];
       
+      // Add HTTP/2 compatibility headers
+      headers['Connection'] = 'keep-alive';
+      headers['User-Agent'] = 'DosMundos-Podcast-App/1.0';
+      
       console.log('🔧 [Supabase] Fetch URL:', url);
       console.log('🔧 [Supabase] Headers after cleanup:', headers);
+      
+      // Add timeout and abort controller for better error handling
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
       
       return fetch(url, {
         ...options,
         headers,
         mode: 'cors',
-        credentials: 'omit'
+        credentials: 'omit',
+        signal: controller.signal
+      }).finally(() => {
+        clearTimeout(timeoutId);
       });
     }
   })
@@ -101,19 +115,34 @@ if (isSelfHosted) {
         headers['Authorization'] = `Bearer ${supabaseAnonKey}`;
       }
       
+      // Add HTTP/2 compatibility headers
+      headers['Connection'] = 'keep-alive';
+      headers['User-Agent'] = 'DosMundos-Podcast-App/1.0';
+      
       // Функция для выполнения запроса с повторными попытками
       const fetchWithRetry = async (attempt = 1) => {
+        // Add timeout and abort controller for better error handling
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+        
         try {
           return await originalFetch(url, {
             ...options,
             headers,
             mode: 'cors',
-            credentials: 'omit'
+            credentials: 'omit',
+            signal: controller.signal
           });
         } catch (error) {
+          clearTimeout(timeoutId);
+          
           // Если это HTTP/2 ошибка и у нас есть еще попытки
-          if ((error.message.includes('HTTP2') || error.message.includes('ERR_HTTP2_PROTOCOL_ERROR')) && attempt < 3) {
-            console.warn(`🔄 [Supabase] HTTP/2 ошибка, попытка ${attempt + 1} из 3`);
+          const isHttp2Error = error.message.includes('HTTP2') || 
+                              error.message.includes('ERR_HTTP2_PROTOCOL_ERROR') ||
+                              error.message.includes('Failed to fetch');
+          
+          if (isHttp2Error && attempt < 3) {
+            console.warn(`🔄 [Supabase] HTTP/2 ошибка, попытка ${attempt + 1} из 3:`, error.message);
             // Небольшая задержка перед повторной попыткой
             await new Promise(resolve => setTimeout(resolve, 500 * attempt));
             return fetchWithRetry(attempt + 1);

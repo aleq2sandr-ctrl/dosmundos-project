@@ -235,7 +235,20 @@ class SyncService {
           
           return { data: serverData, source: 'server' };
         } catch (error) {
-          logger.warn('[Sync] Server load failed, trying cache:', error);
+          // Check if this is an HTTP/2 protocol error
+          const isHttp2Error = error.message.includes('HTTP2') || 
+                              error.message.includes('ERR_HTTP2_PROTOCOL_ERROR') ||
+                              error.message.includes('Failed to fetch');
+          
+          if (isHttp2Error) {
+            logger.warn('[Sync] HTTP/2 protocol error detected, falling back to cache:', {
+              error: error.message,
+              type,
+              params
+            });
+          } else {
+            logger.warn('[Sync] Server load failed, trying cache:', error);
+          }
         }
       }
 
@@ -288,96 +301,143 @@ class SyncService {
 
   // Загрузка данных с сервера
   async loadDataFromServer(type, params) {
+    // Helper function to retry requests with HTTP/2 error handling
+    const fetchWithRetry = async (fetchFn, maxRetries = 3) => {
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          return await fetchFn();
+        } catch (error) {
+          const isHttp2Error = error.message.includes('HTTP2') || 
+                              error.message.includes('ERR_HTTP2_PROTOCOL_ERROR') ||
+                              error.message.includes('Failed to fetch');
+          
+          if (isHttp2Error && attempt < maxRetries) {
+            logger.warn(`[Sync] HTTP/2 error on attempt ${attempt}/${maxRetries}, retrying...:`, error.message);
+            // Exponential backoff: 500ms, 1000ms, 2000ms
+            await new Promise(resolve => setTimeout(resolve, 500 * Math.pow(2, attempt - 1)));
+            continue;
+          }
+          throw error;
+        }
+      }
+    };
+
     switch (type) {
       case 'episode': {
-        const { data: episodeData, error: episodeError } = await supabase
-          .from('episodes')
-          .select('*')
-          .eq('slug', params.slug)
-          .single();
-        
-        if (episodeError) throw episodeError;
-        
-        // Проверяем, что данные эпизода корректны
-        if (episodeData && typeof episodeData === 'object' && episodeData.slug) {
-          return episodeData;
-        } else {
-          throw new Error('Invalid episode data received from server');
-        }
+        // console.log('[Sync] Loading episode from server:', params.slug);
+        const fetchEpisode = async () => {
+          const { data: episodeData, error: episodeError } = await supabase
+            .from('episodes')
+            .select('*')
+            .eq('slug', params.slug)
+            .maybeSingle();
+          
+          if (episodeError) {
+             console.error('[Sync] Supabase episode error:', episodeError);
+             throw episodeError;
+          }
+          
+          if (!episodeData) {
+             // console.warn('[Sync] Episode not found on server:', params.slug);
+             throw new Error('Episode not found on server');
+          }
+          
+          // Проверяем, что данные эпизода корректны
+          if (typeof episodeData === 'object' && episodeData.slug) {
+            return episodeData;
+          } else {
+            console.error('[Sync] Invalid episode data received:', episodeData);
+            throw new Error('Invalid episode data received from server');
+          }
+        };
+
+        return await fetchWithRetry(fetchEpisode);
       }
 
       case 'transcript': {
-        const { data: transcriptData, error: transcriptError } = await supabase
-          .from('transcripts')
-          .select('id, episode_slug, lang, status, created_at, updated_at, edited_transcript_data')
-          .eq('episode_slug', params.episodeSlug)
-          .eq('lang', params.lang)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        
-        if (transcriptError) throw transcriptError;
-        
-        // Проверяем, что данные транскрипта корректны
-        if (transcriptData && typeof transcriptData === 'object') {
-          // Извлекаем данные из edited_transcript_data
-          const editedData = transcriptData.edited_transcript_data || {};
+        const fetchTranscript = async () => {
+          const { data: transcriptData, error: transcriptError } = await supabase
+            .from('transcripts')
+            .select('id, episode_slug, lang, status, created_at, updated_at, edited_transcript_data')
+            .eq('episode_slug', params.episodeSlug)
+            .eq('lang', params.lang)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
           
-          return {
-            id: transcriptData.id,
-            episode_slug: transcriptData.episode_slug || params.episodeSlug,
-            lang: transcriptData.lang || params.lang,
-            utterances: Array.isArray(editedData.utterances) ? editedData.utterances : [],
-            words: Array.isArray(editedData.words) ? editedData.words : [],
-            text: editedData.text || '',
-            status: transcriptData.status || 'completed',
-            created_at: transcriptData.created_at || new Date().toISOString(),
-            updated_at: transcriptData.updated_at || new Date().toISOString(),
-            edited_transcript_data: transcriptData.edited_transcript_data
-          };
-        }
-        
-        return transcriptData;
+          if (transcriptError) throw transcriptError;
+          
+          // Проверяем, что данные транскрипта корректны
+          if (transcriptData && typeof transcriptData === 'object') {
+            // Извлекаем данные из edited_transcript_data
+            const editedData = transcriptData.edited_transcript_data || {};
+            
+            return {
+              id: transcriptData.id,
+              episode_slug: transcriptData.episode_slug || params.episodeSlug,
+              lang: transcriptData.lang || params.lang,
+              utterances: Array.isArray(editedData.utterances) ? editedData.utterances : [],
+              words: Array.isArray(editedData.words) ? editedData.words : [],
+              text: editedData.text || '',
+              status: transcriptData.status || 'completed',
+              created_at: transcriptData.created_at || new Date().toISOString(),
+              updated_at: transcriptData.updated_at || new Date().toISOString(),
+              edited_transcript_data: transcriptData.edited_transcript_data
+            };
+          }
+          
+          return transcriptData;
+        };
+
+        return await fetchWithRetry(fetchTranscript);
       }
 
       case 'questions': {
-        const { data: questionsData, error: questionsError } = await supabase
-          .from('questions')
-          .select('*')
-          .eq('episode_slug', params.episodeSlug)
-          .eq('lang', params.lang)
-          .order('time', { ascending: true });
-        
-        if (questionsError) throw questionsError;
-        
-        // Проверяем, что данные вопросов корректны
-        if (Array.isArray(questionsData)) {
-          return questionsData.filter(q => 
-            q && typeof q === 'object' && 
-            (q.id || q.time !== undefined) && 
-            q.lang === params.lang
-          );
-        }
-        
-        return questionsData || [];
+        const fetchQuestions = async () => {
+          const { data: questionsData, error: questionsError } = await supabase
+            .from('questions')
+            .select('*')
+            .eq('episode_slug', params.episodeSlug)
+            .eq('lang', params.lang)
+            .order('time', { ascending: true });
+          
+          if (questionsError) throw questionsError;
+          
+          // Проверяем, что данные вопросов корректны
+          if (Array.isArray(questionsData)) {
+            return questionsData.filter(q => 
+              q && typeof q === 'object' && 
+              (q.id || q.time !== undefined) && 
+              q.lang === params.lang
+            );
+          }
+          
+          return questionsData || [];
+        };
+
+        return await fetchWithRetry(fetchQuestions);
       }
 
       case 'episodes': {
-        const { data: episodesData, error: episodesError } = await supabase
-          .from('episodes')
-          .select('*')
-          .order('date', { ascending: false });
-        
-        if (episodesError) throw episodesError;
-        
-        // Проверяем, что данные эпизодов корректны
-        if (Array.isArray(episodesData)) {
-          return episodesData.filter(ep => 
-            ep && typeof ep === 'object' && ep.slug
-          );
-        }
-        
-        return episodesData || [];
+        const fetchEpisodes = async () => {
+          const { data: episodesData, error: episodesError } = await supabase
+            .from('episodes')
+            .select('*')
+            .order('date', { ascending: false });
+          
+          if (episodesError) throw episodesError;
+          
+          // Проверяем, что данные эпизодов корректны
+          if (Array.isArray(episodesData)) {
+            return episodesData.filter(ep => 
+              ep && typeof ep === 'object' && ep.slug
+            );
+          }
+          
+          return episodesData || [];
+        };
+
+        return await fetchWithRetry(fetchEpisodes);
       }
 
       default:
