@@ -57,16 +57,6 @@ const PodcastPlayer = ({
   fetchTranscriptForEpisode 
 }) => {
   
-  console.log('🔧 [PodcastPlayer] Props received:', {
-    episodeSlug,
-    episodeAudioUrl,
-    episodeData: {
-      slug: episodeData?.slug,
-      r2_object_key: episodeData?.r2_object_key,
-      audio_url: episodeData?.audio_url
-    }
-  });
-  
   const { toast } = useToast();
   const { isAuthenticated, openAuthModal } = useEditorAuth();
   const internalQuestions = episodeData?.questions || [];
@@ -85,7 +75,7 @@ const PodcastPlayer = ({
     addQuestionDialogInitialTime, setAddQuestionDialogInitialTime
   } = usePlayerState(episodeData?.duration);
 
-  const playbackRate = 1; // Временно упрощаем для отладки
+  const playbackRate = currentPlaybackRateIndex !== undefined ? playbackRateOptions[currentPlaybackRateIndex].value : 1;
 
   const playPromiseRef = useRef(null);
   const isSeekingRef = useRef(false);
@@ -179,12 +169,10 @@ const PodcastPlayer = ({
     
     // Если URL локальный (localhost), получаем оригинальный из episodeData
     if (episodeAudioUrl && episodeAudioUrl.includes('localhost')) {
-      console.log('🔧 [Download] Local URL detected, getting original from episodeData');
       downloadUrl = getAudioUrl(episodeData);
     }
     
     if (downloadUrl) {
-      console.log('🔧 [Download] Using URL:', downloadUrl);
       const link = document.createElement('a');
       link.href = downloadUrl;
       link.download = `${episodeSlug || 'podcast_episode'}.mp3`; 
@@ -194,7 +182,6 @@ const PodcastPlayer = ({
       document.body.removeChild(link);
       toast({ title: getLocaleString('downloadStartedTitle', currentLanguage), description: getLocaleString('downloadStartedDesc', currentLanguage) });
     } else {
-      console.error('🔧 [Download] No valid audio URL found');
       toast({ title: getLocaleString('errorGeneric', currentLanguage), description: getLocaleString('audioNotAvailableForDownload', currentLanguage), variant: 'destructive' });
     }
   };

@@ -27,6 +27,7 @@ const usePlayerInteractions = (audioRef, playerControlsContainerRef, episodeSlug
       if (segmentMatch) {
         const time = parseFloat(segmentMatch[1]) / 1000; 
         const play = hash.includes('&play=true');
+        console.log('🔧 [usePlayerInteractions] Segment jump:', { hash, time, play, segmentId: segmentMatch[1] });
         logger.debug('usePlayerInteractions: Setting segment jump details', { time, play, segmentId: segmentMatch[1] });
         setJumpDetails({ time: time, id: `segment-${segmentMatch[1]}`, questionId: null, playAfterJump: play, segmentToHighlight: parseFloat(segmentMatch[1]) });
       } else if (questionMatch) {
