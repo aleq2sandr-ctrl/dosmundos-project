@@ -22,29 +22,34 @@ const Footer = ({ currentLanguage }) => {
     navigate(newPath, { replace: true });
   };
 
+  // Show edit history only on Radio pages (episodes list or player)
+  const isRadioPage = location.pathname.includes('/episodes') || location.pathname.includes('/episode/');
+
   return (
     <>
       {/* Футер */}
       <footer className="bg-transparent px-4 py-3">
         <div className="max-w-4xl mx-auto flex items-center justify-center gap-3">
-          {/* Кнопка истории редактирования */}
-          <button
-            onClick={() => setIsEditHistoryOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-800/60 hover:bg-slate-700/80 border border-slate-600/30 text-white rounded-lg shadow-lg backdrop-blur-sm transition-all hover:scale-105"
-            title={getLocaleString('editHistoryTitle', currentLanguage)}
-          >
-            <History className="h-4 w-4" />
-            <span className="text-sm font-medium">
-              {getLocaleString('editHistoryTitle', currentLanguage)}
-            </span>
-          </button>
+          {/* Кнопка истории редактирования - только в разделе Радио */}
+          {isRadioPage && (
+            <button
+              onClick={() => setIsEditHistoryOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-800/60 hover:bg-slate-700/80 border border-slate-600/30 text-white rounded-lg shadow-lg backdrop-blur-sm transition-all hover:scale-105"
+              title={getLocaleString('editHistoryTitle', currentLanguage)}
+            >
+              <History className="h-4 w-4" />
+              <span className="text-sm font-medium">
+                {getLocaleString('editHistoryTitle', currentLanguage)}
+              </span>
+            </button>
+          )}
 
-          {/* Выбор языка */}
-          <LanguageSwitcher 
+          {/* Выбор языка - скрыт, так как перенесен в шапку */}
+          {/* <LanguageSwitcher 
             currentLanguage={currentLanguage} 
             onLanguageChange={handleLanguageChange}
             dropdownPosition="up"
-          />
+          /> */}
         </div>
       </footer>
 

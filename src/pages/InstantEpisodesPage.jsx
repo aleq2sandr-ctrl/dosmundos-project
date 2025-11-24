@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { getLocaleString } from '@/lib/locales';
 import EpisodesList from '@/components/episodes/EpisodesList';
-import EpisodesPageHeader from '@/components/episodes/EpisodesPageHeader';
 import FilterAndSearchControls from '@/components/episodes/FilterAndSearchControls';
 import EmptyState from '@/components/episodes/EmptyState';
 import cacheIntegration from '@/lib/cacheIntegration';
@@ -333,10 +332,11 @@ const InstantEpisodesPage = ({ currentLanguage, onLanguageChange }) => {
 
   return (
     <div className="container mx-auto p-2 sm:p-4 max-w-2xl">
-      <EpisodesPageHeader 
-        currentLanguage={currentLanguage}
-        onLanguageChange={onLanguageChange}
-      />
+      <div className="mb-6">
+        <h1 className="text-3xl sm:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-500">
+          {getLocaleString('episodes', currentLanguage)}
+        </h1>
+      </div>
       
       <FilterAndSearchControls
         years={availableYears}

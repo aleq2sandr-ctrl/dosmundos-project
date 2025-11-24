@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { Toaster } from '@/components/ui/toaster';
+import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import LanguageSelectionModal from '@/components/LanguageSelectionModal';
 import { TelegramProvider } from '@/contexts/TelegramContext';
@@ -14,6 +15,9 @@ import NotFoundPage from '@/pages/NotFoundPage';
 import DeepSearchPage from '@/pages/DeepSearchPage';
 import OfflineSettingsPage from '@/pages/OfflineSettingsPage';
 import AnalyticsPage from '@/pages/AnalyticsPage';
+import GenericPage from '@/pages/GenericPage';
+import AboutPage from '@/pages/AboutPage';
+import FestivalPage from '@/pages/FestivalPage';
 import { supabase } from '@/lib/supabaseClient';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import cacheIntegration from '@/lib/cacheIntegration';
@@ -96,99 +100,136 @@ const LanguageRouteWrapper = ({ children }) => {
   return React.cloneElement(children, { currentLanguage: validLang });
 };
 
+const AppLayout = ({ user }) => {
+  const location = useLocation();
+  const { showAuthModal, closeAuthModal } = useEditorAuth();
+  
+  // Determine language from URL
+  const pathParts = location.pathname.split('/');
+  const langCandidate = pathParts[1];
+  const currentLanguage = SUPPORTED_LANGUAGES.includes(langCandidate) ? langCandidate : 'ru';
+
+  const podcastData = {
+    title: 'Dos Mundos',
+    author: 'El centro desarrollo integral',
+    image: 'https://silver-lemur-512881.hostingersite.com/wp-content/uploads/2025/02/logo-5-120x120.png'
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 text-white flex flex-col">
+      <LanguageRedirect />
+      <RouteTracker />
+      
+      <Header podcastData={podcastData} currentLanguage={currentLanguage} />
+      
+      <main className="flex-grow w-full">
+        <Routes>
+          {/* Редирект корня на дефолтный язык */}
+          <Route path="/" element={<Navigate to="/ru/episodes" replace />} />
+          
+          {/* Старые маршруты без языкового префикса - редиректим */}
+          <Route path="/episodes" element={<Navigate to="/ru/episodes" replace />} />
+          <Route path="/manage" element={<Navigate to="/ru/manage" replace />} />
+          <Route path="/upload" element={<Navigate to="/ru/upload" replace />} />
+          <Route path="/deep-search" element={<Navigate to="/ru/deep-search" replace />} />
+          <Route path="/edit" element={<Navigate to="/ru/edit" replace />} />
+          <Route path="/analytics" element={<Navigate to="/ru/analytics" replace />} />
+          <Route path="/offline-settings" element={<Navigate to="/ru/offline-settings" replace />} />
+          <Route path="/about" element={<Navigate to="/ru/about" replace />} />
+          <Route path="/festival" element={<Navigate to="/ru/festival" replace />} />
+          <Route path="/volunteers" element={<Navigate to="/ru/volunteers" replace />} />
+          
+          {/* Старые маршруты эпизодов - специальная обработка */}
+          <Route path="/episode/:episodeSlug" element={
+            <OldEpisodeRedirect />
+          } />
+          
+          {/* Новые маршруты с языковым префиксом */}
+          <Route path="/:lang/about" element={
+            <LanguageRouteWrapper>
+              <AboutPage />
+            </LanguageRouteWrapper>
+          } />
+          <Route path="/:lang/festival" element={
+            <LanguageRouteWrapper>
+              <FestivalPage />
+            </LanguageRouteWrapper>
+          } />
+          <Route path="/:lang/volunteers" element={
+            <LanguageRouteWrapper>
+              <GenericPage title="Волонтерам" />
+            </LanguageRouteWrapper>
+          } />
+          <Route path="/:lang/episodes" element={
+            <LanguageRouteWrapper>
+              <InstantEpisodesPage />
+            </LanguageRouteWrapper>
+          } />
+          <Route path="/:lang/episode/:episodeSlug" element={
+            <LanguageRouteWrapper>
+              <PlayerPage user={user} />
+            </LanguageRouteWrapper>
+          } />
+          <Route path="/:lang/manage" element={
+            <LanguageRouteWrapper>
+              <ManagePage />
+            </LanguageRouteWrapper>
+          } />
+          <Route path="/:lang/upload" element={
+            <LanguageRouteWrapper>
+              <UploadPage />
+            </LanguageRouteWrapper>
+          } />
+          <Route path="/:lang/deep-search" element={
+            <LanguageRouteWrapper>
+              <DeepSearchPage />
+            </LanguageRouteWrapper>
+          } />
+          <Route path="/:lang/edit" element={
+            <LanguageRouteWrapper>
+              <EditHistoryAdminPage />
+            </LanguageRouteWrapper>
+          } />
+          <Route path="/:lang/analytics" element={
+            <LanguageRouteWrapper>
+              <AnalyticsPage />
+            </LanguageRouteWrapper>
+          } />
+          <Route path="/:lang/offline-settings" element={
+            <LanguageRouteWrapper>
+              <OfflineSettingsPage onBack={() => window.history.back()} />
+            </LanguageRouteWrapper>
+          } />
+          <Route path="*" element={
+            <LanguageRouteWrapper>
+              <NotFoundPage />
+            </LanguageRouteWrapper>
+          } />
+        </Routes>
+      </main>
+      
+      <Footer 
+        currentLanguage={currentLanguage}
+      />
+      
+      {/* Global Auth Modal */}
+      <EditorAuthModal 
+        isOpen={showAuthModal}
+        onClose={closeAuthModal}
+        currentLanguage={currentLanguage}
+      />
+      
+      <Toaster />
+    </div>
+  );
+};
+
 // Internal component that has access to EditorAuthContext
 const AppContent = ({ user }) => {
-  const { showAuthModal, closeAuthModal } = useEditorAuth();
-  const { lang } = useParams();
-  const currentLanguage = SUPPORTED_LANGUAGES.includes(lang) ? lang : 'ru';
-
   return (
     <TooltipProvider>
       <Router>
-        <LanguageRedirect />
-        <RouteTracker />
-        <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 text-white flex flex-col">
-          <main className="flex-grow w-full">
-            <Routes>
-              {/* Редирект корня на дефолтный язык */}
-              <Route path="/" element={<Navigate to="/ru/episodes" replace />} />
-              
-              {/* Старые маршруты без языкового префикса - редиректим */}
-              <Route path="/episodes" element={<Navigate to="/ru/episodes" replace />} />
-              <Route path="/manage" element={<Navigate to="/ru/manage" replace />} />
-              <Route path="/upload" element={<Navigate to="/ru/upload" replace />} />
-              <Route path="/deep-search" element={<Navigate to="/ru/deep-search" replace />} />
-              <Route path="/edit" element={<Navigate to="/ru/edit" replace />} />
-              <Route path="/analytics" element={<Navigate to="/ru/analytics" replace />} />
-              <Route path="/offline-settings" element={<Navigate to="/ru/offline-settings" replace />} />
-              
-              {/* Старые маршруты эпизодов - специальная обработка */}
-              <Route path="/episode/:episodeSlug" element={
-                <OldEpisodeRedirect />
-              } />
-              
-              {/* Новые маршруты с языковым префиксом */}
-              <Route path="/:lang/episodes" element={
-                <LanguageRouteWrapper>
-                  <InstantEpisodesPage />
-                </LanguageRouteWrapper>
-              } />
-              <Route path="/:lang/episode/:episodeSlug" element={
-                <LanguageRouteWrapper>
-                  <PlayerPage user={user} />
-                </LanguageRouteWrapper>
-              } />
-              <Route path="/:lang/manage" element={
-                <LanguageRouteWrapper>
-                  <ManagePage />
-                </LanguageRouteWrapper>
-              } />
-              <Route path="/:lang/upload" element={
-                <LanguageRouteWrapper>
-                  <UploadPage />
-                </LanguageRouteWrapper>
-              } />
-              <Route path="/:lang/deep-search" element={
-                <LanguageRouteWrapper>
-                  <DeepSearchPage />
-                </LanguageRouteWrapper>
-              } />
-              <Route path="/:lang/edit" element={
-                <LanguageRouteWrapper>
-                  <EditHistoryAdminPage />
-                </LanguageRouteWrapper>
-              } />
-              <Route path="/:lang/analytics" element={
-                <LanguageRouteWrapper>
-                  <AnalyticsPage />
-                </LanguageRouteWrapper>
-              } />
-              <Route path="/:lang/offline-settings" element={
-                <LanguageRouteWrapper>
-                  <OfflineSettingsPage onBack={() => window.history.back()} />
-                </LanguageRouteWrapper>
-              } />
-              <Route path="*" element={
-                <LanguageRouteWrapper>
-                  <NotFoundPage />
-                </LanguageRouteWrapper>
-              } />
-            </Routes>
-          </main>
-          
-          <Footer 
-            currentLanguage={currentLanguage}
-          />
-          
-          {/* Global Auth Modal */}
-          <EditorAuthModal 
-            isOpen={showAuthModal}
-            onClose={closeAuthModal}
-            currentLanguage={currentLanguage}
-          />
-          
-          <Toaster />
-        </div>
+        <AppLayout user={user} />
       </Router>
     </TooltipProvider>
   );
