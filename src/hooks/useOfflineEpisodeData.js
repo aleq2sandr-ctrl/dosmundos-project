@@ -137,13 +137,7 @@ const useOfflineEpisodeData = (episodeSlug, currentLanguage, toast) => {
           status: transcriptData.status || 'completed'
         });
 
-        if (result.source === 'cache') {
-          toast({
-            title: getLocaleString('transcriptFromCache', currentLanguage) || 'Transcript from cache',
-            description: getLocaleString('transcriptLoadedOffline', currentLanguage) || 'Transcript loaded from offline cache',
-            className: "bg-blue-600/80 border-blue-500 text-white"
-          });
-        }
+        // Cache notification removed
       } else {
         setTranscript(null);
       }
@@ -225,13 +219,7 @@ const useOfflineEpisodeData = (episodeSlug, currentLanguage, toast) => {
 
       setQuestions(fetchedQuestions);
 
-      if (result.source === 'cache') {
-        toast({
-          title: getLocaleString('questionsFromCache', currentLanguage) || 'Questions from cache',
-          description: getLocaleString('questionsLoadedOffline', currentLanguage) || 'Questions loaded from offline cache',
-          className: "bg-green-600/80 border-green-500 text-white"
-        });
-      }
+      // Cache notification removed
     } catch (error) {
       console.error('Error fetching questions:', error);
       setQuestions([]);

@@ -407,24 +407,6 @@ const usePlayerPlayback = ({
       
       // Запоминаем загруженный URL
       lastLoadedUrlRef.current = normalizedNewUrl;
-      
-      // Устанавливаем новый src
-      audioElement.src = newUrl;
-      console.log('[usePlayerPlayback] audio.src set to:', audioElement.src);
-      audioElement.load();
-      console.log('[usePlayerPlayback] Called audio.load()');
-      
-      // Обновляем время последнего доступа в кеше для приоритизации
-      if (typeof window !== 'undefined' && window.audioCacheService) {
-        window.audioCacheService.updateLastAccessed(newUrl).catch(err => {
-          logger.debug('usePlayerPlayback: Failed to update cache access time', err);
-        });
-      }
-      
-      // На первом визите принудительно включаем mute, чтобы обойти блокировку
-      if (firstVisitRef.current) {
-        try { audioElement.muted = true; } catch {}
-      }
 
       // Создаем обработчики для быстрого автозапуска
       let autoplayAttempted = false;
@@ -522,6 +504,30 @@ const usePlayerPlayback = ({
       
       audioElement.addEventListener('loadedmetadata', handleLoadedMetadata, { once: true });
       audioElement.addEventListener('canplay', handleCanPlay, { once: true });
+
+      // Устанавливаем новый src
+      audioElement.src = newUrl;
+      console.log('[usePlayerPlayback] audio.src set to:', audioElement.src);
+      audioElement.load();
+      console.log('[usePlayerPlayback] Called audio.load()');
+      
+      // Check if metadata is already loaded (e.g. from cache)
+      if (audioElement.readyState >= 1) { // HAVE_METADATA
+         console.log('[usePlayerPlayback] Metadata already loaded, triggering handler manually');
+         handleLoadedMetadata();
+      }
+      
+      // Обновляем время последнего доступа в кеше для приоритизации
+      if (typeof window !== 'undefined' && window.audioCacheService) {
+        window.audioCacheService.updateLastAccessed(newUrl).catch(err => {
+          logger.debug('usePlayerPlayback: Failed to update cache access time', err);
+        });
+      }
+      
+      // На первом визите принудительно включаем mute, чтобы обойти блокировку
+      if (firstVisitRef.current) {
+        try { audioElement.muted = true; } catch {}
+      }
       
       // Cleanup функция для удаления обработчиков, если компонент размонтируется
       return () => {
