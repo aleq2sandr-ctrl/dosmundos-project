@@ -47,6 +47,7 @@
     "react-ga4": "^2.1.0",
     "react-router-dom": "^6.16.0",
     "recharts": "^3.3.0",
+    "ssh2": "^1.17.0",
     "tailwind-merge": "^1.14.0",
     "tailwindcss-animate": "^1.0.7"
   },

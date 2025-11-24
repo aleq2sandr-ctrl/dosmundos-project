@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabaseClient';
 import logger from '@/lib/logger';
 import { getLocaleString } from '@/lib/locales';
 import r2Service from '@/lib/r2Service';
-import { getCorrectAudioUrl } from '@/lib/storageRouter';
+import { getAudioUrl } from '@/lib/audioUrl';
 import { getFullTextFromUtterances } from '@/hooks/transcript/transcriptProcessingUtils';
 
 // Utility function to check if a file exists on Archive.org
@@ -276,8 +276,8 @@ const useEpisodeData = (episodeSlug, currentLanguage, toast) => {
       }
       
 
-      // Получаем прямой URL аудио
-      const finalAudioUrl = getCorrectAudioUrl(episode) || r2Service.getCompatibleUrl(
+      // Используем getAudioUrl для получения правильного URL
+      const finalAudioUrl = getAudioUrl(episode) || r2Service.getCompatibleUrl(
         episode.audio_url,
         episode.r2_object_key,
         episode.r2_bucket_name

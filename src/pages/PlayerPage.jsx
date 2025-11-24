@@ -20,7 +20,7 @@ import AddQuestionDialog from '@/components/transcript/AddQuestionDialog';
 import { useEditorAuth } from '@/contexts/EditorAuthContext';
 import { saveEditToHistory } from '@/services/editHistoryService';
 import useAudioPrefetch from '@/hooks/player/useAudioPrefetch';
-import storageRouter from '@/lib/storageRouter';
+import { getAudioUrl } from '@/lib/audioUrl';
 
 
 const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
@@ -519,7 +519,7 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
                 onQuestionSelectJump={handleSeekToTime}
                 audioRef={audioRef} 
                 episodeSlug={playerEpisodeDataMemo.slug}
-                episodeAudioUrl={storageRouter.getCorrectAudioUrl(playerEpisodeDataMemo)}
+                episodeAudioUrl={getAudioUrl(playerEpisodeDataMemo)}
                 episodeLang={playerEpisodeDataMemo.lang}
                 episodeDate={playerEpisodeDataMemo.date}
                 navigateBack={() => navigate(`/${langPrefix}/episodes`)}
@@ -555,7 +555,7 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
             mainPlayerSeekAudio={(time, play) => handleSeekToTime(time, null, play)}
             currentLanguage={currentLanguage}
             episodeLang={playerEpisodeDataMemo.lang || 'all'}
-            episodeAudioUrl={storageRouter.getCorrectAudioUrl(playerEpisodeDataMemo)}
+            episodeAudioUrl={getAudioUrl(playerEpisodeDataMemo)}
             jumpToQuestionId={playerEpisodeDataMemo.jumpToQuestionId}
             isBatchAddDisabled={true}
             showTranscript={showTranscriptUI}

@@ -15,7 +15,7 @@ import { useToast } from '@/components/ui/use-toast';
 import useTranslationManager from '@/hooks/useTranslationManager';
 import timeOldService from '@/lib/timeOldService';
 import { supabase } from '@/lib/supabaseClient';
-import storageRouter from '@/lib/storageRouter';
+import { getAudioUrl } from '@/lib/audioUrl';
 import { startPollingForItem } from '@/services/uploader/transcriptPoller';
 import DevLogPanel from '@/components/DevLogPanel';
 
@@ -109,7 +109,7 @@ const UploadPage = ({ currentLanguage }) => {
     }
 
     // Use storageRouter to get correct audio URL based on storage_provider
-    const audioUrl = storageRouter.getCorrectAudioUrl(episode);
+    const audioUrl = getAudioUrl(episode);
 
     console.log('[Transcription] Episode data:', {
       slug: episode.slug,

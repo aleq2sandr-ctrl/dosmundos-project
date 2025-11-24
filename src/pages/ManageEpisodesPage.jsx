@@ -7,7 +7,7 @@ import { UploadCloud, Loader2, PlusCircle, ArrowLeft, Settings2, Trash2, Search,
 import { getLocaleString, getPluralizedLocaleString } from '@/lib/locales';
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/lib/supabaseClient';
-import storageRouter from '@/lib/storageRouter';
+import { getAudioUrl } from '@/lib/audioUrl';
 import useFileUploadManager from '@/hooks/useFileUploadManager';
 import FileUploadItem from '@/components/uploader/FileUploadItem';
 import OverwriteDialog from '@/components/uploader/OverwriteDialog';
@@ -718,7 +718,7 @@ const EpisodeManagementSection = ({ currentLanguage }) => {
 
     try {
       // Use storageRouter to get correct audio URL based on storage_provider
-      const audioUrl = storageRouter.getCorrectAudioUrl(episode);
+      const audioUrl = getAudioUrl(episode);
       
       if (!audioUrl) {
         throw new Error(getLocaleString('audioUrlNotAvailable', currentLanguage));

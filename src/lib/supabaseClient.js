@@ -5,9 +5,6 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-console.log('🔧 [Supabase] Инициализация клиента...');
-console.log('🔧 [Supabase] URL:', supabaseUrl ? '✅ Установлен' : '❌ Не установлен');
-console.log('🔧 [Supabase] Anon Key:', supabaseAnonKey ? '✅ Установлен' : '❌ Не установлен');
 
 // Проверка наличия переменных окружения
 if (!supabaseUrl || !supabaseAnonKey) {
@@ -21,13 +18,22 @@ if (!supabaseUrl || !supabaseAnonKey) {
 // Определяем, используем ли мы self-hosted Supabase (HTTP без SSL)
 const isSelfHosted = supabaseUrl && (supabaseUrl.startsWith('http://') || supabaseUrl.includes('72.61.186.175') || supabaseUrl.includes('supabase.dosmundos.pe'));
 
+
 // Создаем клиент с настройками для оптимизации и обработки ошибок
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  realtime: {
-    params: {
-      eventsPerSecond: 10
+  // Для self-hosted временно отключаем realtime чтобы избежать WebSocket ошибок
+  ...(isSelfHosted && {
+    realtime: {
+      enabled: false
     }
-  },
+  }),
+  ...(isSelfHosted === false && {
+    realtime: {
+      params: {
+        eventsPerSecond: 10
+      }
+    }
+  }),
   global: {
     headers: {
       'x-client-info': 'dosmundos-podcast-app',
@@ -47,12 +53,79 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   ...(isSelfHosted && {
     db: {
       schema: 'public'
+    },
+    // Дополнительные опции для self-hosted
+    fetch: (url, options = {}) => {
+      // Удаляем проблемные заголовки для CORS
+      const headers = { ...options.headers };
+      
+      // Удаляем заголовки которые могут вызывать CORS проблемы
+      delete headers['accept-profile'];
+      delete headers['Accept-Profile'];
+      delete headers['content-profile'];
+      delete headers['Content-Profile'];
+      
+      console.log('🔧 [Supabase] Fetch URL:', url);
+      console.log('🔧 [Supabase] Headers after cleanup:', headers);
+      
+      return fetch(url, {
+        ...options,
+        headers,
+        mode: 'cors',
+        credentials: 'omit'
+      });
     }
   })
 });
 
-console.log('🔧 [Supabase] Клиент создан:', {
-  url: supabaseUrl,
-  isSelfHosted,
-  urlType: isSelfHosted ? 'Self-hosted VPS' : 'Supabase Cloud'
-});
+
+// Если это self-hosted, добавляем глобальный перехватчик fetch для CORS
+if (isSelfHosted) {
+  const originalFetch = window.fetch;
+  window.fetch = async function(url, options = {}) {
+    // Если это запрос к нашему Supabase, очищаем заголовки и добавляем обработку ошибок
+    if (url && url.includes('supabase.dosmundos.pe')) {
+      const headers = { ...options.headers };
+      
+      // Удаляем только проблемные CORS заголовки, но сохраняем важные
+      delete headers['accept-profile'];
+      delete headers['Accept-Profile'];
+      delete headers['content-profile'];
+      delete headers['Content-Profile'];
+      
+      // Убеждаемся что API ключ и авторизация сохранены
+      if (!headers['apikey'] && supabaseAnonKey) {
+        headers['apikey'] = supabaseAnonKey;
+      }
+      if (!headers['Authorization'] && supabaseAnonKey) {
+        headers['Authorization'] = `Bearer ${supabaseAnonKey}`;
+      }
+      
+      // Функция для выполнения запроса с повторными попытками
+      const fetchWithRetry = async (attempt = 1) => {
+        try {
+          return await originalFetch(url, {
+            ...options,
+            headers,
+            mode: 'cors',
+            credentials: 'omit'
+          });
+        } catch (error) {
+          // Если это HTTP/2 ошибка и у нас есть еще попытки
+          if ((error.message.includes('HTTP2') || error.message.includes('ERR_HTTP2_PROTOCOL_ERROR')) && attempt < 3) {
+            console.warn(`🔄 [Supabase] HTTP/2 ошибка, попытка ${attempt + 1} из 3`);
+            // Небольшая задержка перед повторной попыткой
+            await new Promise(resolve => setTimeout(resolve, 500 * attempt));
+            return fetchWithRetry(attempt + 1);
+          }
+          throw error;
+        }
+      };
+      
+      return fetchWithRetry();
+    }
+    
+    return originalFetch(url, options);
+  };
+  
+  }

@@ -16,6 +16,7 @@ import useSpeakerAssignment from '@/hooks/player/useSpeakerAssignment';
 import { getLocaleString } from '@/lib/locales';
 import textExportService from '@/lib/textExportService';
 import { useEditorAuth } from '@/contexts/EditorAuthContext';
+import { getAudioUrl } from '@/lib/audioUrl';
 
 const playbackRateOptions = [
   { label: "1x", value: 1},
@@ -28,22 +29,40 @@ const PodcastPlayer = ({
   onQuestionUpdate, 
   currentLanguage, 
   onQuestionSelectJump, 
-  audioRef,
+  audioRef, 
   episodeSlug, 
-  episodeAudioUrl,
+  episodeAudioUrl, 
+  episodeLang, 
   episodeDate, 
-  navigateBack,
-  onPlayerStateChange,
-  playerControlsContainerRef,
-  showTranscript,
-  onToggleShowTranscript,
-  user,
-  onTranscriptUpdate,
-  fetchTranscriptForEpisode,
-  isOfflineMode = false
- }) => {
+  navigateBack, 
+  onPlayerStateChange, 
+  playerControlsContainerRef, 
+  showTranscript, 
+  onToggleShowTranscript, 
+  skipEmptySegments, 
+  onToggleSkipEmptySegments, 
+  onDownloadAudio, 
+  onDownloadText, 
+  playbackRateOptions, 
+  currentPlaybackRateValue, 
+  onSetPlaybackRate, 
+  onOpenAddQuestionDialog, 
+  transcriptUtterances, 
+  transcriptId, 
+  transcriptWords, 
+  segmentToHighlight, 
+  user 
+}) => {
   
-  console.log('[PodcastPlayer] Rendered with episodeAudioUrl:', episodeAudioUrl);
+  console.log('🔧 [PodcastPlayer] Props received:', {
+    episodeSlug,
+    episodeAudioUrl,
+    episodeData: {
+      slug: episodeData?.slug,
+      r2_object_key: episodeData?.r2_object_key,
+      audio_url: episodeData?.audio_url
+    }
+  });
   
   const { toast } = useToast();
   const { isAuthenticated, openAuthModal } = useEditorAuth();
@@ -151,15 +170,29 @@ const PodcastPlayer = ({
   }, [navigateQuestion, handleSkip, togglePlayPause, seekAudio]);
 
   const handleDownloadAudio = () => {
-    if (episodeAudioUrl) {
+    // Используем episodeAudioUrl который уже передан в плеер (уже обработанный getAudioUrl)
+    // Но если это локальный URL, то получаем оригинальный из episodeData
+    
+    let downloadUrl = episodeAudioUrl;
+    
+    // Если URL локальный (localhost), получаем оригинальный из episodeData
+    if (episodeAudioUrl && episodeAudioUrl.includes('localhost')) {
+      console.log('🔧 [Download] Local URL detected, getting original from episodeData');
+      downloadUrl = getAudioUrl(episodeData);
+    }
+    
+    if (downloadUrl) {
+      console.log('🔧 [Download] Using URL:', downloadUrl);
       const link = document.createElement('a');
-      link.href = episodeAudioUrl;
+      link.href = downloadUrl;
       link.download = `${episodeSlug || 'podcast_episode'}.mp3`; 
+      link.setAttribute('target', '_blank'); // Открываем в новой вкладке для кросс-доменных ссылок
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       toast({ title: getLocaleString('downloadStartedTitle', currentLanguage), description: getLocaleString('downloadStartedDesc', currentLanguage) });
     } else {
+      console.error('🔧 [Download] No valid audio URL found');
       toast({ title: getLocaleString('errorGeneric', currentLanguage), description: getLocaleString('audioNotAvailableForDownload', currentLanguage), variant: 'destructive' });
     }
   };

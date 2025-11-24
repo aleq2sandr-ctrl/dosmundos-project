@@ -225,45 +225,6 @@ export const checkFileExists = async (filename) => {
   return { exists: false, fileUrl: null, bucketName: null };
 };
 
-/**
- * Возвращает корректный URL аудио для эпизода с учетом провайдера хранения
- * - Если в БД уже сохранен абсолютный audio_url:
- *   - Для Hostinger URL: проксируем через VPS API (так как нет CORS заголовков)
- *   - Для VPS URL: возвращаем как есть
- * - Fallback: если есть r2_object_key — собираем URL из публичной базы на VPS
- */
-export const getCorrectAudioUrl = (episode) => {
-  if (!episode) return null;
-  
-  let finalUrl = null;
-
-  if (episode.audio_url && typeof episode.audio_url === 'string') {
-    finalUrl = episode.audio_url;
-  } else if (episode.r2_object_key && typeof episode.r2_object_key === 'string') {
-    // Fallback: используем публичную базу на VPS, где лежат аудиофайлы
-    finalUrl = `${AUDIO_PUBLIC_BASE}/${encodeURIComponent(episode.r2_object_key)}`;
-  }
-  
-  if (!finalUrl) return null;
-
-  // Если URL содержит старый прокси, извлекаем оригинальный URL
-  if (finalUrl.includes('/api/proxy-audio')) {
-    try {
-      // Обрабатываем как полный URL или относительный
-      const urlString = finalUrl.startsWith('http') ? finalUrl : `https://dosmundos.pe${finalUrl}`;
-      const urlObj = new URL(urlString);
-      const originalUrl = urlObj.searchParams.get('url');
-      if (originalUrl) {
-        finalUrl = decodeURIComponent(originalUrl);
-      }
-    } catch (e) {
-      console.warn('Failed to parse proxy URL:', finalUrl);
-    }
-  }
-
-  // Возвращаем прямой URL.
-  return finalUrl;
-};
 
 // Экспорт по умолчанию
 export default {
@@ -271,6 +232,5 @@ export default {
   listFiles,
   deleteFile,
   getFileInfo,
-  checkFileExists,
-  getCorrectAudioUrl
+  checkFileExists
 };

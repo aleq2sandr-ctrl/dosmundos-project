@@ -10,10 +10,16 @@ class OfflineDataService {
     this.useFallback = false;
     this.initializing = false;
     this.initPromise = null;
+    this.isInitialized = false; // Флаг для предотвращения повторных инициализаций
   }
 
   // Инициализация базы данных
   async init() {
+    // Если уже инициализировано, просто возвращаемся
+    if (this.isInitialized) {
+      return this.db;
+    }
+    
     console.log('🚀 Initializing OfflineDataService...');
     
     // Если уже инициализируемся, возвращаем существующий промис
@@ -26,6 +32,7 @@ class OfflineDataService {
       console.warn('⚠️ IndexedDB не поддерживается, используем fallback хранилище');
       this.useFallback = true;
       this.fallbackStorage = new Map();
+      this.isInitialized = true;
       console.log('✅ OfflineDataService initialized with fallback storage');
       return null;
     }
@@ -41,6 +48,7 @@ class OfflineDataService {
       const timeoutId = setTimeout(() => {
         console.warn('IndexedDB timeout, switching to fallback storage');
         this.useFallback = true;
+        this.isInitialized = true;
         this.initializing = false;
         resolve(null);
       }, 10000); // 10 секунд таймаут
@@ -51,6 +59,7 @@ class OfflineDataService {
         clearTimeout(timeoutId);
         console.warn('IndexedDB error, switching to fallback storage:', event.target.error);
         this.useFallback = true;
+        this.isInitialized = true;
         resolve(null);
       };
 
@@ -58,6 +67,7 @@ class OfflineDataService {
         clearTimeout(timeoutId);
         console.warn('IndexedDB blocked, switching to fallback storage:', event);
         this.useFallback = true;
+        this.isInitialized = true;
         resolve(null);
       };
 
@@ -116,6 +126,8 @@ class OfflineDataService {
       request.onsuccess = (event) => {
         clearTimeout(timeoutId);
         this.db = event.target.result;
+        this.isInitialized = true;
+        console.log('✅ OfflineDataService initialized successfully');
         
         // Добавляем обработчик ошибок для базы данных
         this.db.onerror = (event) => {
@@ -136,7 +148,6 @@ class OfflineDataService {
     try {
       // Если уже используем fallback хранилище, возвращаем null
       if (this.useFallback) {
-        console.log('Using fallback storage');
         return null;
       }
 
@@ -147,7 +158,6 @@ class OfflineDataService {
 
         // Если init() вернул null, значит перешли на fallback
         if (initResult === null) {
-          console.log('Using fallback storage after initialization');
           return null;
         }
       }
@@ -157,7 +167,7 @@ class OfflineDataService {
         console.warn('Database not available after initialization, switching to fallback storage');
         this.useFallback = true;
         this.db = null;
-        console.log('Using fallback storage');
+        this.isInitialized = true;
         return null;
       }
 
