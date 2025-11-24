@@ -6,7 +6,6 @@ import 'dotenv/config';
 // VPS connection details
 const VPS_IP = '72.61.186.175';
 const VPS_USER = 'root';
-const VPS_PASSWORD = 'Qazsxdc@1234';
 const VPS_PATH = '/var/www/dosmundos';
 
 /**
@@ -30,39 +29,34 @@ async function deployToVPS() {
     const archiveName = `dosmundos-${Date.now()}.tar.gz`;
     const archivePath = path.join(process.cwd(), archiveName);
     
-    // For Windows, use PowerShell to create tar
-    const isWindows = process.platform === 'win32';
-    if (isWindows) {
-      // Use tar command which is available in Windows 10+
-      const tarCmd = `cd dist && tar -czf "../${archiveName}" .`;
-      execSync(tarCmd, { stdio: 'inherit', cwd: process.cwd() });
-    } else {
-      const tarCmd = `tar -czf "${archivePath}" -C dist .`;
-      execSync(tarCmd, { stdio: 'inherit' });
+    // Use tar command (available in Windows 10+)
+    const tarCmd = `tar -czf "${archiveName}" -C dist .`;
+    try {
+        execSync(tarCmd, { stdio: 'inherit', cwd: process.cwd() });
+    } catch (e) {
+        console.log('   Retrying tar creation with alternative command...');
+        execSync(`cd dist && tar -czf "../${archiveName}" .`, { stdio: 'inherit', cwd: process.cwd() });
     }
 
     console.log('✅ Archive created:', archiveName);
 
     // Step 2: Upload to VPS using scp
     console.log('\n📤 Step 2: Uploading to VPS...');
+    console.log('🔑 You may be asked for the VPS password.');
     
-    // Using plink (PuTTY) for Windows SSH
-    const scpCmd = isWindows 
-      ? `pscp -pw "${VPS_PASSWORD}" "${archivePath}" ${VPS_USER}@${VPS_IP}:/tmp/`
-      : `scp "${archivePath}" ${VPS_USER}@${VPS_IP}:/tmp/`;
+    const scpCmd = `scp "${archiveName}" ${VPS_USER}@${VPS_IP}:/tmp/`;
 
     try {
-      execSync(scpCmd, { stdio: 'inherit' });
+      execSync(scpCmd, { stdio: 'inherit', cwd: process.cwd() });
       console.log('✅ Upload complete');
     } catch (error) {
-      console.error('❌ Upload failed. Make sure SSH tools are installed:');
-      console.error('   Windows: Install PuTTY (includes pscp)');
-      console.error('   Linux/Mac: scp should be available');
+      console.error('❌ Upload failed.');
       throw error;
     }
 
     // Step 3: Deploy on VPS
     console.log('\n🔧 Step 3: Deploying on VPS...');
+    console.log('🔑 You may be asked for the VPS password again.');
     
     const deployCommands = [
       `mkdir -p ${VPS_PATH}`,
@@ -72,28 +66,21 @@ async function deployToVPS() {
       `chown -R www-data:www-data ${VPS_PATH} || chown -R nginx:nginx ${VPS_PATH} || true`,
       `chmod -R 755 ${VPS_PATH}`,
       `systemctl reload nginx || service nginx reload || nginx -s reload || true`
-    ];
+    ].join(' && ');
 
-    for (const cmd of deployCommands) {
-      console.log(`   Executing: ${cmd}`);
-      const sshCmd = isWindows
-        ? `plink -pw "${VPS_PASSWORD}" ${VPS_USER}@${VPS_IP} "${cmd}"`
-        : `ssh ${VPS_USER}@${VPS_IP} "${cmd}"`;
+    const sshCmd = `ssh ${VPS_USER}@${VPS_IP} "${deployCommands}"`;
       
-      try {
-        execSync(sshCmd, { stdio: 'inherit' });
-      } catch (error) {
-        console.error(`❌ Command failed: ${cmd}`);
-        throw error;
-      }
+    try {
+      execSync(sshCmd, { stdio: 'inherit' });
+    } catch (error) {
+      console.error(`❌ Deployment commands failed`);
+      throw error;
     }
 
     // Step 4: Verify deployment
     console.log('\n✅ Step 4: Verifying deployment...');
     
-    const verifyCmd = isWindows
-      ? `plink -pw "${VPS_PASSWORD}" ${VPS_USER}@${VPS_IP} "test -f ${VPS_PATH}/index.html && echo 'DEPLOYMENT SUCCESS' || echo 'DEPLOYMENT FAILED'"`
-      : `ssh ${VPS_USER}@${VPS_IP} "test -f ${VPS_PATH}/index.html && echo 'DEPLOYMENT SUCCESS' || echo 'DEPLOYMENT FAILED'"`;
+    const verifyCmd = `ssh ${VPS_USER}@${VPS_IP} "test -f ${VPS_PATH}/index.html && echo 'DEPLOYMENT SUCCESS' || echo 'DEPLOYMENT FAILED'"`;
 
     const result = execSync(verifyCmd, { encoding: 'utf8' }).trim();
     

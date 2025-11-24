@@ -59,11 +59,7 @@ const useOfflineEpisodeData = (episodeSlug, currentLanguage, toast) => {
         setEpisodeData(result.data);
         
         if (result.source === 'cache') {
-          toast({
-            title: getLocaleString('episodeFromCache', currentLanguage) || 'Episode from cache',
-            description: getLocaleString('episodeLoadedOffline', currentLanguage) || 'Episode loaded from offline cache',
-            className: "bg-green-600/80 border-green-500 text-white"
-          });
+          // Toast notification removed - no longer show cache/offline messages
         }
       } else {
         console.warn('Invalid episode data received:', result.data);

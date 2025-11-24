@@ -24,6 +24,12 @@ const usePlayerPlayback = ({
   const autoplayPendingRef = useRef(null); // 'play' | 'unmute' | null
   const firstVisitRef = useRef(typeof window !== 'undefined' ? !localStorage.getItem('autoplaySeen') : false);
   
+  // Ref для доступа к актуальному jumpToTime внутри эффектов
+  const jumpToTimeRef = useRef(jumpToTime);
+  useEffect(() => {
+    jumpToTimeRef.current = jumpToTime;
+  }, [jumpToTime]);
+
   // Унифицированная попытка воспроизведения с обходом autoplay-политики
   const attemptPlay = async (audioElement) => {
     try {
@@ -217,6 +223,20 @@ const usePlayerPlayback = ({
           if (isSeekingRef.current) {
             logger.debug('usePlayerPlayback: Fallback timeout - clearing seeking flag');
             isSeekingRef.current = false;
+            
+            // Если таймаут сработал (например, seek 0->0 не вызвал событие), 
+            // но мы хотели играть - пробуем запустить
+            if (playAfterJump && audioRef.current && audioRef.current.paused) {
+               console.log('[usePlayerPlayback] Seek timeout, attempting play');
+               attemptPlay(audioRef.current).then(ok => {
+                  if (ok) {
+                    setIsPlayingState(true);
+                    onPlayerStateChange?.({ isPlaying: true });
+                  }
+               }).catch(e => {
+                  if (e.name === 'NotAllowedError' && typeof setShowPlayOverlay === 'function') setShowPlayOverlay(true);
+               });
+            }
           }
         }, 500); // Уменьшено с 2000ms до 500ms
       }
@@ -352,7 +372,7 @@ const usePlayerPlayback = ({
 
   // Единственный эффект автозапуска при смене эпизода
   useEffect(() => {
-    if (!audioRef.current || !episodeData?.audio_url || isSeekingRef.current) return;
+    if (!audioRef.current || !episodeData?.audio_url) return;
     
     const audioElement = audioRef.current;
     const newUrl = episodeData.audio_url;
@@ -362,13 +382,23 @@ const usePlayerPlayback = ({
     // Проверяем, изменился ли URL эпизода (с нормализацией для точного сравнения)
     const isNewEpisode = normalizedCurrentUrl !== normalizedNewUrl && normalizedNewUrl !== lastLoadedUrlRef.current;
     
-    if (isNewEpisode) {
+    // Force update if src is empty but we have a URL (fix for initial load issues)
+    const shouldUpdateSrc = isNewEpisode || (normalizedCurrentUrl === '' && normalizedNewUrl !== '');
+    
+    // Если мы в процессе поиска (seeking), но это НЕ новый эпизод - выходим
+    if (isSeekingRef.current && !shouldUpdateSrc) return;
+    
+    if (shouldUpdateSrc) {
       logger.debug('usePlayerPlayback: New episode detected', { 
         newUrl: normalizedNewUrl, 
-        currentUrl: normalizedCurrentUrl 
+        currentUrl: normalizedCurrentUrl,
+        reason: isNewEpisode ? 'url_change' : 'empty_src'
       });
       
       console.log('[usePlayerPlayback] Setting new audio URL:', newUrl);
+      
+      // Сбрасываем флаг поиска, так как загружаем новый источник
+      isSeekingRef.current = false;
       
       // Запоминаем загруженный URL
       lastLoadedUrlRef.current = normalizedNewUrl;
@@ -402,6 +432,17 @@ const usePlayerPlayback = ({
         autoplayAttempted = true;
         
         logger.debug('usePlayerPlayback: Metadata loaded, attempting quick autoplay');
+        
+        // Восстанавливаем позицию, если она была задана (исправление потери прыжка при смене src)
+        if (jumpToTimeRef.current !== null && jumpToTimeRef.current !== undefined) {
+             const time = parseFloat(jumpToTimeRef.current);
+             // Если время отличается более чем на 0.1с, восстанавливаем
+             // Также восстанавливаем если это 0, чтобы гарантировать сброс
+             if (!isNaN(time) && (Math.abs(audioElement.currentTime - time) > 0.1 || time === 0)) {
+                 console.log('[usePlayerPlayback] Restoring jump after src load:', time);
+                 audioElement.currentTime = time;
+             }
+        }
         
         // Проверяем, не начало ли уже воспроизводиться
         if (!audioElement.paused) {

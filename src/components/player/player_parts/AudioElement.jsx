@@ -70,7 +70,6 @@ const AudioElement = React.memo(({
   return (
     <audio 
       ref={audioRef}
-      autoPlay
       playsInline
       onTimeUpdate={onTimeUpdate}
       onLoadedMetadata={onLoadedMetadata}

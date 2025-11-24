@@ -1,6 +1,6 @@
 // Версия кеша - обновляется при каждом деплое для принудительного обновления
 // IMPORTANT: Измените эту версию при каждом деплое, чтобы очистить старые кеши
-const CACHE_VERSION = 'v20251123-121500';
+const CACHE_VERSION = 'v20251124-123500';
 const STATIC_CACHE = 'static-' + CACHE_VERSION;
 const DYNAMIC_CACHE = 'dynamic-' + CACHE_VERSION;
 const AUDIO_CACHE = 'audio-' + CACHE_VERSION;
