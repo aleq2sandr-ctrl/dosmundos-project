@@ -10,10 +10,20 @@ export const getAudioUrl = (episode) => {
     audio_url: episode.audio_url
   });
   
-  // Приоритет: r2_object_key (прямая ссылка) > audio_url (но только если не WordPress)
+  // Приоритет: audio_url (полная ссылка из Supabase) > r2_object_key
+  if (episode.audio_url && episode.audio_url.startsWith('http')) {
+    console.log('🔧 [getAudioUrl] Using audio_url from Supabase:', episode.audio_url);
+    return episode.audio_url;
+  }
+  
+  // Fallback: если есть r2_object_key, собираем URL
   if (episode.r2_object_key) {
-    console.log('🔧 [getAudioUrl] Using r2_object_key:', episode.r2_object_key);
-    return episode.r2_object_key;
+    const fullUrl = episode.r2_object_key.startsWith('http') 
+      ? episode.r2_object_key 
+      : `${AUDIO_PUBLIC_BASE}/${encodeURIComponent(episode.r2_object_key)}`;
+    
+    console.log('🔧 [getAudioUrl] Using r2_object_key fallback:', fullUrl);
+    return fullUrl;
   }
   
   // Проверяем что audio_url не指向 WordPress uploads (заблокировано CSP)

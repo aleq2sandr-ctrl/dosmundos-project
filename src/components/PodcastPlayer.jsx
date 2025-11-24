@@ -18,7 +18,7 @@ import textExportService from '@/lib/textExportService';
 import { useEditorAuth } from '@/contexts/EditorAuthContext';
 import { getAudioUrl } from '@/lib/audioUrl';
 
-const playbackRateOptions = [
+const DEFAULT_PLAYBACK_RATE_OPTIONS = [
   { label: "1x", value: 1},
   { label: "1.5x", value: 1.5},
   { label: "2x", value: 2},
@@ -43,7 +43,7 @@ const PodcastPlayer = ({
   onToggleSkipEmptySegments, 
   onDownloadAudio, 
   onDownloadText, 
-  playbackRateOptions, 
+  playbackRateOptions = DEFAULT_PLAYBACK_RATE_OPTIONS, 
   currentPlaybackRateValue, 
   onSetPlaybackRate, 
   onOpenAddQuestionDialog, 
@@ -51,7 +51,10 @@ const PodcastPlayer = ({
   transcriptId, 
   transcriptWords, 
   segmentToHighlight, 
-  user 
+  user, 
+  isOfflineMode, 
+  onTranscriptUpdate, 
+  fetchTranscriptForEpisode 
 }) => {
   
   console.log('🔧 [PodcastPlayer] Props received:', {
@@ -82,12 +85,11 @@ const PodcastPlayer = ({
     addQuestionDialogInitialTime, setAddQuestionDialogInitialTime
   } = usePlayerState(episodeData?.duration);
 
-  const playbackRate = playbackRateOptions[currentPlaybackRateIndex].value;
+  const playbackRate = 1; // Временно упрощаем для отладки
 
   const playPromiseRef = useRef(null);
   const isSeekingRef = useRef(false);
   const lastJumpIdProcessedRef = useRef(null);
-  const [skipEmptySegments, setSkipEmptySegments] = useState(false);
   const [showAutoplayOverlay, setShowAutoplayOverlay] = useState(false);
 
   const langForContent = episodeData?.lang === 'all' ? currentLanguage : episodeData?.lang;
@@ -311,7 +313,7 @@ const PodcastPlayer = ({
           showTranscript={showTranscript}
           onToggleShowTranscript={onToggleShowTranscript}
           skipEmptySegments={skipEmptySegments}
-          onToggleSkipEmptySegments={() => setSkipEmptySegments(prev => !prev)}
+          onToggleSkipEmptySegments={onToggleSkipEmptySegments}
           onDownloadAudio={handleDownloadAudio}
           onDownloadText={handleDownloadText}
           playbackRateOptions={playbackRateOptions}
