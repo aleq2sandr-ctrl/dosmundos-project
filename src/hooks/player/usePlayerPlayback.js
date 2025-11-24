@@ -86,6 +86,7 @@ const usePlayerPlayback = ({
   };
 
   useEffect(() => {
+    console.log('🔧 [usePlayerPlayback] Jump effect:', { jumpToTime, jumpId, playAfterJump });
     if (jumpToTime === null || jumpToTime === undefined || !audioRef.current) {
       return;
     }
@@ -108,7 +109,9 @@ const usePlayerPlayback = ({
 
 
     const performSeek = async () => {
+      console.log('🔧 [usePlayerPlayback] performSeek started:', { audioRef: !!audioRef.current, isSeeking: isSeekingRef.current, time });
       if (!audioRef.current || isSeekingRef.current) {
+        console.log('🔧 [usePlayerPlayback] performSeek early return');
         return;
       }
       
@@ -128,16 +131,19 @@ const usePlayerPlayback = ({
       onPlayerStateChange?.({ currentTime: time });
       
       // Set the audio element's time
+      console.log('🔧 [usePlayerPlayback] Setting currentTime:', time);
       audioRef.current.currentTime = time;
 
       // Оптимизированная логика: не ждем события seeked, если аудио уже готово
       const isReady = audioRef.current.readyState >= audioRef.current.HAVE_CURRENT_DATA;
+      console.log('🔧 [usePlayerPlayback] Audio readyState:', audioRef.current.readyState, 'isReady:', isReady, 'paused:', audioRef.current.paused);
       
       if (isReady) {
         // Аудио готово - сразу продолжаем воспроизведение
         if (playAfterJump || wasPlaying) {
           // Дополнительная проверка: убеждаемся что аудио действительно на паузе
           if (audioRef.current.paused) {
+            console.log('🔧 [usePlayerPlayback] Attempting to play audio...');
             playPromiseRef.current = attemptPlay(audioRef.current);
             playPromiseRef.current?.then((ok) => {
               if (!ok) return; 
@@ -216,7 +222,9 @@ const usePlayerPlayback = ({
       }
     };
 
+    console.log('🔧 [usePlayerPlayback] About to call performSeek');
     performSeek().catch(error => {
+      console.error('🔧 [usePlayerPlayback] Error in performSeek:', error);
       logger.error("Error in performSeek:", error);
       isSeekingRef.current = false;
     });
