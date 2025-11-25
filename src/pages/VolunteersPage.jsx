@@ -6,96 +6,207 @@ import { Heart, Users, Home, Fish, Utensils, Sprout } from 'lucide-react';
 const content = {
   ru: {
     title: "ПРИГЛАШЕНИЕ ВОЛОНТЁРОВ",
-    subtitle: "Приглашение Волонтёров: Исцеление и Служение в Амазонии",
-    intro: "Мы приглашаем вас присоединиться к нашему сообществу, расположенному в самом сердце амазонских джунглей. Это возможность для тех, кто готов к глубокой личной трансформации через работу с растениями, традиционные диеты и скромную жизнь в гармонии с природой.",
+    subtitle: "Исцеление и Служение в Амазонии",
+    intro: "Центр Дос Мундос основан на служении. Мы объединяем людей, которые следуют этому пути. Вместо найма профессиональных работников мы приглашаем волонтеров, чтобы каждый приезжающий в Дос Мундос, мог проявить свою искренность, ощутить себя полезным и нужным, а также проявить свою любовь в сообществе.\n\nЕсли вы чувствуете зов к духовному развитию, мы приглашаем вас присоединиться к нашему сообществу, расположенному в Перу, в сердце амазонских джунглей. Это возможность для тех, кто готов к глубокой внутренней трансформации и желает пройти путь исцеления через служение, а также работу с традиционными растениями под руководством целителя Пепе.",
     sections: [
       {
         title: "Что Мы Предлагаем",
-        text: "Наше сообщество предоставляет сакральное пространство для исцеления с аяуаской и другими растениями, поддерживаемой традиционными практиками, включая диеты с растениями, терапевтические горячие ванны и питательную простую пищу, приготовленную с минимальным количеством специй. Размещение простое, позволяющее вам отключиться от современных отвлекающих факторов и воссоединиться с собой и миром природы."
+        text: "Безопасное пространство для исцеления с Аяуаской и другими традиционными растениями. Органическое питание из продуктов нашей собственной фермы. Здоровую среду и жилье, позволяющую вам отключиться от суеты современного мира, воссоединиться с собой и восстановить связь с природой"
       },
       {
         title: "Кого Мы Ищем",
-        text: "Мы ищем волонтёров, которые хотят совместить свой собственный путь исцеления со служением. Это не ретрит—это погружающий опыт роста через служение."
+        text: "Мы ищем волонтеров, которые хотят совместить свой собственный путь исцеления со служением другим. Это не просто ретрит — это глубокий трансформационный опыт, где рост происходит через проявленное служение."
       }
     ],
     waysToServe: {
       title: "Способы Служения",
       items: [
-        { icon: Sprout, text: "Уход за Фермой и Животными: Забота о наших коровах, козах, морских свинках, кроликах, курах и лошадях" },
-        { icon: Utensils, text: "Помощь на Кухне: Приготовление пищи и Уборка" },
-        { icon: Home, text: "Уход за Домом: Уборка комнат, ванных комнат и помощь со стиркой" },
+        { icon: Sprout, text: "Уход за фермой и животными: забота о коровах, козах, морских свинках, кроликах, курах и лошадях" },
+        { icon: Utensils, text: "Помощь на кухне: приготовление пищи и уборка" },
+        { icon: Home, text: "Уход за домом: уборка комнат и ванных комнат, помощь со стиркой" },
         { icon: Users, text: "Работа в молочном цехе: приготовление масла, творога и сыра" },
-        { icon: Fish, text: "Рыбалка: Помощь с рыбалкой сетями (особенно для мужчин, комфортно себя чувствующих с этой работой)" },
-        { icon: Heart, text: "Общая Поддержка Сообщества: Различные задачи, которые поддерживают процветание нашего сообщества" }
+        { icon: Fish, text: "Рыбалка: помощь с ловлей рыбы сетями (особенно приветствуется участие мужчин, комфортно чувствующих себя с этой работой)" },
+        { icon: Heart, text: "Поддержка сообщества: различные задачи, способствующие процветанию и развитию нашего сообщества" }
       ]
     },
-    exchange: {
-      title: "Обмен",
-      text: "В обмен на ваше преданное служение, вы получите жильё, питание и возможность участвовать в наших исцеляющих церемониях и практиках. Это путь для тех, кто понимает, что истинное исцеление приходит как через внутреннюю работу, так и через служение."
+    philosophy: {
+      title: "Философия Центра",
+      text: "Мы верим, что истинное исцеление приходит как через глубокую внутреннюю работу, так и через служение. Каждый день в Дос Мундос — это возможность трансформации через практику, связь с природой и сердечное служение."
     },
-    closing: "Если вы чувствуете призыв пройти этот путь исцеления и служения с нами, мы ждём вас."
+    closing: {
+      title: "Присоединяйтесь к Нам",
+      text: "Если вы чувствуете призыв пройти этот путь исцеления и служения вместе с нами, мы ждём вас. Напишите о себе, вашем опыте и желаемом времени пребывания"
+    }
   },
   en: {
     title: "VOLUNTEER INVITATION",
-    subtitle: "Invitation for Volunteers: Healing and Service in the Amazon",
-    intro: "We invite you to join our community located in the heart of the Amazon rainforest. This is an opportunity for those ready for deep personal transformation through work with plants, traditional dietas, and humble living in harmony with nature.",
+    subtitle: "Healing and Service in the Amazon",
+    intro: "Dos Mundos Center is founded on service. We bring together people who follow this path. Instead of hiring professional workers, we invite volunteers so that everyone who comes to Dos Mundos can express their sincerity, feel useful and needed, and manifest their love within the community.\n\nIf you feel a call to spiritual development, we invite you to join our community located in Peru, in the heart of the Amazon jungle. This is an opportunity for those ready for deep inner transformation and wishing to walk the path of healing through service, as well as work with traditional plants under the guidance of healer Pepe.",
     sections: [
       {
         title: "What We Offer",
-        text: "Our community provides a sacred space for healing with ayahuasca and other plants, supported by traditional practices including plant dietas, therapeutic hot baths, and nourishing simple food prepared with minimal spices. Accommodations are simple, allowing you to disconnect from modern distractions and reconnect with yourself and the nature."
+        text: "A safe space for healing with Ayahuasca and other traditional plants. Organic food from our own farm. A healthy environment and accommodation allowing you to disconnect from the bustle of the modern world, reconnect with yourself, and restore your connection with nature."
       },
       {
-        title: "Who We’re Looking For",
-        text: "We seek volunteers who want to combine their own healing journey with service. This is not a retreat—it’s an immersive experience of growth through service."
+        title: "Who We Are Looking For",
+        text: "We are looking for volunteers who want to combine their own healing journey with service to others. This is not just a retreat — it is a deep transformational experience where growth happens through manifested service."
       }
     ],
     waysToServe: {
       title: "Ways to Serve",
       items: [
-        { icon: Sprout, text: "Farm & Animal Care: Caring for our cows, goats, guinea pigs, rabbits, chickens, and horses" },
-        { icon: Utensils, text: "Kitchen Support: Food preparation and cooking" },
-        { icon: Home, text: "Household Maintenance: Cleaning rooms, bathrooms, and assisting with laundry" },
-        { icon: Users, text: "Dairy Work: Making butter, cheese, and cottage cheese" },
-        { icon: Fish, text: "Fishing: Helping with net fishing (especially for men comfortable with this work)" },
-        { icon: Heart, text: "General Community Support: Various tasks that support our community’s prosperity" }
+        { icon: Sprout, text: "Farm and animal care: caring for cows, goats, guinea pigs, rabbits, chickens, and horses" },
+        { icon: Utensils, text: "Kitchen help: food preparation and cleaning" },
+        { icon: Home, text: "Housekeeping: cleaning rooms and bathrooms, helping with laundry" },
+        { icon: Users, text: "Dairy work: making butter, cottage cheese, and cheese" },
+        { icon: Fish, text: "Fishing: helping with net fishing (participation of men comfortable with this work is especially welcome)" },
+        { icon: Heart, text: "Community support: various tasks contributing to the prosperity and development of our community" }
       ]
     },
-    exchange: {
-      title: "The Exchange",
-      text: "In return for your dedicated service, you’ll receive accommodation, meals, and the opportunity to participate in our healing ceremonies and practices. This is a path for those who understand that true healing comes through both inner work and service."
+    philosophy: {
+      title: "Center Philosophy",
+      text: "We believe that true healing comes both through deep inner work and through service. Every day at Dos Mundos is an opportunity for transformation through practice, connection with nature, and heartfelt service."
     },
-    closing: "If you feel the call to walk this path of healing and service with us, we are waiting for you."
+    closing: {
+      title: "Join Us",
+      text: "If you feel the call to walk this path of healing and service with us, we are waiting for you. Write to us about yourself, your experience, and your desired length of stay."
+    }
   },
   es: {
     title: "LLAMADO A VOLUNTARIOS",
     subtitle: "Sanación y Servicio en la Amazonía",
-    intro: "Invitamos a almas dedicadas a unirse a nuestra comunidad de sanación ubicada en el corazón de la selva amazónica. Esta es una oportunidad para quienes buscan una transformación personal profunda a través de la medicina de plantas, dietas tradicionales y una vida humilde en armonía con la naturaleza.",
+    intro: "El Centro Dos Mundos se basa en el servicio. Unimos a personas que siguen este camino. En lugar de contratar trabajadores profesionales, invitamos a voluntarios para que cada persona que llegue a Dos Mundos pueda expresar su sinceridad, sentirse útil y necesaria, y manifestar su amor en la comunidad.\n\nSi sientes un llamado al desarrollo espiritual, te invitamos a unirte a nuestra comunidad ubicada en Perú, en el corazón de la selva amazónica. Esta es una oportunidad para aquellos listos para una profunda transformación interior y que desean recorrer el camino de sanación a través del servicio, así como el trabajo con plantas tradicionales bajo la guía del curandero Pepe.",
     sections: [
       {
         title: "Lo Que Ofrecemos",
-        text: "Nuestra comunidad proporciona un espacio sagrado para el trabajo de sanación con ayahuasca y otras medicinas de plantas, apoyado por prácticas tradicionales que incluyen dietas curativas, baños terapéuticos calientes y alimentos nutritivos simples preparados con especias mínimas. Las acomodaciones son básicas, permitiéndote desconectarte de las distracciones modernas y reconectarte contigo mismo y con el mundo natural."
+        text: "Un espacio seguro para la sanación con Ayahuasca y otras plantas tradicionales. Alimentación orgánica con productos de nuestra propia granja. Un entorno saludable y alojamiento que te permite desconectarte del ajetreo del mundo moderno, reconectarte contigo mismo y restaurar tu conexión con la naturaleza."
       },
       {
         title: "A Quién Buscamos",
-        text: "Buscamos voluntarios que deseen combinar su propio camino de sanación con el servicio a los demás. Esto no es un retiro—es una experiencia inmersiva de crecimiento a través del servicio."
+        text: "Buscamos voluntarios que quieran combinar su propio camino de sanación con el servicio a los demás. Esto no es solo un retiro, es una experiencia de transformación profunda donde el crecimiento ocurre a través del servicio manifiesto."
       }
     ],
     waysToServe: {
       title: "Formas de Servir",
       items: [
-        { icon: Sprout, text: "Cuidado de la Granja y Animales: Atender nuestras vacas, cabras, cuyes, conejos, gallinas y caballos" },
-        { icon: Utensils, text: "Apoyo en la Cocina: Preparación de alimentos y cocina" },
-        { icon: Home, text: "Mantenimiento del Hogar: Limpieza de habitaciones, baños y ayuda con la lavandería" },
-        { icon: Users, text: "Trabajar en lechería: elaborar mantequilla, requesón y queso" },
-        { icon: Fish, text: "Pesca: Ayudar con la pesca con redes (particularmente para hombres cómodos con este trabajo)" },
-        { icon: Heart, text: "Apoyo General a la Comunidad: Diversas tareas que mantienen nuestra comunidad próspera" }
+        { icon: Sprout, text: "Cuidado de la granja y animales: cuidado de vacas, cabras, cuyes, conejos, gallinas y caballos" },
+        { icon: Utensils, text: "Ayuda en la cocina: preparación de alimentos y limpieza" },
+        { icon: Home, text: "Cuidado del hogar: limpieza de habitaciones y baños, ayuda con la lavandería" },
+        { icon: Users, text: "Trabajo en la lechería: elaboración de mantequilla, requesón y queso" },
+        { icon: Fish, text: "Pesca: ayuda con la pesca con redes (se agradece especialmente la participación de hombres que se sientan cómodos con este trabajo)" },
+        { icon: Heart, text: "Apoyo a la comunidad: diversas tareas que contribuyen a la prosperidad y desarrollo de nuestra comunidad" }
       ]
     },
-    exchange: {
-      title: "El Intercambio",
-      text: "A cambio de tu servicio dedicado, recibirás alojamiento, comidas y la oportunidad de participar en nuestras ceremonias y prácticas de sanación. Este es un camino para quienes entienden que la verdadera sanación viene tanto del trabajo interior como del servicio hacia afuera."
+    philosophy: {
+      title: "Filosofía del Centro",
+      text: "Creemos que la verdadera sanación llega tanto a través del trabajo interior profundo como a través del servicio. Cada día en Dos Mundos es una oportunidad de transformación a través de la práctica, la conexión con la naturaleza y el servicio de corazón."
     },
-    closing: "Si sientes el llamado de caminar este sendero de sanación y servicio con nosotros, damos la bienvenida a tu consulta."
+    closing: {
+      title: "Únete a Nosotros",
+      text: "Si sientes el llamado a recorrer este camino de sanación y servicio con nosotros, te esperamos. Escríbenos sobre ti, tu experiencia y el tiempo de estancia deseado."
+    }
+  },
+  de: {
+    title: "EINLADUNG FÜR FREIWILLIGE",
+    subtitle: "Heilung und Dienst im Amazonas",
+    intro: "Das Zentrum Dos Mundos gründet sich auf dem Dienen. Wir bringen Menschen zusammen, die diesem Weg folgen. Anstatt professionelle Arbeitskräfte einzustellen, laden wir Freiwillige ein, damit jeder, der nach Dos Mundos kommt, seine Aufrichtigkeit zeigen, sich nützlich und gebraucht fühlen und seine Liebe in der Gemeinschaft zum Ausdruck bringen kann.\n\nWenn Sie den Ruf zur spirituellen Entwicklung spüren, laden wir Sie ein, sich unserer Gemeinschaft in Peru, im Herzen des Amazonas-Dschungels, anzuschließen. Dies ist eine Gelegenheit für diejenigen, die bereit sind für eine tiefe innere Transformation und den Weg der Heilung durch Dienen gehen möchten, sowie für die Arbeit mit traditionellen Pflanzen unter der Leitung des Heilers Pepe.",
+    sections: [
+      {
+        title: "Was Wir Bieten",
+        text: "Einen sicheren Raum für Heilung mit Ayahuasca und anderen traditionellen Pflanzen. Bio-Ernährung mit Produkten von unserer eigenen Farm. Eine gesunde Umgebung und Unterkunft, die es Ihnen ermöglicht, sich von der Hektik der modernen Welt zu lösen, wieder zu sich selbst zu finden und die Verbindung zur Natur wiederherzustellen."
+      },
+      {
+        title: "Wen Wir Suchen",
+        text: "Wir suchen Freiwillige, die ihren eigenen Heilungsweg mit dem Dienst an anderen verbinden möchten. Dies ist nicht nur ein Retreat – es ist eine tiefe transformative Erfahrung, bei der Wachstum durch gelebtes Dienen geschieht."
+      }
+    ],
+    waysToServe: {
+      title: "Möglichkeiten zu Dienen",
+      items: [
+        { icon: Sprout, text: "Farm- und Tierpflege: Pflege von Kühen, Ziegen, Meerschweinchen, Kaninchen, Hühnern und Pferden" },
+        { icon: Utensils, text: "Hilfe in der Küche: Zubereitung von Speisen und Reinigung" },
+        { icon: Home, text: "Hauswirtschaft: Reinigung von Zimmern und Bädern, Hilfe bei der Wäsche" },
+        { icon: Users, text: "Arbeit in der Molkerei: Herstellung von Butter, Quark und Käse" },
+        { icon: Fish, text: "Fischen: Hilfe beim Netzfischen (die Teilnahme von Männern, die sich mit dieser Arbeit wohlfühlen, ist besonders willkommen)" },
+        { icon: Heart, text: "Unterstützung der Gemeinschaft: verschiedene Aufgaben, die zum Wohlstand und zur Entwicklung unserer Gemeinschaft beitragen" }
+      ]
+    },
+    philosophy: {
+      title: "Philosophie des Zentrums",
+      text: "Wir glauben, dass wahre Heilung sowohl durch tiefe innere Arbeit als auch durch Dienen kommt. Jeder Tag in Dos Mundos ist eine Gelegenheit zur Transformation durch Praxis, Verbindung mit der Natur und herzliches Dienen."
+    },
+    closing: {
+      title: "Schließen Sie sich uns an",
+      text: "Wenn Sie den Ruf spüren, diesen Weg der Heilung und des Dienens mit uns zu gehen, erwarten wir Sie. Schreiben Sie uns über sich, Ihre Erfahrung und die gewünschte Aufenthaltsdauer."
+    }
+  },
+  fr: {
+    title: "INVITATION AUX BÉNÉVOLES",
+    subtitle: "Guérison et Service en Amazonie",
+    intro: "Le Centre Dos Mundos est fondé sur le service. Nous réunissons des personnes qui suivent cette voie. Au lieu d'embaucher des travailleurs professionnels, nous invitons des bénévoles afin que chacun venant à Dos Mundos puisse exprimer sa sincérité, se sentir utile et nécessaire, et manifester son amour au sein de la communauté.\n\nSi vous ressentez l'appel du développement spirituel, nous vous invitons à rejoindre notre communauté située au Pérou, au cœur de la jungle amazonienne. C'est une opportunité pour ceux qui sont prêts pour une profonde transformation intérieure et souhaitent parcourir le chemin de la guérison par le service, ainsi que travailler avec des plantes traditionnelles sous la direction du guérisseur Pepe.",
+    sections: [
+      {
+        title: "Ce Que Nous Offrons",
+        text: "Un espace sûr pour la guérison avec l'Ayahuasca et d'autres plantes traditionnelles. Une alimentation biologique issue des produits de notre propre ferme. Un environnement sain et un hébergement vous permettant de vous déconnecter de l'agitation du monde moderne, de vous reconnecter avec vous-même et de rétablir le lien avec la nature."
+      },
+      {
+        title: "Qui Nous Recherchons",
+        text: "Nous recherchons des bénévoles qui souhaitent combiner leur propre chemin de guérison avec le service aux autres. Ce n'est pas simplement une retraite — c'est une expérience transformationnelle profonde où la croissance se produit à travers le service manifesté."
+      }
+    ],
+    waysToServe: {
+      title: "Façons de Servir",
+      items: [
+        { icon: Sprout, text: "Soins de la ferme et des animaux : soins aux vaches, chèvres, cochons d'Inde, lapins, poules et chevaux" },
+        { icon: Utensils, text: "Aide en cuisine : préparation des repas et nettoyage" },
+        { icon: Home, text: "Entretien ménager : nettoyage des chambres et des salles de bain, aide à la lessive" },
+        { icon: Users, text: "Travail à la laiterie : fabrication de beurre, de fromage blanc et de fromage" },
+        { icon: Fish, text: "Pêche : aide à la pêche au filet (la participation des hommes à l'aise avec ce travail est particulièrement bienvenue)" },
+        { icon: Heart, text: "Soutien communautaire : diverses tâches contribuant à la prospérité et au développement de notre communauté" }
+      ]
+    },
+    philosophy: {
+      title: "Philosophie du Centre",
+      text: "Nous croyons que la véritable guérison vient à la fois d'un travail intérieur profond et du service. Chaque jour à Dos Mundos est une opportunité de transformation par la pratique, la connexion avec la nature et le service sincère."
+    },
+    closing: {
+      title: "Rejoignez-nous",
+      text: "Si vous ressentez l'appel à parcourir ce chemin de guérison et de service avec nous, nous vous attendons. Écrivez-nous à propos de vous, de votre expérience et de la durée de séjour souhaitée."
+    }
+  },
+  pl: {
+    title: "ZAPROSZENIE DLA WOLONTARIUSZY",
+    subtitle: "Uzdrowienie i Służba w Amazonii",
+    intro: "Centrum Dos Mundos opiera się na służbie. Łączymy ludzi, którzy podążają tą ścieżką. Zamiast zatrudniać profesjonalnych pracowników, zapraszamy wolontariuszy, aby każdy przybywający do Dos Mundos mógł wyrazić swoją szczerość, poczuć się użytecznym i potrzebnym, a także okazać swoją miłość we wspólnocie.\n\nJeśli czujesz powołanie do rozwoju duchowego, zapraszamy Cię do dołączenia do naszej społeczności położonej w Peru, w sercu amazońskiej dżungli. To szansa dla tych, którzy są gotowi na głęboką wewnętrzną transformację i pragną przejść drogę uzdrowienia poprzez służbę, a także pracę z tradycyjnymi roślinami pod przewodnictwem uzdrowiciela Pepe.",
+    sections: [
+      {
+        title: "Co Oferujemy",
+        text: "Bezpieczną przestrzeń do uzdrowienia z Ayahuascą i innymi tradycyjnymi roślinami. Organiczne jedzenie z produktów z naszej własnej farmy. Zdrowe środowisko i zakwaterowanie, które pozwolą Ci odłączyć się od zgiełku współczesnego świata, połączyć się ze sobą i przywrócić więź z naturą."
+      },
+      {
+        title: "Kogo Szukamy",
+        text: "Szukamy wolontariuszy, którzy chcą połączyć własną drogę uzdrowienia ze służbą innym. To nie jest zwykły warsztat — to głębokie doświadczenie transformacyjne, gdzie wzrost następuje poprzez jawną służbę."
+      }
+    ],
+    waysToServe: {
+      title: "Sposoby Służenia",
+      items: [
+        { icon: Sprout, text: "Opieka nad farmą i zwierzętami: dbanie o krowy, kozy, świnki morskie, króliki, kury i konie" },
+        { icon: Utensils, text: "Pomoc w kuchni: przygotowywanie posiłków i sprzątanie" },
+        { icon: Home, text: "Dbanie o dom: sprzątanie pokoi i łazienek, pomoc w praniu" },
+        { icon: Users, text: "Praca w serowarni: wyrób masła, twarogu i sera" },
+        { icon: Fish, text: "Rybołówstwo: pomoc w łowieniu ryb sieciami (szczególnie mile widziany udział mężczyzn czujących się komfortowo w tej pracy)" },
+        { icon: Heart, text: "Wsparcie społeczności: różne zadania przyczyniające się do dobrobytu i rozwoju naszej społeczności" }
+      ]
+    },
+    philosophy: {
+      title: "Filozofia Centrum",
+      text: "Wierzymy, że prawdziwe uzdrowienie przychodzi zarówno poprzez głęboką pracę wewnętrzną, jak i poprzez służbę. Każdy dzień w Dos Mundos to okazja do transformacji poprzez praktykę, kontakt z naturą i serdeczną służbę."
+    },
+    closing: {
+      title: "Dołącz do Nas",
+      text: "Jeśli czujesz wezwanie, by przejść tę drogę uzdrowienia i służby razem z nami, czekamy na Ciebie. Napisz o sobie, swoim doświadczeniu i pożądanym czasie pobytu."
+    }
   }
 };
 
@@ -140,9 +251,11 @@ const VolunteersPage = () => {
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
-          className="text-lg leading-relaxed text-slate-300 text-center max-w-3xl mx-auto"
+          className="text-lg leading-relaxed text-slate-300 text-center max-w-3xl mx-auto space-y-4"
         >
-          {t.intro}
+          {t.intro.split('\n\n').map((paragraph, idx) => (
+            <p key={idx}>{paragraph}</p>
+          ))}
         </motion.div>
 
         {/* Main Sections */}
@@ -183,7 +296,7 @@ const VolunteersPage = () => {
           </div>
         </div>
 
-        {/* Exchange & Closing */}
+        {/* Philosophy & Closing */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -191,15 +304,16 @@ const VolunteersPage = () => {
           className="bg-gradient-to-br from-purple-900/40 to-blue-900/40 rounded-3xl p-8 md:p-12 text-center space-y-8 border border-white/10"
         >
           <div className="space-y-4">
-            <h3 className="text-2xl font-bold text-white">{t.exchange.title}</h3>
+            <h3 className="text-2xl font-bold text-white">{t.philosophy.title}</h3>
             <p className="text-slate-300 leading-relaxed max-w-2xl mx-auto">
-              {t.exchange.text}
+              {t.philosophy.text}
             </p>
           </div>
           
-          <div className="pt-8 border-t border-white/10">
-            <p className="text-xl font-medium text-white italic">
-              "{t.closing}"
+          <div className="pt-8 border-t border-white/10 space-y-4">
+            <h3 className="text-2xl font-bold text-white">{t.closing.title}</h3>
+            <p className="text-slate-300 leading-relaxed max-w-2xl mx-auto">
+              {t.closing.text}
             </p>
           </div>
         </motion.div>
