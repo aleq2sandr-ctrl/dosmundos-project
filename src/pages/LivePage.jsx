@@ -15,10 +15,11 @@ const LivePage = () => {
     // In a real app, this would come from an environment variable
     // For now, we'll assume the VPS IP or a placeholder
     // You need to replace 'YOUR_VPS_IP' with the actual IP or domain
-    const streamUrl = `https://dosmundos.pe/hls/stream.m3u8`; 
+    // The stream key appears to be '1' based on server logs
+    const streamUrl = `https://dosmundos.pe/hls/1.m3u8`; 
     // Or better, use a relative path if proxied, or a specific config
     // For this task, I'll use a placeholder that the user needs to configure
-    setHlsUrl('https://dosmundos.pe/hls/stream.m3u8');
+    setHlsUrl('https://dosmundos.pe/hls/1.m3u8');
   }, []);
 
   useEffect(() => {
