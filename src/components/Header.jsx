@@ -15,7 +15,7 @@ const Header = ({ podcastData, currentLanguage = 'ru' }) => {
   ];
 
   return (
-    <header className="sticky top-0 z-50 flex flex-col bg-black/20 backdrop-blur-md border-b border-white/5 transition-all duration-300">
+    <header className="relative z-50 flex flex-col bg-black/20 backdrop-blur-md border-b border-white/5 transition-all duration-300">
       <div className="flex items-center justify-between px-4 py-3 gap-4">
         <div className="flex items-center gap-3 shrink-0">
           {podcastData?.image && (
