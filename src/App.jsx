@@ -29,7 +29,6 @@ import { EditorAuthModal } from '@/components/EditorAuthModal';
 import EditHistoryAdminPage from '@/pages/EditHistoryAdminPage';
 import LivePage from '@/pages/LivePage';
 import { initGA4, trackPageView } from '@/lib/analyticsService';
-import useLiveStatus from '@/hooks/useLiveStatus';
 
 // Поддерживаемые языки
 const SUPPORTED_LANGUAGES = ['ru', 'es', 'en', 'de', 'fr', 'pl'];
@@ -107,7 +106,6 @@ const LanguageRouteWrapper = ({ children }) => {
 const AppLayout = ({ user }) => {
   const location = useLocation();
   const { showAuthModal, closeAuthModal } = useEditorAuth();
-  const isLive = useLiveStatus();
   
   // Determine language from URL
   const pathParts = location.pathname.split('/');
@@ -125,7 +123,7 @@ const AppLayout = ({ user }) => {
       <LanguageRedirect />
       <RouteTracker />
       
-      <Header podcastData={podcastData} currentLanguage={currentLanguage} isLive={isLive} />
+      <Header podcastData={podcastData} currentLanguage={currentLanguage} />
 
       <main className="flex-grow w-full">
         {/* Global player sits below the fixed header */}

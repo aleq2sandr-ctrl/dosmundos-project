@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 import LanguageSwitcher from './LanguageSwitcher';
 
-const Header = ({ podcastData, currentLanguage = 'ru', isLive = false }) => {
+const Header = ({ podcastData, currentLanguage = 'ru' }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const translations = {
@@ -18,11 +18,11 @@ const Header = ({ podcastData, currentLanguage = 'ru', isLive = false }) => {
   const t = translations[currentLanguage] || translations.en;
 
   const navLinks = [
-    { to: `/${currentLanguage}/live`, label: t.live },
     { to: `/${currentLanguage}/about`, label: t.about },
     { to: `/${currentLanguage}/festival`, label: t.festival },
     { to: `/${currentLanguage}/volunteers`, label: t.volunteers },
     { to: `/${currentLanguage}/episodes`, label: t.radio },
+    { to: `/${currentLanguage}/live`, label: t.live },
   ];
 
   return (
@@ -55,15 +55,9 @@ const Header = ({ podcastData, currentLanguage = 'ru', isLive = false }) => {
               <Link 
                 key={link.to}
                 to={link.to} 
-                className="px-3 py-2 rounded-lg text-sm font-medium text-slate-200 hover:bg-white/10 hover:text-white transition-all whitespace-nowrap active:scale-95 flex items-center gap-2"
+                className="px-3 py-2 rounded-lg text-sm font-medium text-slate-200 hover:bg-white/10 hover:text-white transition-all whitespace-nowrap active:scale-95"
               >
                 {link.label}
-                {link.label === t.live && isLive && (
-                  <div className="relative">
-                    <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
-                    <div className="absolute inset-0 w-2 h-2 rounded-full bg-red-500 animate-ping"></div>
-                  </div>
-                )}
               </Link>
             ))}
           </nav>
@@ -92,16 +86,10 @@ const Header = ({ podcastData, currentLanguage = 'ru', isLive = false }) => {
               <Link 
                 key={link.to}
                 to={link.to} 
-                className="px-4 py-3 rounded-lg text-base font-medium text-slate-200 hover:bg-white/10 hover:text-white transition-all active:scale-95 flex items-center gap-2"
+                className="px-4 py-3 rounded-lg text-base font-medium text-slate-200 hover:bg-white/10 hover:text-white transition-all active:scale-95"
                 onClick={() => setIsMenuOpen(false)}
               >
                 {link.label}
-                {link.label === t.live && isLive && (
-                  <div className="relative">
-                    <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
-                    <div className="absolute inset-0 w-2 h-2 rounded-full bg-red-500 animate-ping"></div>
-                  </div>
-                )}
               </Link>
             ))}
             <div className="mt-2 pt-4 border-t border-white/10 flex justify-between items-center px-2">
