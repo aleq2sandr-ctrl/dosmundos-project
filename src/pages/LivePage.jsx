@@ -15,14 +15,20 @@ const LivePage = () => {
     // In a real app, this would come from an environment variable
     // For now, we'll assume the VPS IP or a placeholder
     // You need to replace 'YOUR_VPS_IP' with the actual IP or domain
-    const streamUrl = `http://${window.location.hostname}:8080/hls/stream.m3u8`; 
+    const streamUrl = `https://dosmundos.pe/hls/stream.m3u8`; 
     // Or better, use a relative path if proxied, or a specific config
     // For this task, I'll use a placeholder that the user needs to configure
-    setHlsUrl('http://YOUR_VPS_IP:8080/hls/stream.m3u8');
+    setHlsUrl('https://dosmundos.pe/hls/stream.m3u8');
   }, []);
 
   useEffect(() => {
     const calculateTimeLeft = () => {
+      // Force live state for now so we can see the stream
+      setIsLive(true);
+      setTimeLeft('Live now!');
+      return;
+
+      /* Original timer logic - disabled for immediate streaming
       const now = new Date();
       const currentUtc = now.getTime() + (now.getTimezoneOffset() * 60000);
       const peruTime = new Date(currentUtc + (3600000 * PERU_OFFSET));
@@ -73,6 +79,7 @@ const LivePage = () => {
       } else {
           setIsLive(false);
       }
+      */
     };
 
     const timer = setInterval(calculateTimeLeft, 1000);
