@@ -207,13 +207,30 @@ const useSegmentEditing = (
           const segmentId = segmentToModify.id || segmentToModify.start;
           let contentBefore = segmentToModify.text;
           let contentAfter = '';
+          let extraMetadata = {};
           
+          // Find index for rollback positioning
+          const segmentIndex = originalUtterances.findIndex(u => (u.id || u.start) === (segmentToModify.id || segmentToModify.start));
+
           if (actionType === 'Split') {
+            contentBefore = JSON.stringify(segmentToModify); // Save full original segment
             contentAfter = `${actionDetail.segment1.text} | ${actionDetail.segment2.text}`;
+            extraMetadata = { 
+              segmentIndex,
+              createdSegmentsCount: 2 
+            };
           } else if (actionType === 'Merge') {
+            // For merge, we need both segments that were merged
+            const prevSeg = originalUtterances[segmentIndex - 1];
+            contentBefore = JSON.stringify([prevSeg, segmentToModify]); // Save array of original segments
             contentAfter = actionDetail.resultingSegment.text;
+            extraMetadata = { 
+              segmentIndex: segmentIndex - 1 // Index of the first segment in the merge
+            };
           } else if (actionType === 'Delete') {
+            contentBefore = JSON.stringify(segmentToModify); // Save full deleted segment
             contentAfter = '[DELETED]';
+            extraMetadata = { segmentIndex };
           }
           
           await saveEditToHistory({
@@ -231,7 +248,8 @@ const useSegmentEditing = (
               segmentId: segmentId,
               action: actionType,
               actionDetail: actionDetail,
-              timestamp: new Date().toISOString()
+              timestamp: new Date().toISOString(),
+              ...extraMetadata
             }
           });
           console.log(`[SegmentEditing] ${actionType} action saved to history`);

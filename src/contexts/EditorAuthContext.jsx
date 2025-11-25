@@ -80,18 +80,56 @@ export const EditorAuthProvider = ({ children }) => {
         throw new Error('Email and name are required');
       }
 
-      // Call the get_or_create_editor function
-      const { data, error } = await supabase.rpc('get_or_create_editor', {
-        p_email: trimmedEmail,
-        p_name: trimmedName
-      });
+      // Manual check-then-update/insert logic to avoid upsert/RPC issues
+      let data, error;
 
-      if (error) throw error;
+      // 1. Try to find existing user
+      const { data: existingUser, error: fetchError } = await supabase
+        .from('user_editors')
+        .select('*')
+        .eq('email', trimmedEmail)
+        .single();
+
+      if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 is "not found"
+        throw fetchError;
+      }
+
+      if (existingUser) {
+        console.log('[Auth] Found existing user:', existingUser);
+        // 2. Update existing user
+        // Use email for the condition to be safer, avoiding potential undefined id issues
+        const { data: updatedUser, error: updateError } = await supabase
+          .from('user_editors')
+          .update({ 
+            name: trimmedName,
+            last_login: new Date().toISOString()
+          })
+          .eq('email', trimmedEmail)
+          .select()
+          .single();
+          
+        if (updateError) throw updateError;
+        data = updatedUser;
+      } else {
+        // 3. Insert new user
+        const { data: newUser, error: insertError } = await supabase
+          .from('user_editors')
+          .insert({ 
+            email: trimmedEmail, 
+            name: trimmedName,
+            last_login: new Date().toISOString()
+          })
+          .select()
+          .single();
+          
+        if (insertError) throw insertError;
+        data = newUser;
+      }
 
       const editorData = {
-        id: data,
-        email: trimmedEmail,
-        name: trimmedName,
+        id: data.id,
+        email: data.email,
+        name: data.name,
         loginTime: new Date().toISOString()
       };
 

@@ -97,6 +97,46 @@ export const PlayerProvider = ({ children }) => {
   const handlePlay = () => setIsPlaying(true);
   const handlePause = () => setIsPlaying(false);
 
+  const handleError = (e) => {
+    console.error('[PlayerContext] Audio error:', e.target.error);
+    console.error('Audio error code:', e.target.error?.code);
+    console.error('Audio error message:', e.target.error?.message);
+    
+    // Attempt to recover from network/decode errors
+    if (e.target.error?.code === e.target.error?.MEDIA_ERR_NETWORK || 
+        e.target.error?.code === e.target.error?.MEDIA_ERR_DECODE ||
+        e.target.error?.code === e.target.error?.MEDIA_ERR_SRC_NOT_SUPPORTED) {
+      
+      console.log('[PlayerContext] Attempting to recover from audio error...');
+      
+      // 1. Try to refresh cache if SW is active
+      if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({
+          type: 'REFRESH_AUDIO_CACHE',
+          url: e.target.src
+        });
+      }
+
+      // 2. Save current time to restore after reload
+      const savedTime = currentTime;
+      const wasPlaying = isPlaying;
+
+      // 3. Retry loading after a short delay
+      setTimeout(() => {
+        if (audioRef.current) {
+          console.log('[PlayerContext] Reloading audio source...');
+          audioRef.current.load();
+          audioRef.current.currentTime = savedTime;
+          if (wasPlaying) {
+            audioRef.current.play().catch(err => console.error("Retry play failed:", err));
+          }
+        }
+      }, 1000);
+    }
+    
+    setIsPlaying(false);
+  };
+
   return (
     <PlayerContext.Provider value={{
       currentEpisode,
@@ -124,6 +164,7 @@ export const PlayerProvider = ({ children }) => {
         onEnded={handleEnded}
         onPlay={handlePlay}
         onPause={handlePause}
+        onError={handleError}
         style={{ display: 'none' }}
       />
     </PlayerContext.Provider>

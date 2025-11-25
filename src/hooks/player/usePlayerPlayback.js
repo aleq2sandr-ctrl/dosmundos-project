@@ -65,10 +65,13 @@ const usePlayerPlayback = ({
           return false;
         }
       }
-      // Ignore AbortError which happens when pausing while loading
-      if (err?.name !== 'AbortError') {
-        console.error('[usePlayerPlayback] Play error:', err);
+      // AbortError - нормальное поведение при операциях seek/pause, просто игнорируем
+      if (err?.name === 'AbortError') {
+        logger.debug('[usePlayerPlayback] Play request aborted (expected during seek/pause operations)');
+        return false;
       }
+      // Другие ошибки логируем
+      console.error('[usePlayerPlayback] Play error:', err);
       return false;
     }
   };
@@ -169,8 +172,8 @@ const usePlayerPlayback = ({
       if (isReady) {
         // Аудио готово - сразу продолжаем воспроизведение
         if (playAfterJump || wasPlaying) {
-          // Дополнительная проверка: убеждаемся что аудио действительно на паузе
-          if (audioRef.current.paused) {
+          // Дополнительная проверка: убеждаемся что аудио действительно на паузе и не загружается
+          if (audioRef.current.paused && audioRef.current.readyState >= audioRef.current.HAVE_CURRENT_DATA) {
             console.log('🔧 [usePlayerPlayback] Attempting to play audio...');
             playPromiseRef.current = attemptPlay(audioRef.current);
             playPromiseRef.current?.then((ok) => {
@@ -191,9 +194,10 @@ const usePlayerPlayback = ({
               isSeekingRef.current = false;
             });
           } else {
-            // Аудио уже воспроизводится - просто обновляем состояние
-            setIsPlayingState(true);
-            onPlayerStateChange?.({ isPlaying: true });
+            // Аудио уже воспроизводится или не готово - просто обновляем состояние
+            const shouldBePlaying = !audioRef.current.paused && audioRef.current.readyState >= audioRef.current.HAVE_CURRENT_DATA;
+            setIsPlayingState(shouldBePlaying);
+            onPlayerStateChange?.({ isPlaying: shouldBePlaying });
             isSeekingRef.current = false;
           }
         } else {
@@ -212,7 +216,7 @@ const usePlayerPlayback = ({
           
           if (playAfterJump || wasPlaying) {
             // Дополнительная проверка перед воспроизведением
-            if (audioRef.current.paused) {
+            if (audioRef.current.paused && audioRef.current.readyState >= audioRef.current.HAVE_CURRENT_DATA) {
               playPromiseRef.current = attemptPlay(audioRef.current);
               playPromiseRef.current?.then((ok) => {
                 if (!ok) {
@@ -230,9 +234,10 @@ const usePlayerPlayback = ({
                 isSeekingRef.current = false;
               });
             } else {
-              // Аудио уже воспроизводится
-              setIsPlayingState(true);
-              onPlayerStateChange?.({ isPlaying: true });
+              // Аудио уже воспроизводится или не готово
+              const shouldBePlaying = !audioRef.current.paused && audioRef.current.readyState >= audioRef.current.HAVE_CURRENT_DATA;
+              setIsPlayingState(shouldBePlaying);
+              onPlayerStateChange?.({ isPlaying: shouldBePlaying });
               isSeekingRef.current = false;
             }
           } else {
@@ -291,8 +296,15 @@ const usePlayerPlayback = ({
     if (isPlayingState && audioElement.paused) {
       logger.debug('usePlayerPlayback: State says playing but audio paused, resuming playback');
       
+      // Отменяем предыдущий промис, если он есть
       if (playPromiseRef.current) {
         playPromiseRef.current.catch(() => {});
+      }
+      
+      // Дополнительная проверка: не загружается ли аудио в данный момент
+      if (audioElement.readyState < audioElement.HAVE_CURRENT_DATA) {
+        logger.debug('usePlayerPlayback: Audio not ready, waiting for ready state');
+        return;
       }
       
       playPromiseRef.current = attemptPlay(audioElement);
@@ -300,6 +312,7 @@ const usePlayerPlayback = ({
         if (!ok) return;
         logger.debug('usePlayerPlayback: Resume playback successful');
       }).catch(error => {
+        // AbortError ожидаем при операциях seek/паузы - игнорируем
         if (error.name !== 'AbortError') {
           console.error("usePlayerPlayback: Resume playback error:", error);
           toast({

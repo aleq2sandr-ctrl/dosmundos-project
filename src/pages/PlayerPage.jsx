@@ -102,7 +102,7 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
     fetchTranscriptForEpisode,
     fetchQuestionsForEpisode,
     setTranscript,
-  } = useOfflineEpisodeData(episodeSlug, langPrefix);
+  } = useOfflineEpisodeData(episodeSlug, langPrefix, toast);
 
   // Sync with Global Player Context
   useEffect(() => {
@@ -137,6 +137,38 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
     fetchTranscriptForEpisode,
     isOfflineMode // Передаем офлайн статус
   );
+
+  // Listen for rollback events to update UI in realtime
+  useEffect(() => {
+    const handleTranscriptUpdate = (event) => {
+      if (event.detail?.episodeSlug === episodeSlug) {
+        fetchTranscriptForEpisode(episodeSlug, currentLanguage);
+      }
+    };
+
+    const handleQuestionUpdate = (event) => {
+      if (event.detail?.episodeSlug === episodeSlug) {
+        fetchQuestionsForEpisode(episodeSlug, currentLanguage);
+      }
+    };
+
+    const handleSpeakerUpdate = (event) => {
+      if (event.detail?.episodeSlug === episodeSlug) {
+        fetchTranscriptForEpisode(episodeSlug, currentLanguage);
+      }
+    };
+
+    window.addEventListener('transcriptUpdated', handleTranscriptUpdate);
+    window.addEventListener('questionUpdated', handleQuestionUpdate);
+    window.addEventListener('speakerUpdated', handleSpeakerUpdate);
+
+    return () => {
+      window.removeEventListener('transcriptUpdated', handleTranscriptUpdate);
+      window.removeEventListener('questionUpdated', handleQuestionUpdate);
+      window.removeEventListener('speakerUpdated', handleSpeakerUpdate);
+    };
+  }, [episodeSlug, currentLanguage, fetchTranscriptForEpisode, fetchQuestionsForEpisode]);
+
 
   const {
     isAddQuestionFromSegmentDialogOpen,

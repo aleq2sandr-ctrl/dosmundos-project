@@ -14,6 +14,7 @@ const STATIC_ASSETS = [
 
 // Максимальный размер кеша аудио (100MB)
 const MAX_AUDIO_CACHE_SIZE = 100 * 1024 * 1024;
+const pendingCacheOperations = new Map();
 
 self.addEventListener('install', (event) => {
   console.log('[SW] Installing...');
@@ -68,8 +69,7 @@ self.addEventListener('fetch', (event) => {
 
   // Исключаем Hostinger и другие внешние аудио-домены из обработки Service Worker'ом
   // Это критично для CORS запросов, которые могут падать в fetch() внутри SW
-  if (url.hostname.includes('hostingersite.com') || 
-      url.hostname.includes('srvstatic.kz') || 
+  if (url.hostname.includes('srvstatic.kz') || 
       url.hostname.includes('archive.org') ||
       url.hostname.includes('r2.dev')) {
     return;
@@ -141,13 +141,6 @@ function isApiRequest(request) {
 function isAudioRequest(request) {
   const url = new URL(request.url);
 
-  // Исключаем Hostinger из обработки Service Worker'ом.
-  // Пусть браузер сам обрабатывает потоковое воспроизведение и кеширование.
-  // Это решает проблемы с CORS, Range requests и переполнением памяти в SW.
-  if (url.hostname.includes('hostingersite.com')) {
-    return false;
-  }
-  
   // Явно включаем proxy-audio
   if (url.pathname.includes('/api/proxy-audio')) {
     return true;
@@ -236,42 +229,104 @@ async function handleAudioRequest(request) {
     });
   }
 
+  // Cache Miss Logic
   try {
-    console.log('[SW] Fetching audio from network:', request.url);
-    const response = await fetch(request);
-    
-    // Кешируем только успешные ответы, не opaque (status 0) и не partial (206)
-    if (response.ok && response.status === 200 && response.type !== 'opaque') {
-      // Проверяем размер кеша перед добавлением
-      await manageCacheSize(cache, response.clone());
-      
-      // Кешируем только полный ответ (не Range responses) и только GET запросы
-      if (!rangeHeader && request.method === 'GET') {
-        // Используем чистый ключ для сохранения
-        await cache.put(cacheKey, response.clone());
-        console.log('[SW] Audio cached:', request.url);
+    // Проверяем, является ли это "глубоким" seek-ом (запрос не с начала файла)
+    let isDeepSeek = false;
+    if (rangeHeader) {
+      const match = rangeHeader.match(/bytes=(\d+)-/);
+      if (match && parseInt(match[1], 10) > 0) {
+        isDeepSeek = true;
       }
     }
+
+    if (isDeepSeek) {
+      console.log('[SW] Deep seek on non-cached file. Serving from network + Background Cache.');
+      
+      // 1. Запускаем кеширование полного файла в фоне, если еще не запущено
+      if (!pendingCacheOperations.has(url.toString())) {
+        const cachePromise = (async () => {
+          try {
+            const fullRequest = new Request(request.url, {
+              method: 'GET',
+              headers: new Headers(request.headers),
+              mode: 'cors',
+              credentials: 'omit'
+            });
+            fullRequest.headers.delete('range');
+            
+            const response = await fetch(fullRequest);
+            if (response.ok) {
+              await manageCacheSize(cache, response.clone());
+              await cache.put(cacheKey, response);
+              console.log('[SW] Background caching complete:', request.url);
+            }
+          } catch (err) {
+            console.error('[SW] Background caching failed:', err);
+          }
+        })();
+        
+        pendingCacheOperations.set(url.toString(), cachePromise);
+        cachePromise.finally(() => pendingCacheOperations.delete(url.toString()));
+      }
+
+      // 2. Возвращаем пользователю то, что он просил (Range request) из сети
+      return fetch(request);
+    }
+
+    // Если это запрос с начала файла (или без Range), используем стратегию "Fetch Full & Cache"
+    console.log('[SW] Fetching full audio from network:', request.url);
     
-    return response;
-  } catch (error) {
-    console.log('[SW] Audio fetch failed, checking cache:', error);
-    
-    // Если есть кеш (возможно найденный по другому ключу?), пытаемся обработать Range request из кеша
-    // Но мы уже проверили cachedResponse выше.
-    
-    return new Response('Audio not available offline', { 
-      status: 503,
-      headers: { 'Content-Type': 'text/plain' }
+    const fullRequest = new Request(request.url, {
+      method: 'GET',
+      headers: new Headers(request.headers),
+      mode: 'cors', 
+      credentials: 'omit'
     });
+    
+    // Удаляем Range заголовок
+    fullRequest.headers.delete('range');
+    
+    const response = await fetch(fullRequest);
+    
+    if (response.ok && response.status === 200) {
+      const responseForCache = response.clone();
+      
+      manageCacheSize(cache, responseForCache.clone())
+        .then(() => cache.put(cacheKey, responseForCache))
+        .then(() => console.log('[SW] Audio cached fully:', request.url))
+        .catch(err => console.error('[SW] Cache put failed:', err));
+      
+      return response;
+    }
+    
+    console.log('[SW] Full fetch failed or not 200, falling back to original request');
+    return fetch(request);
+    
+  } catch (error) {
+    console.log('[SW] Audio fetch failed:', error);
+    return new Response('Audio not available offline', { status: 503 });
   }
-}// Обработка Range requests для поддержки перемотки в кешированном аудио
+}
+
+// Обработка Range requests для поддержки перемотки в кешированном аудио
 async function handleRangeRequest(response, rangeHeader) {
   try {
-    // Получаем полное содержимое из кеша
-    const arrayBuffer = await response.clone().arrayBuffer();
-    const fullSize = arrayBuffer.byteLength;
+    // Оптимизация: используем blob() вместо arrayBuffer() для экономии памяти
+    const blob = await response.clone().blob();
+    const fullSize = blob.size;
     
+    if (fullSize === 0) {
+      console.warn('[SW] Cached audio is empty (0 bytes). Returning 416.');
+      return new Response(null, {
+        status: 416,
+        headers: {
+          'Content-Range': `bytes */0`,
+          'Content-Type': 'audio/mpeg'
+        }
+      });
+    }
+
     // Парсим Range заголовок (формат: "bytes=start-end")
     const rangeMatch = rangeHeader.match(/bytes=(\d+)-(\d*)/);
     if (!rangeMatch) {
@@ -284,6 +339,7 @@ async function handleRangeRequest(response, rangeHeader) {
     
     // Проверяем валидность диапазона
     if (start >= fullSize || end >= fullSize || start > end) {
+      console.warn(`[SW] Invalid range request: ${start}-${end}/${fullSize}`);
       return new Response(null, {
         status: 416,
         headers: {
@@ -293,13 +349,12 @@ async function handleRangeRequest(response, rangeHeader) {
       });
     }
     
-    // Вырезаем нужный диапазон
-    const slice = arrayBuffer.slice(start, end + 1);
-    const sliceSize = slice.byteLength;
+    // Вырезаем нужный диапазон эффективно
+    const slice = blob.slice(start, end + 1);
+    const sliceSize = slice.size;
     
-    console.log(`[SW] Serving range ${start}-${end}/${fullSize} from cache`);
+    // console.log(`[SW] Serving range ${start}-${end}/${fullSize} from cache`);
     
-    // Возвращаем partial content с правильными заголовками
     return new Response(slice, {
       status: 206, // Partial Content
       statusText: 'Partial Content',
@@ -313,7 +368,6 @@ async function handleRangeRequest(response, rangeHeader) {
     });
   } catch (error) {
     console.error('[SW] Error handling range request:', error);
-    // Возвращаем полный ответ в случае ошибки
     return response;
   }
 }

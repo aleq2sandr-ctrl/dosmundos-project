@@ -132,19 +132,36 @@ export const getAllEditHistory = async (filters = {}, limit = 100, offset = 0) =
  */
 export const rollbackEdit = async (editId, rolledBackByEmail, rollbackReason = null) => {
   try {
+    // Try RPC first
     const { data, error } = await supabase.rpc('rollback_edit', {
       p_edit_id: editId,
       p_rolled_back_by_email: rolledBackByEmail,
       p_rollback_reason: rollbackReason
     });
 
-    if (error) throw error;
-
-    if (!data.success) {
-      throw new Error(data.error);
+    if (!error) {
+       if (!data.success) throw new Error(data.error);
+       return { success: true, data: data.data };
     }
 
-    return { success: true, data: data.data };
+    console.warn('RPC rollback_edit failed, trying direct update:', error);
+    
+    // If RPC failed (e.g. not found), try direct update
+    const { data: updatedData, error: updateError } = await supabase
+      .from('edit_history')
+      .update({
+        is_rolled_back: true,
+        rolled_back_at: new Date().toISOString(),
+        rolled_back_by: rolledBackByEmail,
+        rollback_reason: rollbackReason
+      })
+      .eq('id', editId)
+      .select()
+      .single();
+
+    if (updateError) throw updateError;
+    
+    return { success: true, data: updatedData };
   } catch (error) {
     console.error('Error rolling back edit:', error);
     return { success: false, error: error.message };
@@ -249,17 +266,34 @@ export const getAllEditors = async () => {
  */
 export const applyRollback = async (edit) => {
   try {
-    const { target_type, target_id, content_before, file_path, metadata } = edit;
+    const { target_type, target_id, content_before, file_path, metadata, editor_id } = edit;
 
     switch (target_type) {
       case 'ui_element':
         // For UI elements, we would need to call the visual editor API
         if (file_path) {
+          // Try to get line/column from metadata or target_id
+          let line = metadata?.line;
+          let column = metadata?.column;
+          
+          if ((!line || !column) && target_id && target_id.includes(':')) {
+             const parts = target_id.split(':');
+             if (parts.length >= 3) {
+                column = parts.pop();
+                line = parts.pop();
+             }
+          }
+
+          if (!line || !column) {
+             console.error('Cannot determine line/column for rollback', edit);
+             throw new Error('Missing line/column information for rollback');
+          }
+
           const response = await fetch('/api/apply-edit', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              editId: `${file_path}:${metadata?.line}:${metadata?.column}`,
+              editId: `${file_path}:${line}:${column}`,
               newFullText: content_before
             })
           });
@@ -274,16 +308,319 @@ export const applyRollback = async (edit) => {
 
       case 'transcript':
       case 'segment':
-        // For transcript segments, update the transcript in the database
-        // This would need to be implemented based on your transcript structure
-        console.warn('Transcript rollback not yet implemented');
-        return { success: false, error: 'Transcript rollback not implemented' };
+      case 'speaker': {
+        // For transcript segments and speaker changes, restore the original state
+        if (!metadata?.episodeSlug) {
+          return { success: false, error: 'Missing episode information' };
+        }
 
-      case 'episode':
-      case 'question':
-        // For episodes and questions, update the relevant database table
-        console.warn('Episode/Question rollback not yet implemented');
-        return { success: false, error: 'Episode/Question rollback not implemented' };
+        // Get the current transcript
+        const { data: transcriptData, error: fetchError } = await supabase
+          .from('transcripts')
+          .select('*')
+          .eq('episode_slug', metadata.episodeSlug)
+          .maybeSingle();
+
+        if (fetchError) throw fetchError;
+        if (!transcriptData) {
+          return { success: false, error: 'Transcript not found' };
+        }
+
+        let utterances = Array.isArray(transcriptData.utterances) ? transcriptData.utterances : [];
+        const action = metadata?.action;
+
+        // Handle different types of segment operations
+        if (action === 'Delete') {
+          // Restore deleted segment(s)
+          let deletedContent;
+          try {
+            deletedContent = typeof content_before === 'string' ? JSON.parse(content_before) : content_before;
+          } catch (e) {
+            console.error('Failed to parse deleted content', e);
+          }
+
+          if (!deletedContent) {
+            return { success: false, error: 'Cannot rollback delete without content data' };
+          }
+
+          let insertIndex = metadata.segmentIndex;
+          if (insertIndex === undefined || insertIndex === null) {
+             // Fallback: find by time of first element
+             const firstSegment = Array.isArray(deletedContent) ? deletedContent[0] : deletedContent;
+             insertIndex = utterances.findIndex(u => u.start > firstSegment.start);
+             if (insertIndex === -1) insertIndex = utterances.length;
+          }
+
+          if (Array.isArray(deletedContent)) {
+            utterances.splice(insertIndex, 0, ...deletedContent);
+          } else {
+            utterances.splice(insertIndex, 0, deletedContent);
+          }
+
+        } else if (action === 'Insert' && metadata?.segmentId) {
+          // Remove the inserted segment
+          utterances = utterances.filter(u => 
+            u.id !== metadata.segmentId && u.start !== metadata.startMs
+          );
+
+        } else if (action === 'Split') {
+           // Restore original segment (merge back)
+           let originalSegment;
+           try {
+             originalSegment = typeof content_before === 'string' ? JSON.parse(content_before) : content_before;
+           } catch (e) { return { success: false, error: 'Invalid split data' }; }
+
+           if (!originalSegment || metadata.segmentIndex === undefined) {
+             return { success: false, error: 'Missing data for split rollback' };
+           }
+
+           // Default to 2 if not specified
+           const count = metadata.createdSegmentsCount || 2;
+           utterances.splice(metadata.segmentIndex, count, originalSegment);
+
+        } else if (action === 'Merge') {
+           // Restore original segments (split back)
+           let originalSegments;
+           try {
+             originalSegments = typeof content_before === 'string' ? JSON.parse(content_before) : content_before;
+           } catch (e) { return { success: false, error: 'Invalid merge data' }; }
+
+           if (!originalSegments || !Array.isArray(originalSegments) || metadata.segmentIndex === undefined) {
+             return { success: false, error: 'Missing data for merge rollback' };
+           }
+
+           utterances.splice(metadata.segmentIndex, 1, ...originalSegments);
+
+        } else if (target_type === 'speaker' || action === 'ChangeSpeaker' || action === 'ReassignSpeaker' || action === 'RenameSpeakerGlobally') {
+          // Restore speaker assignment
+          const oldSpeaker = metadata?.oldSpeaker;
+          const newSpeaker = metadata?.newSpeaker;
+          const isGlobal = action === 'RenameSpeakerGlobally';
+          
+          if (isGlobal) {
+            // Restore all segments with the new speaker back to old speaker
+            utterances = utterances.map(u => 
+              u.speaker === newSpeaker ? { ...u, speaker: oldSpeaker } : u
+            );
+          } else if (metadata?.segmentId) {
+            // Restore specific segment
+            const segmentIndex = utterances.findIndex(u => 
+              (u.id === metadata.segmentId) || (u.start === metadata.segmentStart)
+            );
+            if (segmentIndex !== -1) {
+              utterances[segmentIndex] = {
+                ...utterances[segmentIndex],
+                speaker: oldSpeaker
+              };
+            }
+          }
+
+          // Trigger realtime update for speaker changes
+          window.dispatchEvent(new CustomEvent('speakerUpdated', { 
+            detail: { 
+              episodeSlug: metadata.episodeSlug, 
+              action: action || 'restored',
+              segmentId: metadata?.segmentId,
+              oldSpeaker,
+              newSpeaker,
+              isGlobal
+            } 
+          }));
+        } else if (metadata?.segmentId) {
+          // Default: restore text for specific segment
+          const segmentIndex = utterances.findIndex(u => 
+            (u.id === metadata.segmentId) || (u.start === metadata.segmentStart)
+          );
+
+          if (segmentIndex === -1) {
+            return { success: false, error: 'Segment not found in transcript' };
+          }
+
+          // Restore original text
+          utterances[segmentIndex] = {
+            ...utterances[segmentIndex],
+            text: content_before
+          };
+        }
+
+        // Save back to database
+        const { error: updateError } = await supabase
+          .from('transcripts')
+          .update({ utterances })
+          .eq('id', transcriptData.id);
+
+        if (updateError) throw updateError;
+
+        // Trigger realtime update for transcript changes
+        window.dispatchEvent(new CustomEvent('transcriptUpdated', { 
+          detail: { 
+            episodeSlug: metadata.episodeSlug, 
+            action: action || 'restored',
+            segmentId: metadata?.segmentId 
+          } 
+        }));
+
+        return { success: true, message: 'Transcript restored successfully' };
+      }
+
+      case 'question': {
+        // For questions, restore the original question data
+        const questionId = metadata?.questionId || (target_id ? target_id.split('_').pop() : null);
+        
+        if (!questionId || questionId === 'new') {
+          return { success: false, error: 'Missing or invalid question ID' };
+        }
+
+        const action = metadata?.action;
+        const episodeSlug = metadata?.episodeSlug;
+
+        if (action === 'delete') {
+          // For delete, restore from metadata.questionData or content_before
+          let originalQuestion = metadata?.questionData;
+          if (!originalQuestion) {
+            try {
+              originalQuestion = typeof content_before === 'string' ? JSON.parse(content_before) : content_before;
+            } catch {
+              // If parsing fails, extract from text format "Title: X, Time: Ys"
+              const titleMatch = content_before.match(/Title:\s*([^,]+)/);
+              const timeMatch = content_before.match(/Time:\s*(\d+)/);
+              originalQuestion = {
+                id: questionId,
+                title: titleMatch ? titleMatch[1].trim() : 'Untitled',
+                time: timeMatch ? parseInt(timeMatch[1]) : 0,
+                episode_slug: episodeSlug
+              };
+            }
+          }
+
+          // Ensure episode_slug is present
+          if (!originalQuestion.episode_slug && episodeSlug) {
+            originalQuestion.episode_slug = episodeSlug;
+          }
+
+          const { error: insertError } = await supabase
+            .from('questions')
+            .insert(originalQuestion);
+
+          if (insertError) throw insertError;
+          
+          // Trigger realtime update
+          window.dispatchEvent(new CustomEvent('questionUpdated', { 
+            detail: { episodeSlug, action: 'restored', questionId } 
+          }));
+          
+          return { success: true, message: 'Question restored successfully' };
+        } else if (action === 'add') {
+          // For add, delete the question
+          const { error: deleteError } = await supabase
+            .from('questions')
+            .delete()
+            .eq('id', questionId);
+
+          if (deleteError) throw deleteError;
+          
+          // Trigger realtime update
+          window.dispatchEvent(new CustomEvent('questionUpdated', { 
+            detail: { episodeSlug, action: 'deleted', questionId } 
+          }));
+          
+          return { success: true, message: 'Question addition rolled back' };
+        } else {
+          // For update, restore original data (only title and time, not full object)
+          let updateData = {};
+          try {
+            const parsed = typeof content_before === 'string' ? JSON.parse(content_before) : content_before;
+            // Only extract necessary fields
+            if (parsed.title !== undefined) updateData.title = parsed.title;
+            if (parsed.time !== undefined) updateData.time = parsed.time;
+          } catch {
+            // Extract from text format
+            const titleMatch = content_before.match(/Title:\s*([^,]+)/);
+            const timeMatch = content_before.match(/Time:\s*(\d+)/);
+            if (titleMatch) updateData.title = titleMatch[1].trim();
+            if (timeMatch) updateData.time = parseInt(timeMatch[1]);
+          }
+
+          if (Object.keys(updateData).length === 0) {
+            return { success: false, error: 'No data to restore' };
+          }
+
+          const { error: updateError } = await supabase
+            .from('questions')
+            .update(updateData)
+            .eq('id', questionId);
+
+          if (updateError) throw updateError;
+          
+          // Trigger realtime update
+          window.dispatchEvent(new CustomEvent('questionUpdated', { 
+            detail: { episodeSlug, action: 'updated', questionId, data: updateData } 
+          }));
+          
+          return { success: true, message: 'Question restored successfully' };
+        }
+      }
+
+      case 'episode': {
+        // For episodes, restore the original episode data
+        if (!metadata?.episodeSlug && !target_id) {
+          return { success: false, error: 'Missing episode slug' };
+        }
+
+        const episodeSlug = metadata?.episodeSlug || target_id;
+        const action = metadata?.action;
+        
+        if (action === 'add') {
+          // For add operations, delete the added episode
+          const { error: deleteError } = await supabase
+            .from('episodes')
+            .delete()
+            .eq('slug', episodeSlug);
+
+          if (deleteError) throw deleteError;
+
+          // Trigger realtime update
+          window.dispatchEvent(new CustomEvent('episodeUpdated', { 
+            detail: { episodeSlug, action: 'deleted' } 
+          }));
+
+          return { success: true, message: 'Episode addition rolled back' };
+        } else {
+          // For update/delete, parse content_before and only restore specific fields
+          let updateData = {};
+          try {
+            const parsed = typeof content_before === 'string' ? JSON.parse(content_before) : content_before;
+            // Only extract user-editable fields, not system fields
+            const editableFields = ['title_ru', 'title_en', 'description_ru', 'description_en', 
+                                   'tags', 'keywords', 'difficulty', 'published', 'duration_ms'];
+            editableFields.forEach(field => {
+              if (parsed[field] !== undefined) {
+                updateData[field] = parsed[field];
+              }
+            });
+          } catch {
+            return { success: false, error: 'Invalid episode data format' };
+          }
+
+          if (Object.keys(updateData).length === 0) {
+            return { success: false, error: 'No data to restore' };
+          }
+
+          const { error: updateError } = await supabase
+            .from('episodes')
+            .update(updateData)
+            .eq('slug', episodeSlug);
+
+          if (updateError) throw updateError;
+
+          // Trigger realtime update
+          window.dispatchEvent(new CustomEvent('episodeUpdated', { 
+            detail: { episodeSlug, action: 'updated', data: updateData } 
+          }));
+
+          return { success: true, message: 'Episode restored successfully' };
+        }
+      }
 
       default:
         throw new Error(`Unknown target type: ${target_type}`);

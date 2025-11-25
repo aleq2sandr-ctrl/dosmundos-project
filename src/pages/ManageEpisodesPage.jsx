@@ -431,6 +431,20 @@ const EpisodeManagementSection = ({ currentLanguage }) => {
     fetchEpisodes();
   }, [fetchEpisodes]);
 
+  // Listen for rollback events to update episodes list in realtime
+  useEffect(() => {
+    const handleEpisodeUpdate = (event) => {
+      // Refetch episodes when any episode is updated via rollback
+      fetchEpisodes();
+    };
+
+    window.addEventListener('episodeUpdated', handleEpisodeUpdate);
+
+    return () => {
+      window.removeEventListener('episodeUpdated', handleEpisodeUpdate);
+    };
+  }, [fetchEpisodes]);
+
   // Cleanup polling intervals
   useEffect(() => {
     return () => {

@@ -27,6 +27,7 @@ import { EditorAuthProvider, useEditorAuth } from '@/contexts/EditorAuthContext'
 import { PlayerProvider } from '@/contexts/PlayerContext';
 import { EditorAuthModal } from '@/components/EditorAuthModal';
 import EditHistoryAdminPage from '@/pages/EditHistoryAdminPage';
+import LivePage from '@/pages/LivePage';
 import { initGA4, trackPageView } from '@/lib/analyticsService';
 
 // Поддерживаемые языки
@@ -149,6 +150,11 @@ const AppLayout = ({ user }) => {
           } />
           
           {/* Новые маршруты с языковым префиксом */}
+          <Route path="/:lang/live" element={
+            <LanguageRouteWrapper>
+              <LivePage />
+            </LanguageRouteWrapper>
+          } />
           <Route path="/:lang/about" element={
             <LanguageRouteWrapper>
               <AboutPage />

@@ -218,11 +218,8 @@ function handleGlobalEvent(event) {
       const currentText = editableElement.textContent || '';
       showPopup(editableElement, editId, currentText);
     }
-  } else {
-    event.preventDefault();
-    event.stopPropagation();
-    event.stopImmediatePropagation();
   }
+  // Allow normal interaction with non-editable elements
 }
 
 function getParentOrigin() {

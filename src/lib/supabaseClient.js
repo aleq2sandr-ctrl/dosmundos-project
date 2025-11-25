@@ -18,9 +18,16 @@ if (!supabaseUrl || !supabaseAnonKey) {
 // Определяем, используем ли мы self-hosted Supabase (HTTP без SSL)
 const isSelfHosted = supabaseUrl && (supabaseUrl.startsWith('http://') || supabaseUrl.includes('72.61.186.175') || supabaseUrl.includes('supabase.dosmundos.pe'));
 
+// Clean up the key if it accidentally includes "Bearer "
+const cleanAnonKey = supabaseAnonKey.replace(/^Bearer\s+/i, '').trim();
+
+// Check for common key issues
+if (cleanAnonKey.split('.').length !== 3) {
+  console.warn('⚠️ WARNING: VITE_SUPABASE_ANON_KEY does not look like a valid JWT (expected 3 parts). Check your .env file.');
+}
 
 // Создаем клиент с настройками для оптимизации и обработки ошибок
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient(supabaseUrl, cleanAnonKey, {
   // Для self-hosted временно отключаем realtime чтобы избежать WebSocket ошибок
   ...(isSelfHosted && {
     realtime: {
@@ -39,8 +46,9 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       'x-client-info': 'dosmundos-podcast-app',
       // Для self-hosted Supabase всегда добавляем apikey в заголовках
       ...(isSelfHosted && {
-        'apikey': supabaseAnonKey,
-        'Authorization': `Bearer ${supabaseAnonKey}`,
+        'apikey': cleanAnonKey,
+        // Let supabase-js handle Authorization header to avoid duplication
+        // 'Authorization': `Bearer ${cleanAnonKey}`,
         // Add connection headers to prevent HTTP/2 issues
         'Connection': 'keep-alive',
         'User-Agent': 'DosMundos-Podcast-App/1.0'
@@ -59,21 +67,52 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     },
     // Дополнительные опции для self-hosted
     fetch: (url, options = {}) => {
-      // Удаляем проблемные заголовки для CORS
-      const headers = { ...options.headers };
+      // Handle headers whether they are a plain object or Headers object
+      // We normalize keys to lowercase to avoid duplication and case-sensitivity issues
+      let headers = {};
+      if (options.headers instanceof Headers) {
+        options.headers.forEach((value, key) => {
+          headers[key.toLowerCase()] = value;
+        });
+      } else if (options.headers) {
+        Object.keys(options.headers).forEach(key => {
+          headers[key.toLowerCase()] = options.headers[key];
+        });
+      }
       
       // Удаляем заголовки которые могут вызывать CORS проблемы
       delete headers['accept-profile'];
-      delete headers['Accept-Profile'];
       delete headers['content-profile'];
-      delete headers['Content-Profile'];
       
       // Add HTTP/2 compatibility headers
-      headers['Connection'] = 'keep-alive';
-      headers['User-Agent'] = 'DosMundos-Podcast-App/1.0';
+      headers['connection'] = 'keep-alive';
+      headers['user-agent'] = 'DosMundos-Podcast-App/1.0';
+      
+      // Ensure Content-Type is set for mutations
+      if (options.method && ['POST', 'PUT', 'PATCH'].includes(options.method.toUpperCase())) {
+        if (!headers['content-type']) {
+          headers['content-type'] = 'application/json';
+        }
+      }
+
+      // Убеждаемся что API ключ сохранен
+      if (!headers['apikey'] && cleanAnonKey) {
+        headers['apikey'] = cleanAnonKey;
+      }
+      
+      // Only add Authorization if it's completely missing.
+      if (!headers['authorization'] && cleanAnonKey) {
+         headers['authorization'] = `Bearer ${cleanAnonKey}`;
+      } else if (headers['authorization']) {
+         // Check if we have a double bearer issue or other malformed headers
+         if (headers['authorization'].match(/Bearer\s+Bearer/i)) {
+             console.warn('⚠️ [Supabase] Detected double Bearer in Authorization header, fixing...');
+             headers['authorization'] = headers['authorization'].replace(/Bearer\s+Bearer/i, 'Bearer');
+         }
+      }
       
       console.log('🔧 [Supabase] Fetch URL:', url);
-      console.log('🔧 [Supabase] Headers after cleanup:', headers);
+      // console.log('🔧 [Supabase] Final Headers:', headers); // Uncomment for debugging
       
       // Add timeout and abort controller for better error handling
       const controller = new AbortController();
@@ -99,25 +138,49 @@ if (isSelfHosted) {
   window.fetch = async function(url, options = {}) {
     // Если это запрос к нашему Supabase, очищаем заголовки и добавляем обработку ошибок
     if (url && url.includes('supabase.dosmundos.pe')) {
-      const headers = { ...options.headers };
-      
-      // Удаляем только проблемные CORS заголовки, но сохраняем важные
-      delete headers['accept-profile'];
-      delete headers['Accept-Profile'];
-      delete headers['content-profile'];
-      delete headers['Content-Profile'];
-      
-      // Убеждаемся что API ключ и авторизация сохранены
-      if (!headers['apikey'] && supabaseAnonKey) {
-        headers['apikey'] = supabaseAnonKey;
+      // Handle headers whether they are a plain object or Headers object
+      // We normalize keys to lowercase to avoid duplication
+      let headers = {};
+      if (options.headers instanceof Headers) {
+        options.headers.forEach((value, key) => {
+          headers[key.toLowerCase()] = value;
+        });
+      } else if (options.headers) {
+        Object.keys(options.headers).forEach(key => {
+          headers[key.toLowerCase()] = options.headers[key];
+        });
       }
-      if (!headers['Authorization'] && supabaseAnonKey) {
-        headers['Authorization'] = `Bearer ${supabaseAnonKey}`;
+      
+      // Удаляем только проблемные CORS заголовки
+      delete headers['accept-profile'];
+      delete headers['content-profile'];
+      
+      // Убеждаемся что API ключ сохранен
+      if (!headers['apikey'] && cleanAnonKey) {
+        headers['apikey'] = cleanAnonKey;
+      }
+      
+      // Only add Authorization if it's completely missing.
+      if (!headers['authorization'] && cleanAnonKey) {
+         headers['authorization'] = `Bearer ${cleanAnonKey}`;
+      } else if (headers['authorization']) {
+         // Check if we have a double bearer issue
+         if (headers['authorization'].match(/Bearer\s+Bearer/i)) {
+             console.warn('⚠️ [Supabase] Detected double Bearer in Authorization header, fixing...');
+             headers['authorization'] = headers['authorization'].replace(/Bearer\s+Bearer/i, 'Bearer');
+         }
       }
       
       // Add HTTP/2 compatibility headers
-      headers['Connection'] = 'keep-alive';
-      headers['User-Agent'] = 'DosMundos-Podcast-App/1.0';
+      headers['connection'] = 'keep-alive';
+      headers['user-agent'] = 'DosMundos-Podcast-App/1.0';
+
+      // Ensure Content-Type is set for mutations
+      if (options.method && ['POST', 'PUT', 'PATCH'].includes(options.method.toUpperCase())) {
+        if (!headers['content-type']) {
+          headers['content-type'] = 'application/json';
+        }
+      }
       
       // Функция для выполнения запроса с повторными попытками
       const fetchWithRetry = async (attempt = 1) => {

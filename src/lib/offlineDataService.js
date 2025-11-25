@@ -11,6 +11,67 @@ class OfflineDataService {
     this.initializing = false;
     this.initPromise = null;
     this.isInitialized = false; // Флаг для предотвращения повторных инициализаций
+    
+    // Compact logging configuration
+    this.logCounts = new Map();
+    this.lastLogTime = new Map();
+    this.logThrottleInterval = 5000; // 5 seconds
+    this.maxLogCount = 10; // Show count after this many occurrences
+  }
+
+  // Compact logging method to reduce repetitive messages
+  compactLog(message, category = 'default') {
+    const now = Date.now();
+    const key = `${category}:${message}`;
+    
+    // Initialize counters for this message
+    if (!this.logCounts.has(key)) {
+      this.logCounts.set(key, 0);
+      this.lastLogTime.set(key, 0);
+    }
+    
+    const count = this.logCounts.get(key);
+    const lastTime = this.lastLogTime.get(key);
+    
+    // Increment count
+    this.logCounts.set(key, count + 1);
+    this.lastLogTime.set(key, now);
+    
+    // If this is the first occurrence or enough time has passed, log it
+    if (count === 0 || (now - lastTime) > this.logThrottleInterval) {
+      if (count === 0) {
+        console.log(message);
+      } else if (count >= this.maxLogCount) {
+        console.log(`${message} (repeated ${count + 1} times)`);
+        // Reset counter after showing the count
+        this.logCounts.set(key, 0);
+      }
+    } else if (count === this.maxLogCount - 1) {
+      // Show the count when we reach the threshold
+      console.log(`${message} (repeated ${count + 1} times)`);
+      this.logCounts.set(key, 0);
+    }
+  }
+
+  // Attempt to recover from fallback mode to IndexedDB
+  async attemptRecovery() {
+    if (!this.useFallback) {
+      return true; // Already using IndexedDB
+    }
+
+    // Reset state and try to reinitialize
+    this.useFallback = false;
+    this.isInitialized = false;
+    this.db = null;
+    this.initPromise = null;
+    
+    try {
+      const result = await this.init();
+      return result !== null;
+    } catch (error) {
+      console.warn('Recovery attempt failed:', error);
+      return false;
+    }
   }
 
   // Инициализация базы данных
@@ -144,7 +205,7 @@ class OfflineDataService {
   }
 
   // Получение транзакции
-  async getTransaction(storeNames, mode = 'readonly') {
+  async getTransaction(storeNames, mode = 'readonly', retryCount = 0) {
     try {
       // Если уже используем fallback хранилище, возвращаем null
       if (this.useFallback) {
@@ -153,7 +214,7 @@ class OfflineDataService {
 
       // Если база данных не инициализирована или закрыта, инициализируем её
       if (!this.db || this.db.readyState !== 'open') {
-        console.log('🔄 Initializing or reinitializing database...');
+        this.compactLog('🔄 Initializing or reinitializing database...', 'database_init');
         const initResult = await this.init();
 
         // Если init() вернул null, значит перешли на fallback
@@ -206,10 +267,13 @@ class OfflineDataService {
       return transaction;
     } catch (error) {
       console.error('Error creating transaction:', error);
-      if (error.name === 'InvalidStateError') {
-        console.log('Database connection was lost, attempting to reinitialize...');
+      if (error.name === 'InvalidStateError' && retryCount < 2) {
+        this.compactLog('Database connection was lost, attempting to reinitialize...', 'database_init');
         this.db = null;
-        return this.getTransaction(storeNames, mode);
+        // Reset fallback state to allow retry
+        this.useFallback = false;
+        this.isInitialized = false;
+        return this.getTransaction(storeNames, mode, retryCount + 1);
       }
       throw new Error(`Ошибка создания транзакции: ${error.message}`);
     }
@@ -228,22 +292,47 @@ class OfflineDataService {
       last_updated: Date.now()
     };
 
+    // Если используем fallback хранилище, попытаться восстановить IndexedDB
+    if (this.useFallback) {
+      // Try recovery every 10 saves
+      if (!this.recoveryCounter) this.recoveryCounter = 0;
+      this.recoveryCounter++;
+      
+      if (this.recoveryCounter % 10 === 0) {
+        this.compactLog('🔄 Attempting to recover IndexedDB...', 'recovery');
+        const recovered = await this.attemptRecovery();
+        if (recovered) {
+          this.compactLog('✅ IndexedDB recovered successfully', 'recovery');
+        }
+      }
+    }
+
     // Если используем fallback хранилище
     if (this.useFallback) {
       const key = `episode_${episode.slug}`;
       this.fallbackStorage.set(key, episodeData);
-      console.log('💾 Episode saved to fallback storage:', episode.slug);
+      this.compactLog(`💾 Episode saved to fallback storage: ${episode.slug}`, 'episode_save');
       return episode.slug;
     }
 
     try {
       const transaction = await this.getTransaction(['episodes'], 'readwrite');
+      
+      if (!transaction) {
+        // If transaction creation failed (e.g. fallback mode activated), use fallback
+        this.compactLog(`🔄 Transaction failed, falling back to fallback storage for episode: ${episode.slug}`, 'fallback');
+        this.useFallback = true;
+        const key = `episode_${episode.slug}`;
+        this.fallbackStorage.set(key, episodeData);
+        return episode.slug;
+      }
+
       const store = transaction.objectStore('episodes');
       
       return new Promise((resolve, reject) => {
         const request = store.put(episodeData);
         request.onsuccess = () => {
-          console.log('💾 Episode saved to IndexedDB:', episode.slug);
+          this.compactLog(`💾 Episode saved to IndexedDB: ${episode.slug}`, 'episode_save');
           resolve(request.result);
         };
         request.onerror = () => {
@@ -254,7 +343,7 @@ class OfflineDataService {
     } catch (error) {
       console.error('Error in saveEpisode:', error);
       // Fallback to fallback storage if IndexedDB fails
-      console.log('🔄 Falling back to fallback storage for episode:', episode.slug);
+      this.compactLog(`🔄 Falling back to fallback storage for episode: ${episode.slug}`, 'fallback');
       this.useFallback = true;
       const key = `episode_${episode.slug}`;
       this.fallbackStorage.set(key, episodeData);
@@ -347,6 +436,21 @@ class OfflineDataService {
 
     try {
       const transaction = await this.getTransaction(['transcripts'], 'readwrite');
+      
+      if (!transaction) {
+        // If transaction creation failed (e.g. fallback mode activated), use fallback
+        this.compactLog(`🔄 Transaction failed, falling back to fallback storage for transcript: ${sanitizedTranscript.episode_slug}`, 'fallback');
+        this.useFallback = true;
+        const key = `transcript_${sanitizedTranscript.episode_slug}_${sanitizedTranscript.lang}`;
+        const transcriptData = {
+          ...sanitizedTranscript,
+          cached_at: Date.now(),
+          last_updated: Date.now()
+        };
+        this.fallbackStorage.set(key, transcriptData);
+        return Date.now();
+      }
+
       const store = transaction.objectStore('transcripts');
       
       const transcriptData = {
@@ -449,6 +553,23 @@ class OfflineDataService {
       }
 
       const transaction = await this.getTransaction(['questions'], 'readwrite');
+      
+      if (!transaction) {
+        // If transaction creation failed (e.g. fallback mode activated), use fallback
+        this.compactLog(`🔄 Transaction failed, falling back to fallback storage for questions: ${episodeSlug}`, 'fallback');
+        this.useFallback = true;
+        const key = `questions_${episodeSlug}_${lang}`;
+        const questionsData = {
+          questions: questions,
+          episode_slug: episodeSlug,
+          lang: lang,
+          cached_at: Date.now(),
+          last_updated: Date.now()
+        };
+        this.fallbackStorage.set(key, questionsData);
+        return questions.length;
+      }
+
       const store = transaction.objectStore('questions');
       
       // Сортируем вопросы по времени перед сохранением
@@ -498,6 +619,17 @@ class OfflineDataService {
 
     try {
       const transaction = await this.getTransaction(['questions']);
+      
+      if (!transaction) {
+        // Fallback if transaction failed
+        const key = `questions_${episodeSlug}_${lang}`;
+        const questionsData = this.fallbackStorage.get(key);
+        if (questionsData && questionsData.questions) {
+          return questionsData.questions.sort((a, b) => (a.time || 0) - (b.time || 0));
+        }
+        return [];
+      }
+
       const store = transaction.objectStore('questions');
       const index = store.index('episode_slug');
       
@@ -527,6 +659,14 @@ class OfflineDataService {
 
     try {
       const transaction = await this.getTransaction(['questions'], 'readwrite');
+      
+      if (!transaction) {
+        // Fallback if transaction failed
+        const key = `questions_${episodeSlug}_${lang}`;
+        this.fallbackStorage.delete(key);
+        return true;
+      }
+
       const store = transaction.objectStore('questions');
       const index = store.index('episode_slug');
       
@@ -721,7 +861,7 @@ class OfflineDataService {
     } catch (error) {
       console.error('Error in getSyncQueue:', error);
       // Fallback to fallback storage if IndexedDB fails
-      console.log('🔄 Falling back to fallback storage for sync queue');
+      this.compactLog('🔄 Falling back to fallback storage for sync queue', 'fallback');
       this.useFallback = true;
       const queue = [];
       for (const [key, value] of this.fallbackStorage.entries()) {
@@ -735,6 +875,10 @@ class OfflineDataService {
 
   async removeSyncItem(id) {
     const transaction = await this.getTransaction(['syncQueue'], 'readwrite');
+    if (!transaction) {
+      console.warn(`Failed to get transaction for removing sync item: ${id}`);
+      return;
+    }
     const store = transaction.objectStore('syncQueue');
     
     return new Promise((resolve, reject) => {
@@ -746,6 +890,10 @@ class OfflineDataService {
 
   async incrementSyncAttempts(id) {
     const transaction = await this.getTransaction(['syncQueue'], 'readwrite');
+    if (!transaction) {
+      console.warn(`Failed to get transaction for incrementing sync attempts: ${id}`);
+      return null;
+    }
     const store = transaction.objectStore('syncQueue');
     
     return new Promise((resolve, reject) => {
@@ -770,6 +918,10 @@ class OfflineDataService {
   
   async saveCacheSetting(key, value) {
     const transaction = await this.getTransaction(['cacheSettings'], 'readwrite');
+    if (!transaction) {
+      console.warn(`Failed to get transaction for saving cache setting: ${key}`);
+      return;
+    }
     const store = transaction.objectStore('cacheSettings');
     
     return new Promise((resolve, reject) => {
@@ -781,6 +933,10 @@ class OfflineDataService {
 
   async getCacheSetting(key, defaultValue = null) {
     const transaction = await this.getTransaction(['cacheSettings']);
+    if (!transaction) {
+      console.warn(`Failed to get transaction for getting cache setting: ${key}`);
+      return defaultValue;
+    }
     const store = transaction.objectStore('cacheSettings');
     
     return new Promise((resolve, reject) => {
@@ -800,7 +956,11 @@ class OfflineDataService {
     const stores = ['episodes', 'transcripts', 'questions', 'audioFiles'];
     
     for (const storeName of stores) {
-      const transaction = this.getTransaction([storeName], 'readwrite');
+      const transaction = await this.getTransaction([storeName], 'readwrite');
+      if (!transaction) {
+        console.warn(`Failed to get transaction for ${storeName}, skipping cleanup`);
+        continue;
+      }
       const store = transaction.objectStore(storeName);
       
       await new Promise((resolve, reject) => {
@@ -931,7 +1091,11 @@ class OfflineDataService {
     }
 
     try {
-      const transaction = this.getTransaction(['episodes'], 'readwrite');
+      const transaction = await this.getTransaction(['episodes'], 'readwrite');
+      if (!transaction) {
+        console.warn(`Failed to get transaction for deleting episode: ${slug}`);
+        return false;
+      }
       const store = transaction.objectStore('episodes');
       
       return new Promise((resolve, reject) => {

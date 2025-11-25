@@ -7,17 +7,18 @@ const Header = ({ podcastData, currentLanguage = 'ru' }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const translations = {
-    ru: { about: 'О центре', festival: 'Фестиваль', volunteers: 'Волонтерам', radio: 'Радио' },
-    en: { about: 'About', festival: 'Festival', volunteers: 'Volunteers', radio: 'Radio' },
-    es: { about: 'Sobre nosotros', festival: 'Festival', volunteers: 'Voluntarios', radio: 'Radio' },
-    de: { about: 'Über uns', festival: 'Festival', volunteers: 'Freiwillige', radio: 'Radio' },
-    fr: { about: 'À propos', festival: 'Festival', volunteers: 'Bénévoles', radio: 'Radio' },
-    pl: { about: 'O nas', festival: 'Festiwal', volunteers: 'Wolontariat', radio: 'Radio' },
+    ru: { about: 'О центре', festival: 'Фестиваль', volunteers: 'Волонтерам', radio: 'Радио', live: 'Live' },
+    en: { about: 'About', festival: 'Festival', volunteers: 'Volunteers', radio: 'Radio', live: 'Live' },
+    es: { about: 'Sobre nosotros', festival: 'Festival', volunteers: 'Voluntarios', radio: 'Radio', live: 'En vivo' },
+    de: { about: 'Über uns', festival: 'Festival', volunteers: 'Freiwillige', radio: 'Radio', live: 'Live' },
+    fr: { about: 'À propos', festival: 'Festival', volunteers: 'Bénévoles', radio: 'Radio', live: 'En direct' },
+    pl: { about: 'O nas', festival: 'Festiwal', volunteers: 'Wolontariat', radio: 'Radio', live: 'Na żywo' },
   };
 
   const t = translations[currentLanguage] || translations.en;
 
   const navLinks = [
+    { to: `/${currentLanguage}/live`, label: t.live },
     { to: `/${currentLanguage}/about`, label: t.about },
     { to: `/${currentLanguage}/festival`, label: t.festival },
     { to: `/${currentLanguage}/volunteers`, label: t.volunteers },
