@@ -34,12 +34,12 @@ const LivePage = () => {
       const currentUtc = now.getTime() + (now.getTimezoneOffset() * 60000);
       const peruTime = new Date(currentUtc + (3600000 * PERU_OFFSET));
 
-      // Find next Wednesday 21:30 Peru time
-      let nextStream = set(nextWednesday(peruTime), { hours: 21, minutes: 30, seconds: 0, milliseconds: 0 });
+      // Find next Wednesday 9:30 AM Peru time
+      let nextStream = set(nextWednesday(peruTime), { hours: 9, minutes: 30, seconds: 0, milliseconds: 0 });
       
-      // If today is Wednesday and it's before 21:30, use today
+      // If today is Wednesday and it's before 9:30, use today
       if (peruTime.getDay() === 3) {
-        const todayStream = set(peruTime, { hours: 21, minutes: 30, seconds: 0, milliseconds: 0 });
+        const todayStream = set(peruTime, { hours: 9, minutes: 30, seconds: 0, milliseconds: 0 });
         if (isBefore(peruTime, todayStream)) {
           nextStream = todayStream;
         }
@@ -51,7 +51,7 @@ const LivePage = () => {
       // So we need to check if today is Wednesday and we haven't passed the time yet.
       
       if (peruTime.getDay() === 3) {
-         const todayStream = set(peruTime, { hours: 21, minutes: 30, seconds: 0, milliseconds: 0 });
+         const todayStream = set(peruTime, { hours: 9, minutes: 30, seconds: 0, milliseconds: 0 });
          if (isBefore(peruTime, todayStream)) {
              nextStream = todayStream;
          }
@@ -74,7 +74,7 @@ const LivePage = () => {
       setTimeLeft(`${days}d ${hours}h ${minutes}m ${seconds}s`);
       
       // Simple check if we are within a 2 hour window of the start time
-      if (diff < 0 && diff > -7200000) {
+      if (diff >= 0 && diff < 7200000) {
           setIsLive(true);
           setTimeLeft('Live now!');
       } else {
@@ -123,69 +123,39 @@ const LivePage = () => {
   // We can display the time in different zones.
   
   const renderSchedule = () => {
-      // Create a date object for the next broadcast in UTC
-      // 21:30 PET = 02:30 UTC (Thursday)
-      // We need to find the next occurrence
+      const cities = [
+          { city: 'Lima', time: '9:30 AM' },
+          { city: 'Madrid', time: '2:30 PM' },
+          { city: 'Moscow', time: '4:30 PM' },
+          { city: 'Bangkok', time: '8:30 PM' },
+          { city: 'Sydney', time: '12:30 AM (Thu)' },
+      ];
       
-      const now = new Date();
-      let target = new Date();
-      
-      // Set to next Wednesday
-      const day = target.getDay();
-      const diff = 3 - day + (day >= 3 && target.getHours() >= 21 && target.getMinutes() >= 30 ? 7 : 0);
-      // This logic is rough, let's just use a reference date for formatting
-      
-      // Let's use a fixed reference date that is a Wednesday 21:30 PET
-      // 2023-11-29 is a Wednesday. 21:30 PET is 2023-11-30 02:30 UTC
-      const refDate = new Date('2023-11-30T02:30:00Z'); 
-      
-      return timeZones.map((tz) => {
-          try {
-            const timeString = new Intl.DateTimeFormat('en-US', {
-                timeZone: tz.zone,
-                hour: '2-digit',
-                minute: '2-digit',
-                weekday: 'short'
-            }).format(refDate);
-            
-            return (
-                <div key={tz.city} className="flex justify-between items-center py-2 border-b border-white/10 last:border-0">
-                    <div className="flex flex-col">
-                        <span className="font-medium text-slate-200">{tz.city}</span>
-                        <span className="text-xs text-slate-400">{tz.label}</span>
-                    </div>
-                    <span className="font-mono text-amber-400">{timeString}</span>
-                </div>
-            );
-          } catch (e) {
-              return null;
-          }
-      });
+      return cities.map((city) => (
+          <div key={city.city} className="flex justify-between items-center py-2 border-b border-white/10 last:border-0">
+              <span className="font-medium text-slate-200">{city.city}</span>
+              <span className="font-mono text-amber-400">{city.time}</span>
+          </div>
+      ));
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 pt-24 pb-12 px-4">
-      <div className="max-w-6xl mx-auto space-y-12">
+    <div className="min-h-screen bg-slate-950 pt-8 pb-6 px-4">
+      <div className="max-w-6xl mx-auto space-y-6">
         
         {/* Header Section */}
-        <div className="text-center space-y-4">
+        <div className="text-center space-y-2">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20 animate-pulse">
             <div className="w-2 h-2 rounded-full bg-red-500"></div>
             <span className="text-sm font-medium uppercase tracking-wider">Live Broadcast</span>
           </div>
-          <h1 className="text-4xl md:text-6xl font-bold text-white tracking-tight">
-            Dos Mundos <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-500">Live</span>
-          </h1>
-          <p className="text-lg text-slate-400 max-w-2xl mx-auto">
-            Join us every Wednesday for a live journey through music, culture, and conversation.
+          <p className="text-lg text-slate-200 max-w-2xl mx-auto">
+            Каждую среду медитация с перуанским целителем Пепе
           </p>
         </div>
 
-        {/* Main Content Grid */}
-        <div className="grid lg:grid-cols-3 gap-8">
-          
-          {/* Video Player Section (2 cols) */}
-          <div className="lg:col-span-2 space-y-6">
+        {/* Main Content */}
+        <div className="max-w-3xl mx-auto space-y-4">
             <div className="relative aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl ring-1 ring-white/10 group">
               {isLive ? (
                   <LivePlayer 
@@ -208,60 +178,35 @@ const LivePage = () => {
               {/* Overlay for offline state if needed */}
             </div>
 
-            <div className="flex flex-wrap gap-4 justify-center md:justify-start">
+            <div className="flex flex-wrap gap-3 justify-center md:justify-start">
                 <a href="https://youtube.com/@dosmundos" target="_blank" rel="noreferrer" 
-                   className="flex items-center gap-2 px-6 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium transition-colors">
+                   className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium transition-colors">
                     <Play size={20} fill="currentColor" />
                     Watch on YouTube
                 </a>
-                <button className="flex items-center gap-2 px-6 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-medium transition-colors">
+                <button className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-medium transition-colors">
                     <Share2 size={20} />
                     Share Stream
                 </button>
             </div>
-          </div>
 
-          {/* Sidebar Info (1 col) */}
-          <div className="space-y-8">
-            
             {/* Schedule Card */}
-            <div className="p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm">
-              <div className="flex items-center gap-3 mb-6">
-                <Calendar className="w-6 h-6 text-amber-400" />
-                <h3 className="text-xl font-bold text-white">Broadcast Schedule</h3>
+            <div className="p-4 rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm">
+              <div className="flex items-center gap-3 mb-4">
+                <Calendar className="w-5 h-5 text-amber-400" />
+                <h3 className="text-lg font-bold text-white">Broadcast Times</h3>
               </div>
               
               <div className="space-y-1">
                 {renderSchedule()}
               </div>
 
-              <div className="mt-6 pt-6 border-t border-white/10">
-                <p className="text-sm text-slate-400 flex items-start gap-2">
-                  <Globe className="w-4 h-4 mt-0.5 shrink-0" />
-                  Broadcasts originate from Lima, Peru (GMT-5). Times shown are adjusted to your local timezone where possible.
+              <div className="mt-4 pt-4 border-t border-white/10">
+                <p className="text-xs text-slate-400">
+                  Broadcasts start every Wednesday at 9:30 AM Peru time (GMT-5).
                 </p>
               </div>
             </div>
-
-            {/* Platforms */}
-            <div className="p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm">
-                <div className="grid grid-cols-2 gap-3">
-                    <a href="#" className="p-3 rounded-lg bg-[#1877F2]/20 hover:bg-[#1877F2]/30 text-[#1877F2] text-center font-medium transition-colors border border-[#1877F2]/20">
-                        Facebook
-                    </a>
-                    <a href="#" className="p-3 rounded-lg bg-[#FF0000]/20 hover:bg-[#FF0000]/30 text-[#FF0000] text-center font-medium transition-colors border border-[#FF0000]/20">
-                        YouTube
-                    </a>
-                    <a href="#" className="p-3 rounded-lg bg-[#6441A5]/20 hover:bg-[#6441A5]/30 text-[#6441A5] text-center font-medium transition-colors border border-[#6441A5]/20">
-                        Twitch
-                    </a>
-                    <a href="#" className="p-3 rounded-lg bg-orange-500/20 hover:bg-orange-500/30 text-orange-500 text-center font-medium transition-colors border border-orange-500/20">
-                        Restream
-                    </a>
-                </div>
-            </div>
-
-          </div>
         </div>
       </div>
     </div>
