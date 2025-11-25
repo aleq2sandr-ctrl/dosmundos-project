@@ -2,16 +2,26 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 import LanguageSwitcher from './LanguageSwitcher';
-import GlobalPlayer from './GlobalPlayer';
 
 const Header = ({ podcastData, currentLanguage = 'ru' }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
+  const translations = {
+    ru: { about: 'О центре', festival: 'Фестиваль', volunteers: 'Волонтерам', radio: 'Радио' },
+    en: { about: 'About', festival: 'Festival', volunteers: 'Volunteers', radio: 'Radio' },
+    es: { about: 'Sobre nosotros', festival: 'Festival', volunteers: 'Voluntarios', radio: 'Radio' },
+    de: { about: 'Über uns', festival: 'Festival', volunteers: 'Freiwillige', radio: 'Radio' },
+    fr: { about: 'À propos', festival: 'Festival', volunteers: 'Bénévoles', radio: 'Radio' },
+    pl: { about: 'O nas', festival: 'Festiwal', volunteers: 'Wolontariat', radio: 'Radio' },
+  };
+
+  const t = translations[currentLanguage] || translations.en;
+
   const navLinks = [
-    { to: `/${currentLanguage}/about`, label: 'О центре' },
-    { to: `/${currentLanguage}/festival`, label: 'Фестиваль' },
-    { to: `/${currentLanguage}/volunteers`, label: 'Волонтерам' },
-    { to: `/${currentLanguage}/episodes`, label: 'Радио' },
+    { to: `/${currentLanguage}/about`, label: t.about },
+    { to: `/${currentLanguage}/festival`, label: t.festival },
+    { to: `/${currentLanguage}/volunteers`, label: t.volunteers },
+    { to: `/${currentLanguage}/episodes`, label: t.radio },
   ];
 
   return (
@@ -88,8 +98,6 @@ const Header = ({ podcastData, currentLanguage = 'ru' }) => {
           </nav>
         </div>
       )}
-
-      <GlobalPlayer currentLanguage={currentLanguage} />
     </header>
   ); 
 };

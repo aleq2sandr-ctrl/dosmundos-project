@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { Toaster } from '@/components/ui/toaster';
 import Header from '@/components/Header';
+import GlobalPlayer from '@/components/GlobalPlayer';
 import Footer from '@/components/Footer';
 import LanguageSelectionModal from '@/components/LanguageSelectionModal';
 import { TelegramProvider } from '@/contexts/TelegramContext';
@@ -17,6 +18,7 @@ import AnalyticsPage from '@/pages/AnalyticsPage';
 import GenericPage from '@/pages/GenericPage';
 import AboutPage from '@/pages/AboutPage';
 import FestivalPage from '@/pages/FestivalPage';
+import VolunteersPage from '@/pages/VolunteersPage';
 import { supabase } from '@/lib/supabaseClient';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import cacheIntegration from '@/lib/cacheIntegration';
@@ -121,8 +123,10 @@ const AppLayout = ({ user }) => {
       <RouteTracker />
       
       <Header podcastData={podcastData} currentLanguage={currentLanguage} />
-      
+
       <main className="flex-grow w-full">
+        {/* Global player sits below the fixed header */}
+        <GlobalPlayer currentLanguage={currentLanguage} />
         <Routes>
           {/* Редирект корня на дефолтный язык */}
           <Route path="/" element={<Navigate to="/ru/episodes" replace />} />
@@ -157,7 +161,7 @@ const AppLayout = ({ user }) => {
           } />
           <Route path="/:lang/volunteers" element={
             <LanguageRouteWrapper>
-              <GenericPage title="Волонтерам" />
+              <VolunteersPage />
             </LanguageRouteWrapper>
           } />
           <Route path="/:lang/episodes" element={
