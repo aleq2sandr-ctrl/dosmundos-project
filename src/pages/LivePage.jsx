@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Play, Calendar, Clock, Globe, Share2 } from 'lucide-react';
 import { format, nextWednesday, set, isBefore, addWeeks } from 'date-fns';
+import LivePlayer from '../components/LivePlayer';
 
 const LivePage = () => {
   const [timeLeft, setTimeLeft] = useState('');
   const [isLive, setIsLive] = useState(false);
-  const videoRef = useRef(null);
   const [hlsUrl, setHlsUrl] = useState(''); // Will be set from config or env
 
   // Peru is UTC-5
@@ -88,47 +88,6 @@ const LivePage = () => {
 
     return () => clearInterval(timer);
   }, []);
-
-  // HLS setup
-  useEffect(() => {
-    if (!videoRef.current) return;
-    
-    const video = videoRef.current;
-    let hls = null;
-
-    if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      // Native HLS support (Safari, etc)
-      video.src = hlsUrl;
-    } else {
-      // Check if HLS.js is already loaded
-      if (window.Hls) {
-        if (window.Hls.isSupported()) {
-          hls = new window.Hls();
-          hls.loadSource(hlsUrl);
-          hls.attachMedia(video);
-        }
-      } else {
-        // Load HLS.js from CDN
-        const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/hls.js@latest';
-        script.async = true;
-        script.onload = () => {
-          if (window.Hls && window.Hls.isSupported()) {
-            hls = new window.Hls();
-            hls.loadSource(hlsUrl);
-            hls.attachMedia(video);
-          }
-        };
-        document.head.appendChild(script);
-      }
-    }
-
-    return () => {
-      if (hls) {
-        hls.destroy();
-      }
-    };
-  }, [hlsUrl, isLive]);
 
   const timeZones = [
     { city: 'Lima', zone: 'America/Lima', label: 'Peru' },
@@ -229,12 +188,10 @@ const LivePage = () => {
           <div className="lg:col-span-2 space-y-6">
             <div className="relative aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl ring-1 ring-white/10 group">
               {isLive ? (
-                  <video 
-                    ref={videoRef}
-                    className="w-full h-full object-cover"
-                    controls
-                    playsInline
-                    poster="/images/live-poster.jpg" // You should add a poster image
+                  <LivePlayer 
+                    src={hlsUrl}
+                    poster="/images/live-poster.jpg"
+                    autoPlay={true}
                   />
               ) : (
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/80 backdrop-blur-sm">
@@ -288,7 +245,6 @@ const LivePage = () => {
 
             {/* Platforms */}
             <div className="p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm">
-                <h3 className="text-lg font-bold text-white mb-4">Also Streaming On</h3>
                 <div className="grid grid-cols-2 gap-3">
                     <a href="#" className="p-3 rounded-lg bg-[#1877F2]/20 hover:bg-[#1877F2]/30 text-[#1877F2] text-center font-medium transition-colors border border-[#1877F2]/20">
                         Facebook
