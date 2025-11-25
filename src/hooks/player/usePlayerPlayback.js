@@ -32,9 +32,13 @@ const usePlayerPlayback = ({
 
   // Унифицированная попытка воспроизведения с обходом autoplay-политики
   const attemptPlay = async (audioElement) => {
+    if (!audioElement.paused) return true;
+    
     try {
       const p = audioElement.play();
-      await p;
+      if (p !== undefined) {
+        await p;
+      }
       return true;
     } catch (err) {
       if (err?.name === 'NotAllowedError') {
@@ -44,7 +48,9 @@ const usePlayerPlayback = ({
           const prevMuted = audioElement.muted;
           if (!audioElement.muted) audioElement.muted = true;
           const p2 = audioElement.play();
-          await p2;
+          if (p2 !== undefined) {
+            await p2;
+          }
           // Помечаем, что нужно снять mute при первом жесте пользователя
           autoplayPendingRef.current = 'unmute';
           // Если раньше не был mute, вернем громкость по жесту пользователя
@@ -59,7 +65,10 @@ const usePlayerPlayback = ({
           return false;
         }
       }
-      console.error('[usePlayerPlayback] Play error:', err);
+      // Ignore AbortError which happens when pausing while loading
+      if (err?.name !== 'AbortError') {
+        console.error('[usePlayerPlayback] Play error:', err);
+      }
       return false;
     }
   };
@@ -157,12 +166,17 @@ const usePlayerPlayback = ({
             console.log('🔧 [usePlayerPlayback] Attempting to play audio...');
             playPromiseRef.current = attemptPlay(audioRef.current);
             playPromiseRef.current?.then((ok) => {
-              if (!ok) return; 
+              if (!ok) {
+                 // If play failed (e.g. aborted), ensure state reflects that
+                 setIsPlayingState(false);
+                 onPlayerStateChange?.({ isPlaying: false });
+                 return;
+              }
               setIsPlayingState(true);
               onPlayerStateChange?.({ isPlaying: true });
             }).catch(e => {
-              // NotAllowedError handled in attemptPlay
-              if (e.name !== 'AbortError') console.error("Error playing after jump:", e);
+              // Should not happen as attemptPlay catches errors, but just in case
+              console.error("Error in play promise chain:", e);
               setIsPlayingState(false);
               onPlayerStateChange?.({ isPlaying: false });
             }).finally(() => {
@@ -193,12 +207,15 @@ const usePlayerPlayback = ({
             if (audioRef.current.paused) {
               playPromiseRef.current = attemptPlay(audioRef.current);
               playPromiseRef.current?.then((ok) => {
-                if (!ok) return;
+                if (!ok) {
+                   setIsPlayingState(false);
+                   onPlayerStateChange?.({ isPlaying: false });
+                   return;
+                }
                 setIsPlayingState(true);
                 onPlayerStateChange?.({ isPlaying: true });
               }).catch(e => {
-                // NotAllowedError handled in attemptPlay
-                if (e.name !== 'AbortError') console.error("Error playing after jump:", e);
+                console.error("Error in play promise chain (seeked):", e);
                 setIsPlayingState(false);
                 onPlayerStateChange?.({ isPlaying: false });
               }).finally(() => {
@@ -452,7 +469,10 @@ const usePlayerPlayback = ({
         // Пытаемся запустить воспроизведение сразу
         const playPromise = attemptPlay(audioElement);
         playPromise?.then((ok) => {
-          if (!ok) return;
+          if (!ok) {
+             // Autoplay failed or aborted
+             return;
+          }
           logger.debug('usePlayerPlayback: Quick autoplay successful');
           isUpdatingPlayStateRef.current = true;
           setIsPlayingState(true);
@@ -463,11 +483,7 @@ const usePlayerPlayback = ({
             scheduleAutoUnmute(audioElement);
           }
         }).catch(error => {
-          // Note: NotAllowedError is now handled inside attemptPlay
-          if (error.name !== 'AbortError') {
-            console.error("usePlayerPlayback: Autoplay error:", error);
-          }
-          // Не обновляем состояние при блокировке автозапуска
+           console.error("usePlayerPlayback: Autoplay promise error:", error);
         });
       };
       
@@ -501,12 +517,7 @@ const usePlayerPlayback = ({
             scheduleAutoUnmute(audioElement);
           }
         }).catch(error => {
-          if (error.name === 'NotAllowedError') {
-            logger.debug('usePlayerPlayback: Fallback autoplay blocked');
-            if (typeof setShowPlayOverlay === 'function') setShowPlayOverlay(true);
-          } else if (error.name !== 'AbortError') {
-            console.error("usePlayerPlayback: Fallback autoplay error:", error);
-          }
+           console.error("usePlayerPlayback: Fallback autoplay promise error:", error);
         });
       };
       
