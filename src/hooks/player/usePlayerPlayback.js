@@ -130,8 +130,16 @@ const usePlayerPlayback = ({
 
     const performSeek = async () => {
       console.log('🔧 [usePlayerPlayback] performSeek started:', { audioRef: !!audioRef.current, isSeeking: isSeekingRef.current, time });
-      if (!audioRef.current || isSeekingRef.current) {
-        console.log('🔧 [usePlayerPlayback] performSeek early return');
+      
+      // If src is empty, we can't seek yet. 
+      // The useEffect will handle loading and initial seek (via jumpToTimeRef).
+      if (!audioRef.current || (!audioRef.current.src && !audioRef.current.currentSrc)) {
+        console.log('🔧 [usePlayerPlayback] performSeek skipped: no src');
+        return;
+      }
+
+      if (isSeekingRef.current) {
+        console.log('🔧 [usePlayerPlayback] performSeek early return: already seeking');
         return;
       }
       
@@ -453,6 +461,11 @@ const usePlayerPlayback = ({
              if (!isNaN(time) && (Math.abs(audioElement.currentTime - time) > 0.1 || time === 0)) {
                  console.log('[usePlayerPlayback] Restoring jump after src load:', time);
                  audioElement.currentTime = time;
+                 
+                 // Update UI state as well
+                 if (typeof setCurrentTimeState === 'function') {
+                    setCurrentTimeState(time);
+                 }
              }
         }
         

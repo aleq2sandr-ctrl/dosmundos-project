@@ -44,6 +44,20 @@ export const EditorAuthProvider = ({ children }) => {
     }
   }, [editor]);
 
+  // Toggle edit mode based on auth status
+  useEffect(() => {
+    // Small delay to ensure the edit script is ready and listening
+    const timer = setTimeout(() => {
+      if (editor) {
+        window.postMessage({ type: 'enable-edit-mode' }, '*');
+      } else {
+        window.postMessage({ type: 'disable-edit-mode' }, '*');
+      }
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [editor]);
+
   const login = async (email, name) => {
     try {
       // Validate email format (Latin characters only)
