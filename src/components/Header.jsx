@@ -1,12 +1,22 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Menu, X } from 'lucide-react';
 import LanguageSwitcher from './LanguageSwitcher';
 import GlobalPlayer from './GlobalPlayer';
 
 const Header = ({ podcastData, currentLanguage = 'ru' }) => {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  const navLinks = [
+    { to: `/${currentLanguage}/about`, label: 'О центре' },
+    { to: `/${currentLanguage}/festival`, label: 'Фестиваль' },
+    { to: `/${currentLanguage}/volunteers`, label: 'Волонтерам' },
+    { to: `/${currentLanguage}/episodes`, label: 'Радио' },
+  ];
+
   return (
     <header className="sticky top-0 z-50 flex flex-col bg-black/20 backdrop-blur-md border-b border-white/5 transition-all duration-300">
-      <div className="flex flex-wrap items-center justify-between px-4 py-3 gap-4">
+      <div className="flex items-center justify-between px-4 py-3 gap-4">
         <div className="flex items-center gap-3 shrink-0">
           {podcastData?.image && (
             <img 
@@ -27,39 +37,58 @@ const Header = ({ podcastData, currentLanguage = 'ru' }) => {
           </div>
         </div>
 
-        <div className="flex-1 flex justify-center order-last md:order-none w-full md:w-auto">
-          <nav className="flex items-center gap-1 md:gap-2 overflow-x-auto pb-1 md:pb-0 no-scrollbar">
-            <Link 
-              to={`/${currentLanguage}/about`} 
-              className="px-3 py-2 rounded-lg text-sm font-medium text-slate-200 hover:bg-white/10 hover:text-white transition-all whitespace-nowrap active:scale-95"
-            >
-              О центре
-            </Link>
-            <Link 
-              to={`/${currentLanguage}/festival`} 
-              className="px-3 py-2 rounded-lg text-sm font-medium text-slate-200 hover:bg-white/10 hover:text-white transition-all whitespace-nowrap active:scale-95"
-            >
-              Фестиваль
-            </Link>
-            <Link 
-              to={`/${currentLanguage}/volunteers`} 
-              className="px-3 py-2 rounded-lg text-sm font-medium text-slate-200 hover:bg-white/10 hover:text-white transition-all whitespace-nowrap active:scale-95"
-            >
-              Волонтерам
-            </Link>
-            <Link 
-              to={`/${currentLanguage}/episodes`} 
-              className="px-3 py-2 rounded-lg text-sm font-medium text-slate-200 hover:bg-white/10 hover:text-white transition-all whitespace-nowrap active:scale-95"
-            >
-              Радио
-            </Link>
+        {/* Desktop Navigation */}
+        <div className="hidden md:flex flex-1 justify-center">
+          <nav className="flex items-center gap-2">
+            {navLinks.map((link) => (
+              <Link 
+                key={link.to}
+                to={link.to} 
+                className="px-3 py-2 rounded-lg text-sm font-medium text-slate-200 hover:bg-white/10 hover:text-white transition-all whitespace-nowrap active:scale-95"
+              >
+                {link.label}
+              </Link>
+            ))}
           </nav>
         </div>
 
-        <div className="flex items-center gap-4 shrink-0 ml-auto md:ml-0">
+        {/* Desktop Language Switcher */}
+        <div className="hidden md:flex items-center gap-4 shrink-0">
           <LanguageSwitcher currentLanguage={currentLanguage} />
         </div>
+
+        {/* Mobile Menu Button */}
+        <button 
+          className="md:hidden p-2 text-slate-200 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+          onClick={() => setIsMenuOpen(!isMenuOpen)}
+          aria-label="Toggle menu"
+        >
+          {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
+        </button>
       </div>
+
+      {/* Mobile Menu */}
+      {isMenuOpen && (
+        <div className="md:hidden border-t border-white/5 bg-black/40 backdrop-blur-xl">
+          <nav className="flex flex-col p-4 gap-2">
+            {navLinks.map((link) => (
+              <Link 
+                key={link.to}
+                to={link.to} 
+                className="px-4 py-3 rounded-lg text-base font-medium text-slate-200 hover:bg-white/10 hover:text-white transition-all active:scale-95"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                {link.label}
+              </Link>
+            ))}
+            <div className="mt-2 pt-4 border-t border-white/10 flex justify-between items-center px-2">
+              <span className="text-sm text-slate-400">Язык / Language</span>
+              <LanguageSwitcher currentLanguage={currentLanguage} />
+            </div>
+          </nav>
+        </div>
+      )}
+
       <GlobalPlayer currentLanguage={currentLanguage} />
     </header>
   ); 
