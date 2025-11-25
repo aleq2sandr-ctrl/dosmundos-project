@@ -446,7 +446,9 @@ const usePlayerPlayback = ({
       
       // Обработчик для быстрого старта (как только метаданные загружены)
       const handleLoadedMetadata = () => {
+        // Remove both listeners to ensure we only run once
         audioElement.removeEventListener('loadedmetadata', handleLoadedMetadata);
+        audioElement.removeEventListener('canplay', handleCanPlay);
         
         if (autoplayAttempted) return;
         autoplayAttempted = true;
@@ -502,7 +504,9 @@ const usePlayerPlayback = ({
       
       // Fallback обработчик если loadedmetadata не сработал
       const handleCanPlay = () => {
+        // Remove both listeners
         audioElement.removeEventListener('canplay', handleCanPlay);
+        audioElement.removeEventListener('loadedmetadata', handleLoadedMetadata);
         
         if (autoplayAttempted) return;
         autoplayAttempted = true;
@@ -544,9 +548,17 @@ const usePlayerPlayback = ({
       console.log('[usePlayerPlayback] Called audio.load()');
       
       // Check if metadata is already loaded (e.g. from cache)
+      // We check this AFTER setting src and calling load()
+      // But we need to be careful not to trigger it twice if the event fires immediately
       if (audioElement.readyState >= 1) { // HAVE_METADATA
          console.log('[usePlayerPlayback] Metadata already loaded, triggering handler manually');
-         handleLoadedMetadata();
+         // Use setTimeout to allow the event loop to process any pending events first
+         // This prevents double-firing if the browser fires the event synchronously
+         setTimeout(() => {
+            if (!autoplayAttempted) {
+                handleLoadedMetadata();
+            }
+         }, 0);
       }
       
       // Обновляем время последнего доступа в кеше для приоритизации
@@ -565,6 +577,10 @@ const usePlayerPlayback = ({
       return () => {
         audioElement.removeEventListener('loadedmetadata', handleLoadedMetadata);
         audioElement.removeEventListener('canplay', handleCanPlay);
+        
+        // If we are unmounting or changing episode, we should probably stop playback
+        // But only if we are actually changing the source
+        // We don't want to stop if we are just re-rendering
       };
     }
   }, [episodeData?.slug, episodeData?.audio_url]); // Зависим только от slug и audio_url
