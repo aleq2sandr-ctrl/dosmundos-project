@@ -128,7 +128,7 @@ const LivePage = () => {
         hls.destroy();
       }
     };
-  }, [hlsUrl]);
+  }, [hlsUrl, isLive]);
 
   const timeZones = [
     { city: 'Lima', zone: 'America/Lima', label: 'Peru' },
