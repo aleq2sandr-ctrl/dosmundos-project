@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { Toaster } from '@/components/ui/toaster';
@@ -23,6 +22,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import cacheIntegration from '@/lib/cacheIntegration';
 import { useToast } from '@/components/ui/use-toast';
 import { EditorAuthProvider, useEditorAuth } from '@/contexts/EditorAuthContext';
+import { PlayerProvider } from '@/contexts/PlayerContext';
 import { EditorAuthModal } from '@/components/EditorAuthModal';
 import EditHistoryAdminPage from '@/pages/EditHistoryAdminPage';
 import { initGA4, trackPageView } from '@/lib/analyticsService';
@@ -320,7 +320,9 @@ function App() {
   return (
     <TelegramProvider>
       <EditorAuthProvider>
-        <AppContent user={user} />
+        <PlayerProvider>
+          <AppContent user={user} />
+        </PlayerProvider>
       </EditorAuthProvider>
     </TelegramProvider>
   );

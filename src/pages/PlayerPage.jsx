@@ -21,6 +21,7 @@ import { useEditorAuth } from '@/contexts/EditorAuthContext';
 import { saveEditToHistory } from '@/services/editHistoryService';
 import useAudioPrefetch from '@/hooks/player/useAudioPrefetch';
 import { getAudioUrl } from '@/lib/audioUrl';
+import { usePlayer } from '@/contexts/PlayerContext';
 
 
 const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
@@ -62,6 +63,7 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
   const playerControlsContainerRef = useRef(null);
   const [editingQuestion, setEditingQuestion] = useState(null);
   const [allEpisodesForPrefetch, setAllEpisodesForPrefetch] = useState([]);
+  const { playEpisode, audioRef, currentEpisode } = usePlayer();
   
   // Загрузка списка эпизодов для prefetch
   useEffect(() => {
@@ -98,31 +100,18 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
     saveQuestions,
     refreshAllData,
     preloadAudio,
-    fetchTranscriptForEpisode,
-    fetchQuestionsForEpisode,
-    setTranscript,
-  } = useOfflineEpisodeData(episodeSlug, currentLanguage, toast);
+  } = useOfflineEpisodeData(episodeSlug, langPrefix);
 
-  // Слушаем обновления эпизодов после перевода
+  // Sync with Global Player Context
   useEffect(() => {
-    if (!refreshAllData) return; // Защита от вызова до инициализации
-
-    const handleEpisodeUpdate = (event) => {
-      const { slug, lang, episode } = event.detail;
-      
-      // Если это текущий эпизод, обновляем данные
-      if (slug === episodeSlug && lang === currentLanguage) {
-        console.log('[PlayerPage] Episode updated after translation, refreshing data');
-        refreshAllData();
+    if (episodeData && episodeData.slug) {
+      // Only play if it's not already the current episode or if we want to ensure it's active
+      // But we don't want to restart if it's already playing
+      if (currentEpisode?.slug !== episodeData.slug) {
+         playEpisode(episodeData);
       }
-    };
-
-    window.addEventListener('episodeUpdated', handleEpisodeUpdate);
-    
-    return () => {
-      window.removeEventListener('episodeUpdated', handleEpisodeUpdate);
-    };
-  }, [episodeSlug, currentLanguage, refreshAllData]);
+    }
+  }, [episodeData, playEpisode, currentEpisode]);
 
   const {
     jumpDetails,
@@ -523,6 +512,7 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
                 episodeLang={playerEpisodeDataMemo.lang}
                 episodeDate={playerEpisodeDataMemo.date}
                 navigateBack={() => navigate(`/${langPrefix}/episodes`)}
+                navigateHistory={() => navigate(-1)}
                 onPlayerStateChange={handlePlayerStateChange}
                 playerControlsContainerRef={playerControlsContainerRef}
                 showTranscript={showTranscriptUI}

@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from '@/components/ui/use-toast';
-import AudioElement from '@/components/player/player_parts/AudioElement';
 import PlayerHeader from '@/components/player/player_parts/PlayerHeader';
 import PlayerUIControls from '@/components/player/player_parts/PlayerUIControls';
 import SpeakerAssignmentDialog from '@/components/transcript/SpeakerAssignmentDialog';
@@ -17,6 +16,7 @@ import { getLocaleString } from '@/lib/locales';
 import textExportService from '@/lib/textExportService';
 import { useEditorAuth } from '@/contexts/EditorAuthContext';
 import { getAudioUrl } from '@/lib/audioUrl';
+import { usePlayer } from '@/contexts/PlayerContext';
 
 const DEFAULT_PLAYBACK_RATE_OPTIONS = [
   { label: "1x", value: 1},
@@ -35,6 +35,7 @@ const PodcastPlayer = ({
   episodeLang, 
   episodeDate, 
   navigateBack, 
+  navigateHistory,
   onPlayerStateChange, 
   playerControlsContainerRef, 
   showTranscript, 
@@ -62,6 +63,17 @@ const PodcastPlayer = ({
   const internalQuestions = episodeData?.questions || [];
   const internalTranscriptUtterances = episodeData?.transcript?.utterances || [];
   
+  const { 
+    currentTime, 
+    duration, 
+    isPlaying, 
+    togglePlay, 
+    seek, 
+    playbackRate, 
+    setPlaybackRate,
+    currentEpisode: contextEpisode
+  } = usePlayer();
+
   // Состояние для диалога скачивания текста
   const [isDownloadTextDialogOpen, setIsDownloadTextDialogOpen] = useState(false);
 
@@ -74,6 +86,16 @@ const PodcastPlayer = ({
     isAddQuestionPlayerDialogOpen, setIsAddQuestionPlayerDialogOpen,
     addQuestionDialogInitialTime, setAddQuestionDialogInitialTime
   } = usePlayerState(episodeData?.duration);
+
+  // Sync context to local state
+  useEffect(() => {
+    if (contextEpisode?.slug === episodeData?.slug) {
+      setCurrentTimeState(currentTime);
+      setDurationState(duration);
+      setIsPlayingState(isPlaying);
+    }
+  }, [currentTime, duration, isPlaying, contextEpisode, episodeData, setCurrentTimeState, setDurationState, setIsPlayingState]);
+
 
   const playbackRate = currentPlaybackRateIndex !== undefined ? playbackRateOptions[currentPlaybackRateIndex].value : 1;
 
@@ -239,29 +261,12 @@ const PodcastPlayer = ({
         episodeTitle={episodeData.displayTitle}
         episodeDate={episodeData.date} 
         onNavigateBack={navigateBack} 
+        onNavigateHistory={navigateHistory}
         currentLanguage={currentLanguage} 
       />
       <div>
-        <AudioElement 
-          audioRef={audioRef}
-          episodeAudioUrl={episodeAudioUrl}
-          onTimeUpdate={handleTimeUpdate}
-          onLoadedMetadata={handleLoadedMetadata}
-          onEnded={() => { setIsPlayingState(false); onPlayerStateChange?.({isPlaying: false});}}
-          onDurationChange={handleLoadedMetadata} 
-          playbackRate={playbackRate}
-          onError={(e) => {
-             if (e.target.error && e.target.error.code !== e.target.error.MEDIA_ERR_ABORTED) {
-                console.error('PodcastPlayer: Audio error occurred', e.target.error);
-                toast({
-                title: getLocaleString('audioErrorTitle', currentLanguage),
-                description: getLocaleString('audioErrorDescriptionPlayer', currentLanguage, {episodeTitle: episodeData.title}),
-                variant: "destructive",
-                });
-            }
-          }}
-        />
-
+        {/* AudioElement is managed by PlayerContext globally */}
+        
         {showAutoplayOverlay && (
           <div
             className="absolute inset-0 z-20 flex items-center justify-center rounded-xl bg-slate-900/70 backdrop-blur-sm cursor-pointer"
