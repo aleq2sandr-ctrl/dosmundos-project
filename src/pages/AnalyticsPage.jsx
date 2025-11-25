@@ -30,7 +30,7 @@ import TrafficSources from '@/components/analytics/TrafficSources';
 import ListeningStats from '@/components/analytics/ListeningStats';
 import BehaviorMetrics from '@/components/analytics/BehaviorMetrics';
 
-const AnalyticsPage = ({ currentLanguage }) => {
+const AnalyticsPage = ({ currentLanguage = 'ru' }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
 

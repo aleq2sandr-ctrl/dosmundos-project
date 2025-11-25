@@ -393,6 +393,14 @@ const usePlayerPlayback = ({
     // Если мы в процессе поиска (seeking), но это НЕ новый эпизод - выходим
     if (isSeekingRef.current && !shouldUpdateSrc) return;
     
+    // Check if the src is already set correctly (e.g. by PlayerContext)
+    // If it is, we don't need to set it again, which avoids reloading
+    if (normalizedCurrentUrl === normalizedNewUrl && normalizedNewUrl !== '') {
+        // Just update our ref so we know we've "loaded" it
+        lastLoadedUrlRef.current = normalizedNewUrl;
+        return;
+    }
+
     if (shouldUpdateSrc) {
       logger.debug('usePlayerPlayback: New episode detected', { 
         newUrl: normalizedNewUrl, 

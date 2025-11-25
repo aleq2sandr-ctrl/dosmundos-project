@@ -58,7 +58,6 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
     }
   }, [urlLanguage, appCurrentLanguage, location.pathname, location.search, location.hash, navigate]);
 
-  const audioRef = useRef(null); 
   const [showFloatingControls, setShowFloatingControls] = useState(false);
   const playerControlsContainerRef = useRef(null);
   const [editingQuestion, setEditingQuestion] = useState(null);
@@ -100,6 +99,9 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
     saveQuestions,
     refreshAllData,
     preloadAudio,
+    fetchTranscriptForEpisode,
+    fetchQuestionsForEpisode,
+    setTranscript,
   } = useOfflineEpisodeData(episodeSlug, langPrefix);
 
   // Sync with Global Player Context

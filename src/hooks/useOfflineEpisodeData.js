@@ -445,6 +445,7 @@ const useOfflineEpisodeData = (episodeSlug, currentLanguage, toast) => {
     // Методы управления
     refreshAllData,
     preloadAudio,
+    setTranscript,
     
     // Методы загрузки (для совместимости)
     fetchTranscriptForEpisode,

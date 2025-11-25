@@ -101,8 +101,11 @@ export const PlayerProvider = ({ children }) => {
     <PlayerContext.Provider value={{
       currentEpisode,
       isPlaying,
+      setIsPlaying,
       currentTime,
+      setCurrentTime,
       duration,
+      setDuration,
       audioRef,
       playEpisode,
       togglePlay,

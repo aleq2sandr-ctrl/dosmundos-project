@@ -65,8 +65,11 @@ const PodcastPlayer = ({
   
   const { 
     currentTime, 
+    setCurrentTime,
     duration, 
+    setDuration,
     isPlaying, 
+    setIsPlaying,
     togglePlay, 
     seek, 
     playbackRate, 
@@ -78,16 +81,25 @@ const PodcastPlayer = ({
   const [isDownloadTextDialogOpen, setIsDownloadTextDialogOpen] = useState(false);
 
   const {
-    isPlayingState, setIsPlayingState,
-    currentTimeState, setCurrentTimeState,
-    durationState, setDurationState,
+    // isPlayingState, setIsPlayingState, // Use global state
+    // currentTimeState, setCurrentTimeState, // Use global state
+    // durationState, setDurationState, // Use global state
     currentPlaybackRateIndex, setCurrentPlaybackRateIndex,
     activeQuestionTitleState, setActiveQuestionTitleState,
     isAddQuestionPlayerDialogOpen, setIsAddQuestionPlayerDialogOpen,
     addQuestionDialogInitialTime, setAddQuestionDialogInitialTime
   } = usePlayerState(episodeData?.duration);
 
-  // Sync context to local state
+  // Use global state as the source of truth
+  const isPlayingState = isPlaying;
+  const setIsPlayingState = setIsPlaying;
+  const currentTimeState = currentTime;
+  const setCurrentTimeState = setCurrentTime;
+  const durationState = duration;
+  const setDurationState = setDuration;
+
+  // Sync context to local state - REMOVED as we use global state directly
+  /*
   useEffect(() => {
     if (contextEpisode?.slug === episodeData?.slug) {
       setCurrentTimeState(currentTime);
@@ -95,9 +107,7 @@ const PodcastPlayer = ({
       setIsPlayingState(isPlaying);
     }
   }, [currentTime, duration, isPlaying, contextEpisode, episodeData, setCurrentTimeState, setDurationState, setIsPlayingState]);
-
-
-  const playbackRate = currentPlaybackRateIndex !== undefined ? playbackRateOptions[currentPlaybackRateIndex].value : 1;
+  */
 
   const playPromiseRef = useRef(null);
   const isSeekingRef = useRef(false);
@@ -119,6 +129,9 @@ const PodcastPlayer = ({
     playbackRateOptions, onPlayerStateChange, lastJumpIdProcessedRef,
     jumpToTime: episodeData?.jumpToTime,
   });
+
+  // Only use usePlayerPlayback if we are the active episode
+  const isCurrentEpisode = contextEpisode?.slug === episodeData?.slug;
 
   usePlayerPlayback({
     episodeData, audioRef, isPlayingState, setIsPlayingState,

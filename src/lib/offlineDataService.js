@@ -696,6 +696,21 @@ class OfflineDataService {
 
     try {
       const transaction = await this.getTransaction(['syncQueue']);
+      
+      if (!transaction) {
+        // If transaction is null, we might have switched to fallback
+        if (this.useFallback) {
+           const queue = [];
+           for (const [key, value] of this.fallbackStorage.entries()) {
+             if (key.startsWith('sync_')) {
+               queue.push(value);
+             }
+           }
+           return queue.sort((a, b) => a.timestamp - b.timestamp);
+        }
+        throw new Error('Failed to get transaction');
+      }
+
       const store = transaction.objectStore('syncQueue');
       
       return new Promise((resolve, reject) => {
