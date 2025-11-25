@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 import LanguageSwitcher from './LanguageSwitcher';
 
-const Header = ({ podcastData, currentLanguage = 'ru' }) => {
+const Header = ({ podcastData, currentLanguage = 'ru', isLive = false }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const translations = {
@@ -55,9 +55,15 @@ const Header = ({ podcastData, currentLanguage = 'ru' }) => {
               <Link 
                 key={link.to}
                 to={link.to} 
-                className="px-3 py-2 rounded-lg text-sm font-medium text-slate-200 hover:bg-white/10 hover:text-white transition-all whitespace-nowrap active:scale-95"
+                className="px-3 py-2 rounded-lg text-sm font-medium text-slate-200 hover:bg-white/10 hover:text-white transition-all whitespace-nowrap active:scale-95 flex items-center gap-2"
               >
                 {link.label}
+                {link.label === t.live && isLive && (
+                  <div className="relative">
+                    <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+                    <div className="absolute inset-0 w-2 h-2 rounded-full bg-red-500 animate-ping"></div>
+                  </div>
+                )}
               </Link>
             ))}
           </nav>
@@ -86,10 +92,16 @@ const Header = ({ podcastData, currentLanguage = 'ru' }) => {
               <Link 
                 key={link.to}
                 to={link.to} 
-                className="px-4 py-3 rounded-lg text-base font-medium text-slate-200 hover:bg-white/10 hover:text-white transition-all active:scale-95"
+                className="px-4 py-3 rounded-lg text-base font-medium text-slate-200 hover:bg-white/10 hover:text-white transition-all active:scale-95 flex items-center gap-2"
                 onClick={() => setIsMenuOpen(false)}
               >
                 {link.label}
+                {link.label === t.live && isLive && (
+                  <div className="relative">
+                    <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+                    <div className="absolute inset-0 w-2 h-2 rounded-full bg-red-500 animate-ping"></div>
+                  </div>
+                )}
               </Link>
             ))}
             <div className="mt-2 pt-4 border-t border-white/10 flex justify-between items-center px-2">
