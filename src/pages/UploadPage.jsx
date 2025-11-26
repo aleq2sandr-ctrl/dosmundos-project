@@ -18,6 +18,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { getAudioUrl } from '@/lib/audioUrl';
 import { startPollingForItem } from '@/services/uploader/transcriptPoller';
 import DevLogPanel from '@/components/DevLogPanel';
+import DateBasedUpload from '@/components/manage/DateBasedUpload';
 
 const UploadPage = ({ currentLanguage }) => {
   const navigate = useNavigate();
@@ -35,6 +36,7 @@ const UploadPage = ({ currentLanguage }) => {
   });
   const [episodes, setEpisodes] = useState([]);
   const [isLoadingEpisodes, setIsLoadingEpisodes] = useState(true);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const {
     filesToProcess,
@@ -818,11 +820,11 @@ const UploadPage = ({ currentLanguage }) => {
     } finally {
       setIsLoadingEpisodes(false);
     }
-  }, [currentLanguage, toast]);
+  }, [currentLanguage, toast, refreshTrigger]);
 
   useEffect(() => {
     loadEpisodes();
-  }, [loadEpisodes]);
+  }, [loadEpisodes, refreshTrigger]);
 
   const onDrop = useCallback((acceptedFiles) => {
     addFilesToQueue(acceptedFiles);
@@ -1148,6 +1150,12 @@ const UploadPage = ({ currentLanguage }) => {
           </>
         )}
       </div>
+
+      {/* Date-based Upload Section */}
+      <DateBasedUpload 
+        currentLanguage={currentLanguage}
+        onUploadComplete={() => setRefreshTrigger(prev => prev + 1)}
+      />
 
       {/* Upload Queue */}
       <UploadQueue

@@ -687,7 +687,6 @@
   "nameLatinOnly": "Имя должно содержать только латинские символы, пробелы и дефисы",
   "loginFailed": "Ошибка входа",
   "authenticating": "Аутентификация...",
-  "translateQuestionsFromRussian": "Перевести вопросы с русского",
   "translateQuestionsToAllLanguages": "Перевести вопросы на все языки",
   "questionsTranslatedFromRussian": "Вопросы переведены с русского",
   "noRussianQuestionsToTranslate": "Нет русских вопросов для перевода",
@@ -836,5 +835,21 @@
   "confirmDeleteEpisodeMessage": "Вы уверены, что хотите удалить этот эпизод?",
   "actionIrreversible": "Это действие необратимо.",
   "deleting": "Удаление...",
-  "deleteConfirm": "Удалить"
+  "deleteConfirm": "Удалить",
+
+  "dateBasedUpload": "Загрузка по дате",
+  "dateBasedUploadDescription": "Автоматически добавляет эпизоды на основе даты. Создает записи для RU и ES версий с ссылками на аудиофайлы.",
+  "selectDate": "Выберите дату",
+  "dateRequired": "Пожалуйста, выберите дату",
+  "invalidDateFormat": "Неверный формат даты. Используйте формат ГГГГ-ММ-ДД",
+  "today": "Сегодня",
+  "tomorrow": "Завтра",
+  "yesterday": "Вчера",
+  "generatedUrls": "Сгенерированные ссылки",
+  "addingEpisodes": "Добавление эпизодов...",
+  "addEpisodes": "Добавить эпизоды",
+  "episodesAddedSuccessfully": "Эпизоды успешно добавлены",
+  "episodesAddedDescription": "Добавлено {count} эпизодов для даты {date}",
+  "episodesAlreadyExist": "Эпизоды уже существуют",
+  "errorAddingEpisodes": "Ошибка добавления эпизодов: {errorMessage}"
 }

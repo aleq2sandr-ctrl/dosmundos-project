@@ -20,6 +20,7 @@ import { startPollingForItem } from '@/services/uploader/transcriptPoller';
 import timeOldService from '@/lib/timeOldService';
 import logger from '@/lib/logger';
 import LanguageCard from '@/components/manage/LanguageCard';
+import DateBasedUpload from '@/components/manage/DateBasedUpload';
 
 /**
  * Enhanced Manage Page for Episode Management
@@ -33,6 +34,8 @@ const ManageEpisodesPage = ({ currentLanguage }) => {
   const navigate = useNavigate();
   const { lang } = useParams();
   const langPrefix = lang || currentLanguage || 'ru';
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  
   const {
     filesToProcess,
     isProcessingAll,
@@ -103,6 +106,12 @@ const ManageEpisodesPage = ({ currentLanguage }) => {
         handleTranslateTimings={handleTranslateTimings}
       />
 
+      {/* Date-based Upload Section */}
+      <DateBasedUpload 
+        currentLanguage={currentLanguage}
+        onUploadComplete={() => setRefreshTrigger(prev => prev + 1)}
+      />
+
       <OverwriteDialog 
         isOpen={showOverwriteDialog}
         onOpenChange={() => {}} 
@@ -113,7 +122,7 @@ const ManageEpisodesPage = ({ currentLanguage }) => {
       />
 
       {/* Episode Management Section */}
-      <EpisodeManagementSection currentLanguage={currentLanguage} />
+      <EpisodeManagementSection currentLanguage={currentLanguage} refreshTrigger={refreshTrigger} />
     </div>
   );
 };
@@ -334,7 +343,7 @@ const formatDuration = (seconds) => {
 /**
  * Episode Management Section Component
  */
-const EpisodeManagementSection = ({ currentLanguage }) => {
+const EpisodeManagementSection = ({ currentLanguage, refreshTrigger }) => {
   const [episodes, setEpisodes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -425,11 +434,11 @@ const EpisodeManagementSection = ({ currentLanguage }) => {
     } finally {
       setLoading(false);
     }
-  }, [currentLanguage, toast]);
+  }, [currentLanguage, toast, refreshTrigger]);
 
   useEffect(() => {
     fetchEpisodes();
-  }, [fetchEpisodes]);
+  }, [fetchEpisodes, refreshTrigger]);
 
   // Listen for rollback events to update episodes list in realtime
   useEffect(() => {
