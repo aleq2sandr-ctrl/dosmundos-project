@@ -152,7 +152,7 @@ const LivePlayer = ({ src, poster, autoPlay = false }) => {
   return (
     <div 
       ref={containerRef}
-      className="relative group bg-black rounded-xl overflow-hidden aspect-video shadow-2xl ring-1 ring-white/10"
+      className="relative group bg-black rounded-xl overflow-hidden aspect-[9/16] shadow-2xl ring-1 ring-white/10"
       onMouseMove={handleMouseMove}
       onMouseLeave={() => isPlaying && setShowControls(false)}
     >

@@ -1,86 +1,41 @@
 import React, { useState, useEffect } from 'react';
-import { Play, Calendar, Clock, Globe, Share2 } from 'lucide-react';
-import { format, nextWednesday, set, isBefore, addWeeks } from 'date-fns';
+import { Play, Calendar, Clock, Globe, Share2, Users, Zap } from 'lucide-react';
+import { format, addDays, isBefore, addWeeks, differenceInSeconds } from 'date-fns';
 import LivePlayer from '../components/LivePlayer';
 
 const LivePage = () => {
-  const [timeLeft, setTimeLeft] = useState('');
+  const [timeLeft, setTimeLeft] = useState({});
   const [isLive, setIsLive] = useState(false);
-  const [hlsUrl, setHlsUrl] = useState(''); // Will be set from config or env
+  const [hlsUrl, setHlsUrl] = useState('');
+  const [nextStreamTime, setNextStreamTime] = useState(null);
 
-  // Peru is UTC-5
-  const PERU_OFFSET = -5;
+  // Peru timezone
+  const PERU_TIMEZONE = 'America/Lima';
 
   useEffect(() => {
-    // In a real app, this would come from an environment variable
-    // For now, we'll assume the VPS IP or a placeholder
-    // You need to replace 'YOUR_VPS_IP' with the actual IP or domain
-    // The stream key appears to be '1' based on server logs
-    const streamUrl = `https://dosmundos.pe/hls/1.m3u8`; 
-    // Or better, use a relative path if proxied, or a specific config
-    // For this task, I'll use a placeholder that the user needs to configure
     setHlsUrl('https://dosmundos.pe/hls/1.m3u8');
   }, []);
 
   useEffect(() => {
     const calculateTimeLeft = () => {
-      // Force live state for now so we can see the stream
-      setIsLive(true);
-      setTimeLeft('Live now!');
-      return;
-
-      /* Original timer logic - disabled for immediate streaming
       const now = new Date();
-      const currentUtc = now.getTime() + (now.getTimezoneOffset() * 60000);
-      const peruTime = new Date(currentUtc + (3600000 * PERU_OFFSET));
-
-      // Find next Wednesday 9:30 AM Peru time
-      let nextStream = set(nextWednesday(peruTime), { hours: 9, minutes: 30, seconds: 0, milliseconds: 0 });
       
-      // If today is Wednesday and it's before 9:30, use today
-      if (peruTime.getDay() === 3) {
-        const todayStream = set(peruTime, { hours: 9, minutes: 30, seconds: 0, milliseconds: 0 });
-        if (isBefore(peruTime, todayStream)) {
-          nextStream = todayStream;
-        }
-      }
+      // Find next Wednesday 9:30 AM Peru time (UTC-5)
+      let nextStream = getNextWednesdayStream(now);
+      setNextStreamTime(nextStream);
       
-      // If we are past the stream time on Wednesday, nextWednesday already handles it? 
-      // date-fns nextWednesday returns the *next* Wednesday. 
-      // If today is Wednesday, nextWednesday returns next week's Wednesday.
-      // So we need to check if today is Wednesday and we haven't passed the time yet.
+      const diffInSeconds = differenceInSeconds(nextStream, now);
       
-      if (peruTime.getDay() === 3) {
-         const todayStream = set(peruTime, { hours: 9, minutes: 30, seconds: 0, milliseconds: 0 });
-         if (isBefore(peruTime, todayStream)) {
-             nextStream = todayStream;
-         }
-      }
-
-      const diff = nextStream.getTime() - peruTime.getTime();
+      // Auto-show as live when time comes (even if no actual stream)
+      const isCurrentlyLive = !isBefore(now, nextStream);
       
-      if (diff < 0) {
-        // Should not happen with logic above, but safety check
-        setTimeLeft('Live now!');
+      if (isCurrentlyLive) {
         setIsLive(true);
-        return;
-      }
-
-      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-
-      setTimeLeft(`${days}d ${hours}h ${minutes}m ${seconds}s`);
-      
-      // Simple check if we are within a 2 hour window of the start time
-      if (diff >= 0 && diff < 7200000) {
-          setIsLive(true);
-          setTimeLeft('Live now!');
+        setTimeLeft({ status: 'live' });
       } else {
-          setIsLive(false);
+        setTimeLeft(formatTimeLeft(diffInSeconds));
+        setIsLive(false);
       }
-      */
     };
 
     const timer = setInterval(calculateTimeLeft, 1000);
@@ -89,124 +44,217 @@ const LivePage = () => {
     return () => clearInterval(timer);
   }, []);
 
-  const timeZones = [
-    { city: 'Lima', zone: 'America/Lima', label: 'Peru' },
-    { city: 'New York', zone: 'America/New_York', label: 'USA (East)' },
-    { city: 'Los Angeles', zone: 'America/Los_Angeles', label: 'USA (West)' },
-    { city: 'Madrid', zone: 'Europe/Madrid', label: 'Spain' },
-    { city: 'London', zone: 'Europe/London', label: 'UK' },
-    { city: 'Moscow', zone: 'Europe/Moscow', label: 'Russia' },
-  ];
-
-  const getLocalTime = (zone) => {
-    // Calculate next Wednesday 21:30 Peru time in UTC
-    // Peru is UTC-5 fixed (mostly)
-    const now = new Date();
-    // ... logic to find next wednesday 21:30 UTC-5 ...
-    // Simplified: just show the time string for that zone
+  const getNextWednesdayStream = (now) => {
+    // Get current UTC time
+    const utcNow = new Date(now.getTime() + (now.getTimezoneOffset() * 60000));
     
-    // We want to show what 21:30 PET is in other zones.
-    // 21:30 PET = 02:30 UTC (next day)
+    // Convert to Peru time (UTC-5)
+    const peruOffset = -5;
+    const peruTime = new Date(utcNow.getTime() + (peruOffset * 3600000));
     
-    // Create a date object that represents next Wednesday 21:30 PET
-    // We can use a fixed date for formatting purposes, e.g., next Wed
+    const currentDay = peruTime.getUTCDay(); // Use UTC day to avoid timezone issues
+    const wednesdayDay = 3; // Wednesday is 3 in JS (0=Sunday)
     
-    // This is a bit complex to do perfectly without a library like luxon or date-fns-tz
-    // But we can use Intl.DateTimeFormat
+    let daysUntilWednesday = wednesdayDay - currentDay;
+    if (daysUntilWednesday < 0 || (daysUntilWednesday === 0 && peruTime.getUTCHours() > 9 || (daysUntilWednesday === 0 && peruTime.getUTCHours() === 9 && peruTime.getUTCMinutes() >= 30))) {
+      daysUntilWednesday += 7;
+    }
     
-    // Let's just hardcode the offsets for display or use a helper
-    return "Check local time"; 
+    // Calculate next Wednesday 9:30 AM Peru time in UTC
+    const nextWednesdayPeru = new Date(peruTime.getTime() + (daysUntilWednesday * 24 * 3600000));
+    const nextWednesdayUTC = new Date(
+      Date.UTC(
+        nextWednesdayPeru.getUTCFullYear(),
+        nextWednesdayPeru.getUTCMonth(),
+        nextWednesdayPeru.getUTCDate(),
+        14, // 9:30 AM Peru = 14:30 UTC
+        30, // 30 minutes
+        0, 0
+      )
+    );
+    
+    return nextWednesdayUTC;
   };
 
-  // Better approach for the schedule:
-  // 21:30 PET is the anchor.
-  // We can display the time in different zones.
-  
-  const renderSchedule = () => {
-      const cities = [
-          { city: 'Lima', time: '9:30 AM' },
-          { city: 'Madrid', time: '2:30 PM' },
-          { city: 'Moscow', time: '4:30 PM' },
-          { city: 'Bangkok', time: '8:30 PM' },
-          { city: 'Sydney', time: '12:30 AM (Thu)' },
-      ];
-      
-      return cities.map((city) => (
-          <div key={city.city} className="flex justify-between items-center py-2 border-b border-white/10 last:border-0">
-              <span className="font-medium text-slate-200">{city.city}</span>
-              <span className="font-mono text-amber-400">{city.time}</span>
-          </div>
-      ));
+  const formatTimeLeft = (totalSeconds) => {
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    return {
+      status: 'waiting',
+      days,
+      hours,
+      minutes,
+      seconds,
+      totalSeconds
+    };
   };
+
+  const getWorldTimes = () => {
+    if (!nextStreamTime) return [];
+    
+    const timeZones = [
+      { city: 'Lima', offset: -5, flag: '🇵🇪' },
+      { city: 'New York', offset: -5, flag: '🇺🇸' },
+      { city: 'Los Angeles', offset: -8, flag: '🇺🇸' },
+      { city: 'Madrid', offset: +1, flag: '🇪🇸' },
+      { city: 'London', offset: 0, flag: '🇬🇧' },
+      { city: 'Moscow', offset: +3, flag: '🇷🇺' },
+      { city: 'Dubai', offset: +4, flag: '🇦🇪' },
+      { city: 'Bangkok', offset: +7, flag: '🇹🇭' },
+      { city: 'Tokyo', offset: +9, flag: '🇯🇵' },
+    ];
+
+    return timeZones.map(({ city, offset, flag }) => {
+      // Convert UTC stream time to local time
+      const localTime = new Date(nextStreamTime.getTime() + (offset * 3600000));
+      const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const dayName = days[localTime.getUTCDay()];
+      const time = `${String(localTime.getUTCHours()).padStart(2, '0')}:${String(localTime.getUTCMinutes()).padStart(2, '0')}, ${dayName}`;
+      return { city, time, flag };
+    });
+  };
+
 
   return (
-    <div className="min-h-screen bg-slate-950 pt-8 pb-6 px-4">
-      <div className="max-w-6xl mx-auto space-y-6">
+    <div className="min-h-screen relative jungle-bg">
+      {/* Content */}
+      <div className="relative z-10">
+        <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
         
-        {/* Header Section */}
-        <div className="text-center space-y-2">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20 animate-pulse">
-            <div className="w-2 h-2 rounded-full bg-red-500"></div>
-            <span className="text-sm font-medium uppercase tracking-wider">Live Broadcast</span>
+        {/* Header */}
+        <div className="text-center space-y-4">
+          <div className="inline-flex items-center gap-3 px-6 py-3 rounded-full bg-gradient-to-r from-red-500/20 to-orange-500/20 text-red-400 border border-red-500/30 backdrop-blur-sm">
+            <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse"></div>
+            <span className="text-sm font-bold uppercase tracking-wider">Live Broadcast</span>
+            <Zap className="w-4 h-4" />
           </div>
-          <p className="text-lg text-slate-200 max-w-2xl mx-auto">
-            Каждую среду медитация с перуанским целителем Пепе
-          </p>
+          
+          <div className="space-y-2">
+            <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-white via-slate-100 to-slate-300 bg-clip-text text-transparent">
+              Медитация с Пепе
+            </h1>
+            <p className="text-lg text-slate-300 max-w-2xl mx-auto">
+              Каждую среду трансляция из Перу с перуанским целителем
+            </p>
+          </div>
         </div>
 
-        {/* Main Content */}
-        <div className="max-w-3xl mx-auto space-y-4">
-            <div className="relative aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl ring-1 ring-white/10 group">
+        {/* Main Content - Vertical Layout */}
+        <div className="space-y-8">
+          
+          {/* Video Player Section */}
+          <div className="bg-slate-900/50 rounded-3xl p-6 backdrop-blur-sm border border-white/10">
+            <div className="relative aspect-[9/16] bg-black rounded-2xl overflow-hidden shadow-2xl ring-1 ring-white/10 max-w-sm mx-auto">
               {isLive ? (
-                  <LivePlayer 
-                    src={hlsUrl}
-                    poster="/images/live-poster.jpg"
-                    autoPlay={true}
-                  />
+                <LivePlayer 
+                  src={hlsUrl}
+                  poster="/images/live-poster.jpg"
+                  autoPlay={true}
+                />
               ) : (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/80 backdrop-blur-sm">
-                      <div className="p-6 rounded-full bg-white/5 mb-6">
-                          <Clock className="w-12 h-12 text-slate-400" />
-                      </div>
-                      <h3 className="text-2xl font-bold text-white mb-2">Next Broadcast In</h3>
-                      <div className="text-4xl md:text-6xl font-mono font-bold text-amber-400 tracking-wider">
-                          {timeLeft}
-                      </div>
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-slate-900/90 to-slate-800/90 backdrop-blur-sm">
+                  <div className="p-8 rounded-full bg-gradient-to-br from-amber-500/20 to-orange-500/20 mb-8 border border-amber-500/30">
+                    <Clock className="w-16 h-16 text-amber-400" />
                   </div>
+                  
+                  <div className="text-center space-y-4">
+                    <h3 className="text-3xl font-bold text-white">Следующая трансляция через</h3>
+                    
+                    {/* Timer Display */}
+                    <div className="flex flex-wrap justify-center gap-4 text-center">
+                      {timeLeft.status === 'waiting' && (
+                        <>
+                          {timeLeft.days > 0 && (
+                            <div className="bg-white/10 rounded-xl p-4 min-w-[80px]">
+                              <div className="text-3xl font-bold text-amber-400">{timeLeft.days}</div>
+                              <div className="text-xs text-slate-400 uppercase tracking-wider">Дней</div>
+                            </div>
+                          )}
+                          <div className="bg-white/10 rounded-xl p-4 min-w-[80px]">
+                            <div className="text-3xl font-bold text-amber-400">{String(timeLeft.hours).padStart(2, '0')}</div>
+                            <div className="text-xs text-slate-400 uppercase tracking-wider">Часов</div>
+                          </div>
+                          <div className="bg-white/10 rounded-xl p-4 min-w-[80px]">
+                            <div className="text-3xl font-bold text-amber-400">{String(timeLeft.minutes).padStart(2, '0')}</div>
+                            <div className="text-xs text-slate-400 uppercase tracking-wider">Минут</div>
+                          </div>
+                          <div className="bg-white/10 rounded-xl p-4 min-w-[80px]">
+                            <div className="text-3xl font-bold text-amber-400">{String(timeLeft.seconds).padStart(2, '0')}</div>
+                            <div className="text-xs text-slate-400 uppercase tracking-wider">Секунд</div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                    
+                    <div className="text-slate-400 text-sm mt-4">
+                      Начало в {nextStreamTime ? nextStreamTime.toLocaleString('ru-RU') : '...'}
+                    </div>
+                  </div>
+                </div>
               )}
-              
-              {/* Overlay for offline state if needed */}
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <a href="https://www.youtube.com/@DosMundosPeru/streams" target="_blank" rel="noreferrer" 
+               className="flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold transition-all transform hover:scale-105 shadow-lg">
+              <Play size={24} fill="currentColor" />
+              <span>Смотреть на YouTube</span>
+            </a>
+            
+            <a href="https://www.facebook.com/dosmundosperu" target="_blank" rel="noreferrer"
+               className="flex items-center justify-center gap-3 px-8 py-4 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold transition-all transform hover:scale-105 shadow-lg">
+              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M9 8h-3v4h3v12h5v-12h3.642l.358-4h-4v-1.667c0-.955.192-1.333 1.115-1.333h2.885v-5h-3.808c-3.596 0-5.192 1.583-5.192 4.615v3.385z"/>
+              </svg>
+              <span>Facebook</span>
+            </a>
+          </div>
+
+          {/* Previous Episodes Link */}
+          <div className="text-center">
+            <a href="http://dosmundos.pe/episodes" target="_blank" rel="noreferrer"
+               className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-medium transition-all border border-white/20 backdrop-blur-sm">
+              <Calendar size={20} />
+              <span>Предыдущие трансляции</span>
+            </a>
+          </div>
+
+          {/* World Times Card */}
+          <div className="bg-slate-900/50 rounded-3xl p-6 backdrop-blur-sm border border-white/10">
+            <div className="flex items-center gap-3 mb-6">
+              <Globe className="w-6 h-6 text-amber-400" />
+              <h3 className="text-2xl font-bold text-white">Время трансляции в разных городах</h3>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {getWorldTimes().map(({ city, time, flag }) => (
+                <div key={city} className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">{flag}</span>
+                    <span className="font-medium text-slate-200">{city}</span>
+                  </div>
+                  <span className="font-mono text-amber-400 text-sm">{time}</span>
+                </div>
+              ))}
             </div>
 
-            <div className="flex flex-wrap gap-3 justify-center md:justify-start">
-                <a href="https://youtube.com/@dosmundos" target="_blank" rel="noreferrer" 
-                   className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium transition-colors">
-                    <Play size={20} fill="currentColor" />
-                    Watch on YouTube
-                </a>
-                <button className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-medium transition-colors">
-                    <Share2 size={20} />
-                    Share Stream
-                </button>
-            </div>
-
-            {/* Schedule Card */}
-            <div className="p-4 rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm">
-              <div className="flex items-center gap-3 mb-4">
+            <div className="mt-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30">
+              <div className="flex items-center gap-2 mb-2">
                 <Calendar className="w-5 h-5 text-amber-400" />
-                <h3 className="text-lg font-bold text-white">Broadcast Times</h3>
+                <span className="font-semibold text-amber-400">Расписание</span>
               </div>
-              
-              <div className="space-y-1">
-                {renderSchedule()}
-              </div>
-
-              <div className="mt-4 pt-4 border-t border-white/10">
-                <p className="text-xs text-slate-400">
-                  Broadcasts start every Wednesday at 9:30 AM Peru time (GMT-5).
-                </p>
-              </div>
+              <p className="text-slate-300 text-sm leading-relaxed">
+                Трансляции начинаются каждую среду в <span className="font-bold text-amber-400">9:30 AM по перуанскому времени (GMT-5)</span>.
+                Время начала может варьироваться.
+              </p>
             </div>
+          </div>
+        </div>
         </div>
       </div>
     </div>

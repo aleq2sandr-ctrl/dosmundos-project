@@ -7,19 +7,19 @@ const Header = ({ podcastData, currentLanguage = 'ru' }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const translations = {
-    ru: { about: 'О центре', festival: 'Фестиваль', volunteers: 'Волонтерам', radio: 'Радио', live: 'Live' },
-    en: { about: 'About', festival: 'Festival', volunteers: 'Volunteers', radio: 'Radio', live: 'Live' },
-    es: { about: 'Sobre nosotros', festival: 'Festival', volunteers: 'Voluntarios', radio: 'Radio', live: 'En vivo' },
-    de: { about: 'Über uns', festival: 'Festival', volunteers: 'Freiwillige', radio: 'Radio', live: 'Live' },
-    fr: { about: 'À propos', festival: 'Festival', volunteers: 'Bénévoles', radio: 'Radio', live: 'En direct' },
-    pl: { about: 'O nas', festival: 'Festiwal', volunteers: 'Wolontariat', radio: 'Radio', live: 'Na żywo' },
+    ru: { about: 'О центре', events: 'События', volunteers: 'Волонтерам', radio: 'Радио', live: 'LIVE' },
+    en: { about: 'About', events: 'Events', volunteers: 'Volunteers', radio: 'Radio', live: 'LIVE' },
+    es: { about: 'Sobre nosotros', events: 'Eventos', volunteers: 'Voluntarios', radio: 'Radio', live: 'LIVE' },
+    de: { about: 'Über uns', events: 'Veranstaltungen', volunteers: 'Freiwillige', radio: 'Radio', live: 'LIVE' },
+    fr: { about: 'À propos', events: 'Événements', volunteers: 'Bénévoles', radio: 'Radio', live: 'LIVE' },
+    pl: { about: 'O nas', events: 'Wydarzenia', volunteers: 'Wolontariat', radio: 'Radio', live: 'LIVE' },
   };
 
   const t = translations[currentLanguage] || translations.en;
 
   const navLinks = [
     { to: `/${currentLanguage}/about`, label: t.about },
-    { to: `/${currentLanguage}/festival`, label: t.festival },
+    { to: `/${currentLanguage}/events`, label: t.events },
     { to: `/${currentLanguage}/volunteers`, label: t.volunteers },
     { to: `/${currentLanguage}/episodes`, label: t.radio },
     { to: `/${currentLanguage}/live`, label: t.live },
@@ -55,8 +55,15 @@ const Header = ({ podcastData, currentLanguage = 'ru' }) => {
               <Link 
                 key={link.to}
                 to={link.to} 
-                className="px-3 py-2 rounded-lg text-sm font-medium text-slate-200 hover:bg-white/10 hover:text-white transition-all whitespace-nowrap active:scale-95"
+                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap active:scale-95 flex items-center gap-2 ${
+                  link.to.includes('/live') 
+                    ? 'text-red-400 border border-red-500 bg-red-950/20' 
+                    : 'text-slate-200 hover:bg-white/10 hover:text-white'
+                }`}
               >
+                {link.to.includes('/live') && (
+                  <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                )}
                 {link.label}
               </Link>
             ))}
@@ -86,9 +93,16 @@ const Header = ({ podcastData, currentLanguage = 'ru' }) => {
               <Link 
                 key={link.to}
                 to={link.to} 
-                className="px-4 py-3 rounded-lg text-base font-medium text-slate-200 hover:bg-white/10 hover:text-white transition-all active:scale-95"
+                className={`px-4 py-3 rounded-lg text-base font-medium transition-all active:scale-95 flex items-center gap-2 ${
+                  link.to.includes('/live') 
+                    ? 'text-red-400 border border-red-500 bg-red-950/20' 
+                    : 'text-slate-200 hover:bg-white/10 hover:text-white'
+                }`}
                 onClick={() => setIsMenuOpen(false)}
               >
+                {link.to.includes('/live') && (
+                  <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                )}
                 {link.label}
               </Link>
             ))}
