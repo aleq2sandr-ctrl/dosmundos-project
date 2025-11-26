@@ -45,19 +45,39 @@ export const generateInitialItemData = async (file, targetLang, currentLanguage,
     try {
       const columnToFetch = targetLang === 'ru' ? 'timings_ru' : targetLang === 'es' ? 'timings_es' : null;
       if (columnToFetch) {
-        const { data, error } = await supabase
-          .from('timeOld')
-          .select(columnToFetch)
-          .eq('date', dateFromFile)
-        .maybeSingle();
-      if (error) throw error; 
-        if (data) {
-          timingsText = data[columnToFetch] || '';
+        // Try to fetch from timeOld, but handle if table doesn't exist
+        try {
+          const { data, error } = await supabase
+            .from('timeOld')
+            .select(columnToFetch)
+            .eq('date', dateFromFile)
+            .maybeSingle();
+          
+          if (error) {
+            // If table doesn't exist (PGRST205), just ignore and continue without timings
+            if (error.code === 'PGRST205' || error.code === '42P01') {
+              console.warn('timeOld table not found, skipping timings fetch');
+            } else {
+              throw error;
+            }
+          } else if (data) {
+            timingsText = data[columnToFetch] || '';
+          }
+        } catch (innerErr) {
+           // Double check if it was a table missing error that was thrown
+           if (innerErr.code === 'PGRST205' || innerErr.code === '42P01') {
+             console.warn('timeOld table not found (caught), skipping timings fetch');
+           } else {
+             throw innerErr;
+           }
         }
       }
     } catch (err) {
       console.error(`Error fetching timings for ${file.name} (${targetLang}):`, err);
-      toast({ title: getLocaleString('errorGeneric', currentLanguage), description: `Не удалось загрузить тайминги для ${file.name} (${targetLang}): ${err.message}`, variant: 'destructive' });
+      // Don't show toast for missing table error to avoid user confusion
+      if (err.code !== 'PGRST205' && err.code !== '42P01') {
+        toast({ title: getLocaleString('errorGeneric', currentLanguage), description: `Не удалось загрузить тайминги для ${file.name} (${targetLang}): ${err.message}`, variant: 'destructive' });
+      }
     }
   }
 

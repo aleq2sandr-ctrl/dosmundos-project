@@ -21,45 +21,135 @@ export const PlayerProvider = ({ children }) => {
 
   // Play a specific episode
   const playEpisode = useCallback((episode, startTime = 0) => {
+    console.log('🎵 [PlayerContext] playEpisode called:', {
+      episodeSlug: episode.slug,
+      startTime,
+      audioUrl: episode.audioUrl || episode.audio_url
+    });
+    
     const isSameEpisode = currentEpisode?.slug === episode.slug;
+    const audioUrl = episode.audioUrl || episode.audio_url;
+    
+    if (!audioUrl) {
+      console.error('[PlayerContext] No audio URL available for episode:', episode.slug);
+      return;
+    }
     
     if (!isSameEpisode) {
+      console.log('🎵 [PlayerContext] Loading new episode:', episode.slug);
       setCurrentEpisode(episode);
       setCurrentTime(startTime);
       setIsPlaying(true);
       setIsGlobalPlayerVisible(true);
       
       if (audioRef.current) {
-        audioRef.current.src = episode.audioUrl || episode.audio_url;
+        console.log('🎵 [PlayerContext] Setting audio src:', audioUrl);
+        // Force reload for new episode
+        audioRef.current.src = audioUrl;
         audioRef.current.currentTime = startTime;
         audioRef.current.playbackRate = playbackRate;
-        audioRef.current.play().catch(e => console.error("Play error:", e));
+        audioRef.current.load(); // Ensure proper loading
+        
+        // Attempt play after load
+        const attemptPlay = () => {
+          console.log('🎵 [PlayerContext] Attempting to play, readyState:', audioRef.current.readyState);
+          if (audioRef.current && audioRef.current.readyState >= audioRef.current.HAVE_CURRENT_DATA) {
+            audioRef.current.play().then(() => {
+              console.log('🎵 [PlayerContext] Play successful');
+            }).catch(e => {
+              console.error("[PlayerContext] Play error:", e);
+              setIsPlaying(false);
+            });
+          } else {
+            // Retry after a short delay
+            console.log('🎵 [PlayerContext] Audio not ready, retrying in 100ms');
+            setTimeout(attemptPlay, 100);
+          }
+        };
+        
+        // Start attempting to play
+        setTimeout(attemptPlay, 50);
+      } else {
+        console.error('🎵 [PlayerContext] No audioRef.current available');
       }
     } else {
+      console.log('🎵 [PlayerContext] Same episode, ensuring playback');
       // If same episode, just ensure it's playing
       if (!isPlaying) {
         togglePlay();
+      } else {
+        // If playing and seeking to different time
+        if (Math.abs(audioRef.current.currentTime - startTime) > 0.5) {
+          audioRef.current.currentTime = startTime;
+          setCurrentTime(startTime);
+        }
       }
     }
-  }, [currentEpisode, isPlaying]);
+  }, [currentEpisode, isPlaying, playbackRate]);
 
   const togglePlay = useCallback(() => {
-    if (audioRef.current) {
-      if (isPlaying) {
-        audioRef.current.pause();
+    if (!audioRef.current || !audioRef.current.src) {
+      console.warn('[PlayerContext] No audio source available for playback');
+      setIsPlaying(false);
+      return;
+    }
+    
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      // Ensure audio is ready before playing
+      if (audioRef.current.readyState >= audioRef.current.HAVE_CURRENT_DATA) {
+        audioRef.current.play().then(() => {
+          setIsPlaying(true);
+        }).catch(e => {
+          console.error('[PlayerContext] Play error:', e);
+          setIsPlaying(false);
+        });
       } else {
-        audioRef.current.play().catch(e => console.error("Play error:", e));
+        // Wait for audio to be ready, then play
+        const onCanPlay = () => {
+          audioRef.current?.play().then(() => {
+            setIsPlaying(true);
+          }).catch(e => {
+            console.error('[PlayerContext] Play error after canplay:', e);
+            setIsPlaying(false);
+          });
+          audioRef.current?.removeEventListener('canplay', onCanPlay);
+        };
+        
+        audioRef.current.addEventListener('canplay', onCanPlay, { once: true });
+        
+        // Fallback timeout
+        setTimeout(() => {
+          if (audioRef.current) {
+            audioRef.current.removeEventListener('canplay', onCanPlay);
+          }
+        }, 2000);
       }
-      setIsPlaying(!isPlaying);
     }
   }, [isPlaying]);
 
   const seek = useCallback((time) => {
-    if (audioRef.current) {
-      audioRef.current.currentTime = time;
-      setCurrentTime(time);
+    if (!audioRef.current) return;
+    
+    const clampedTime = Math.max(0, Math.min(time, duration || audioRef.current.duration || 0));
+    
+    try {
+      audioRef.current.currentTime = clampedTime;
+      setCurrentTime(clampedTime);
+      
+      // If seeking while playing, ensure playback continues
+      if (isPlaying && audioRef.current.paused) {
+        audioRef.current.play().catch(e => {
+          console.error('[PlayerContext] Play error after seek:', e);
+          setIsPlaying(false);
+        });
+      }
+    } catch (error) {
+      console.error('[PlayerContext] Seek error:', error);
     }
-  }, []);
+  }, [duration, isPlaying]);
 
   const setRate = useCallback((rate) => {
     setPlaybackRate(rate);
@@ -102,6 +192,9 @@ export const PlayerProvider = ({ children }) => {
     console.error('Audio error code:', e.target.error?.code);
     console.error('Audio error message:', e.target.error?.message);
     
+    // Stop playback on error
+    setIsPlaying(false);
+    
     // Attempt to recover from network/decode errors
     if (e.target.error?.code === e.target.error?.MEDIA_ERR_NETWORK || 
         e.target.error?.code === e.target.error?.MEDIA_ERR_DECODE ||
@@ -119,22 +212,36 @@ export const PlayerProvider = ({ children }) => {
 
       // 2. Save current time to restore after reload
       const savedTime = currentTime;
+      const savedSrc = audioRef.current?.src;
       const wasPlaying = isPlaying;
 
       // 3. Retry loading after a short delay
       setTimeout(() => {
-        if (audioRef.current) {
+        if (audioRef.current && savedSrc) {
           console.log('[PlayerContext] Reloading audio source...');
+          
+          // Clear and reload
+          audioRef.current.src = '';
           audioRef.current.load();
-          audioRef.current.currentTime = savedTime;
-          if (wasPlaying) {
-            audioRef.current.play().catch(err => console.error("Retry play failed:", err));
-          }
+          
+          // Set source again after a brief pause
+          setTimeout(() => {
+            if (audioRef.current) {
+              audioRef.current.src = savedSrc;
+              audioRef.current.load();
+              audioRef.current.currentTime = savedTime;
+              
+              if (wasPlaying) {
+                audioRef.current.play().catch(err => {
+                  console.error('[PlayerContext] Retry play failed:', err);
+                  setIsPlaying(false);
+                });
+              }
+            }
+          }, 100);
         }
       }, 1000);
     }
-    
-    setIsPlaying(false);
   };
 
   return (

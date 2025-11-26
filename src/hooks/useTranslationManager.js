@@ -208,6 +208,7 @@ const useTranslationManager = (currentLanguage, toast, episodes, setEpisodes) =>
             edited_transcript_data: compactTranslated,
             updated_at: new Date().toISOString()
           }], {
+            onConflict: 'episode_slug,lang'
           });
 
         if (transcriptUpsertError) {

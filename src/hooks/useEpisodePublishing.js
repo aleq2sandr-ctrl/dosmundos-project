@@ -85,6 +85,7 @@ const useEpisodePublishing = (currentLanguage) => {
             content: itemData.transcriptContent || '',
             updated_at: new Date().toISOString()
           }], {
+            onConflict: 'episode_slug,lang'
           });
 
         if (transcriptError) {

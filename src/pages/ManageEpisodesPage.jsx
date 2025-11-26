@@ -33,7 +33,6 @@ const ManageEpisodesPage = ({ currentLanguage }) => {
   const navigate = useNavigate();
   const { lang } = useParams();
   const langPrefix = lang || currentLanguage || 'ru';
-  
   const {
     filesToProcess,
     isProcessingAll,
@@ -759,7 +758,7 @@ const EpisodeManagementSection = ({ currentLanguage }) => {
         status: jobStatus
       };
 
-      await supabase.from('transcripts').insert(transcriptPayload);
+      await supabase.from('transcripts').upsert(transcriptPayload, { onConflict: 'episode_slug,lang' });
 
       // Update local state
       setEpisodes(prev => prev.map(ep => 
@@ -1120,7 +1119,7 @@ const EpisodeManagementSection = ({ currentLanguage }) => {
         status: 'completed',
         edited_transcript_data: translatedTranscriptData,
         updated_at: new Date().toISOString(),
-      }, { });
+      }, { onConflict: 'episode_slug,lang' });
 
       toast({ title: getLocaleString('transcriptTranslated', currentLanguage), description: getLocaleString('enTranscriptCreated', currentLanguage, { episodeSlug: enSlug }) });
 

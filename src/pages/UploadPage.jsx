@@ -18,7 +18,6 @@ import { supabase } from '@/lib/supabaseClient';
 import { getAudioUrl } from '@/lib/audioUrl';
 import { startPollingForItem } from '@/services/uploader/transcriptPoller';
 import DevLogPanel from '@/components/DevLogPanel';
-import DateBasedUpload from '@/components/manage/DateBasedUpload';
 
 const UploadPage = ({ currentLanguage }) => {
   const navigate = useNavigate();
@@ -36,8 +35,6 @@ const UploadPage = ({ currentLanguage }) => {
   });
   const [episodes, setEpisodes] = useState([]);
   const [isLoadingEpisodes, setIsLoadingEpisodes] = useState(true);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [loadingFromDB, setLoadingFromDB] = useState(false);
 
   const {
     filesToProcess,
@@ -45,6 +42,7 @@ const UploadPage = ({ currentLanguage }) => {
     currentItemForOverwrite,
     conflictDialog,
     addFilesToQueue,
+    addRemoteFilesByDate,
     updateItemState,
     processSingleItem,
     handleTitleChange,
@@ -98,6 +96,47 @@ const UploadPage = ({ currentLanguage }) => {
 
   // State for question generation
   const [processingQuestionsEpisodes, setProcessingQuestionsEpisodes] = useState(new Set());
+
+  // State for remote date input
+  const [remoteDateInput, setRemoteDateInput] = useState('');
+
+  const handleRemoteDateSubmit = (e) => {
+    e.preventDefault();
+    if (remoteDateInput) {
+      addRemoteFilesByDate(remoteDateInput);
+      setRemoteDateInput('');
+    }
+  };
+
+  const setLastWednesday = () => {
+    const d = new Date();
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1) - 1 - 7; // adjust when day is sunday
+    // Logic:
+    // 0 = Sunday, 1 = Monday, ..., 3 = Wednesday, ..., 6 = Saturday
+    // We want the *previous* Wednesday.
+    // If today is Wednesday (3), we might want today or last week? Usually "last Wednesday" means previous week if today is Wed, or just the most recent Wed.
+    // Let's assume "most recent past Wednesday".
+    
+    const today = new Date();
+    const dayOfWeek = today.getDay(); // 0-6
+    // Calculate days to subtract to get to Wednesday (3)
+    // If today is Wed (3), subtract 7? Or 0? "Last Wednesday" usually implies not today.
+    // Let's go with: find the most recent Wednesday that is strictly before today? Or just the Wednesday of this week if we are past it?
+    // "Прошедшая среда" -> Past Wednesday.
+    
+    let daysToSubtract = (dayOfWeek + 7 - 3) % 7;
+    if (daysToSubtract === 0) daysToSubtract = 7; // If today is Wednesday, go back a week
+    
+    const lastWed = new Date(today);
+    lastWed.setDate(today.getDate() - daysToSubtract);
+    
+    const yyyy = lastWed.getFullYear();
+    const mm = String(lastWed.getMonth() + 1).padStart(2, '0');
+    const dd = String(lastWed.getDate()).padStart(2, '0');
+    
+    setRemoteDateInput(`${yyyy}-${mm}-${dd}`);
+  };
 
   // Real transcription function
   const handleStartTranscription = async (episode) => {
@@ -436,7 +475,6 @@ const UploadPage = ({ currentLanguage }) => {
 
   const handleLoadFromDB = async (episode) => {
     console.log('Load from DB:', episode);
-    setLoadingFromDB(true);
     
     try {
       toast({
@@ -470,8 +508,6 @@ const UploadPage = ({ currentLanguage }) => {
         variant: 'destructive',
         duration: 5000
       });
-    } finally {
-      setLoadingFromDB(false);
     }
   };
 
@@ -661,14 +697,49 @@ const UploadPage = ({ currentLanguage }) => {
             };
           }
 
+          // Перезагружаем список эпизодов чтобы показать новый
+          await loadEpisodes();
+
           // Если включена автоматическая транскрипция
           if (autoSettings.autoTranscribe) {
             updateItemState(item.id, {
               transcriptionStatus: 'Начинается транскрипция...'
             });
             
-            // Транскрипция уже запускается автоматически в processSingleItem
-            // Если нужно дождаться результата, можно добавить дополнительную логику
+            try {
+              // Fetch the episode to get necessary data for transcription
+              const { data: episodeData } = await supabase
+                .from('episodes')
+                .select('*')
+                .eq('slug', item.episodeSlug)
+                .eq('lang', item.lang)
+                .single();
+
+              if (episodeData) {
+                // Start transcription
+                await handleStartTranscription(episodeData);
+                
+                // Wait for transcription to complete (sequential processing)
+                let isComplete = false;
+                let attempts = 0;
+                while (!isComplete && attempts < 120) { // Max wait ~10 mins
+                  await new Promise(r => setTimeout(r, 5000));
+                  const { data: transcript } = await supabase
+                    .from('transcripts')
+                    .select('status')
+                    .eq('episode_slug', episodeData.slug)
+                    .eq('lang', episodeData.lang)
+                    .single();
+                    
+                  if (transcript?.status === 'completed' || transcript?.status === 'error') {
+                    isComplete = true;
+                  }
+                  attempts++;
+                }
+              }
+            } catch (err) {
+              console.error("Auto-transcription error:", err);
+            }
           }
 
           // Если включена автоматическая загрузка из БД
@@ -680,15 +751,21 @@ const UploadPage = ({ currentLanguage }) => {
             }
           }
 
-          // Перезагружаем список эпизодов чтобы показать новый
+          // Перезагружаем список эпизодов чтобы обновить статус
           await loadEpisodes();
 
           // Если включен автоматический перевод
           if (autoSettings.autoTranslate) {
-            // Найдем только что загруженный эпизод
-            const uploadedEpisode = episodes.find(ep => 
-              ep.slug === item.episodeSlug && ep.lang === item.lang
-            );
+            // Найдем только что загруженный эпизод (нужно получить свежие данные после loadEpisodes)
+            const { data: uploadedEpisode } = await supabase
+                .from('episodes')
+                .select(`
+                  *,
+                  transcript:transcripts(*)
+                `)
+                .eq('slug', item.episodeSlug)
+                .eq('lang', item.lang)
+                .single();
 
             if (uploadedEpisode && uploadedEpisode.transcript?.status === 'completed') {
               updateItemState(item.id, {
@@ -824,11 +901,11 @@ const UploadPage = ({ currentLanguage }) => {
     } finally {
       setIsLoadingEpisodes(false);
     }
-  }, [currentLanguage, toast, refreshTrigger]);
+  }, [currentLanguage, toast]);
 
   useEffect(() => {
     loadEpisodes();
-  }, [loadEpisodes, refreshTrigger]);
+  }, [loadEpisodes]);
 
   const onDrop = useCallback((acceptedFiles) => {
     addFilesToQueue(acceptedFiles);
@@ -1155,11 +1232,47 @@ const UploadPage = ({ currentLanguage }) => {
         )}
       </div>
 
-      {/* Date-based Upload Section */}
-      <DateBasedUpload 
-        currentLanguage={currentLanguage}
-        onUploadComplete={() => setRefreshTrigger(prev => prev + 1)}
-      />
+      {/* Remote Upload by Date */}
+      <div className="mb-6 p-4 rounded-lg bg-slate-700/30 border border-slate-600">
+        <h3 className="text-lg font-medium text-slate-200 mb-3">
+          Добавить уже загруженные файлы по дате
+        </h3>
+        <form onSubmit={handleRemoteDateSubmit} className="flex gap-4 items-end">
+          <div className="flex-1 max-w-xs">
+            <label className="block text-sm font-medium text-slate-400 mb-1">
+              Дата (YYYY-MM-DD)
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="date"
+                value={remoteDateInput}
+                onChange={(e) => setRemoteDateInput(e.target.value)}
+                className="w-full h-10 px-3 rounded bg-slate-800 border border-slate-600 text-slate-100 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                required
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={setLastWednesday}
+                className="bg-slate-700 hover:bg-slate-600 border-slate-600 text-slate-300 whitespace-nowrap"
+                title="Прошедшая среда"
+              >
+                Среда
+              </Button>
+            </div>
+          </div>
+          <Button 
+            type="submit"
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Добавить
+          </Button>
+        </form>
+        <p className="text-xs text-slate-500 mt-2">
+          Автоматически добавит ссылки: .../Audio/YYYY-MM-DD_RU.mp3 и .../Audio/YYYY-MM-DD_ES.mp3
+        </p>
+      </div>
 
       {/* Upload Queue */}
       <UploadQueue
@@ -1197,7 +1310,7 @@ const UploadPage = ({ currentLanguage }) => {
             translatingFrom={translatingFrom}
             translationProgress={translationProgress}
             isTranscribing={isTranscribing}
-            loadingFromDB={loadingFromDB}
+            loadingFromDB={false}
             generatingFromText={false}
             processingQuestionsEpisodes={processingQuestionsEpisodes}
           />

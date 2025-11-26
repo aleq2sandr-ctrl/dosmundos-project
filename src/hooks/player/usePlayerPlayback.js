@@ -70,6 +70,10 @@ const usePlayerPlayback = ({
         logger.debug('[usePlayerPlayback] Play request aborted (expected during seek/pause operations)');
         return false;
       }
+      // NotAllowedError - уже обработан выше
+      if (err?.name === 'NotAllowedError') {
+        return false;
+      }
       // Другие ошибки логируем
       console.error('[usePlayerPlayback] Play error:', err);
       return false;
@@ -151,6 +155,7 @@ const usePlayerPlayback = ({
       // Cancel any pending play promise
       if (playPromiseRef.current) {
         playPromiseRef.current.catch(() => {});
+        playPromiseRef.current = null;
       }
       
       const wasPlaying = isPlayingState; // Используем состояние React вместо аудио элемента
@@ -161,65 +166,25 @@ const usePlayerPlayback = ({
       }
       onPlayerStateChange?.({ currentTime: time });
       
-      // Set the audio element's time
-      console.log('🔧 [usePlayerPlayback] Setting currentTime:', time);
-      audioRef.current.currentTime = time;
+      try {
+        // Set the audio element's time
+        console.log('🔧 [usePlayerPlayback] Setting currentTime:', time);
+        audioRef.current.currentTime = time;
 
-      // Оптимизированная логика: не ждем события seeked, если аудио уже готово
-      const isReady = audioRef.current.readyState >= audioRef.current.HAVE_CURRENT_DATA;
-      console.log('🔧 [usePlayerPlayback] Audio readyState:', audioRef.current.readyState, 'isReady:', isReady, 'paused:', audioRef.current.paused);
-      
-      if (isReady) {
-        // Аудио готово - сразу продолжаем воспроизведение
-        if (playAfterJump || wasPlaying) {
-          // Дополнительная проверка: убеждаемся что аудио действительно на паузе и не загружается
-          if (audioRef.current.paused && audioRef.current.readyState >= audioRef.current.HAVE_CURRENT_DATA) {
-            console.log('🔧 [usePlayerPlayback] Attempting to play audio...');
-            playPromiseRef.current = attemptPlay(audioRef.current);
-            playPromiseRef.current?.then((ok) => {
-              if (!ok) {
-                 // If play failed (e.g. aborted), ensure state reflects that
-                 setIsPlayingState(false);
-                 onPlayerStateChange?.({ isPlaying: false });
-                 return;
-              }
-              setIsPlayingState(true);
-              onPlayerStateChange?.({ isPlaying: true });
-            }).catch(e => {
-              // Should not happen as attemptPlay catches errors, but just in case
-              console.error("Error in play promise chain:", e);
-              setIsPlayingState(false);
-              onPlayerStateChange?.({ isPlaying: false });
-            }).finally(() => {
-              isSeekingRef.current = false;
-            });
-          } else {
-            // Аудио уже воспроизводится или не готово - просто обновляем состояние
-            const shouldBePlaying = !audioRef.current.paused && audioRef.current.readyState >= audioRef.current.HAVE_CURRENT_DATA;
-            setIsPlayingState(shouldBePlaying);
-            onPlayerStateChange?.({ isPlaying: shouldBePlaying });
-            isSeekingRef.current = false;
-          }
-        } else {
-          // Если не нужно воспроизводить, убеждаемся что аудио на паузе
-          if (!audioRef.current.paused) {
-            audioRef.current.pause();
-          }
-          setIsPlayingState(false);
-          onPlayerStateChange?.({ isPlaying: false });
-          isSeekingRef.current = false;
-        }
-      } else {
-        // Аудио не готово - используем старую логику с событием seeked
-        const onSeeked = () => {
-          audioRef.current?.removeEventListener('seeked', onSeeked);
-          
+        // Оптимизированная логика: не ждем события seeked, если аудио уже готово
+        const isReady = audioRef.current.readyState >= audioRef.current.HAVE_CURRENT_DATA;
+        console.log('🔧 [usePlayerPlayback] Audio readyState:', audioRef.current.readyState, 'isReady:', isReady, 'paused:', audioRef.current.paused);
+        
+        if (isReady) {
+          // Аудио готово - сразу продолжаем воспроизведение
           if (playAfterJump || wasPlaying) {
-            // Дополнительная проверка перед воспроизведением
+            // Дополнительная проверка: убеждаемся что аудио действительно на паузе и не загружается
             if (audioRef.current.paused && audioRef.current.readyState >= audioRef.current.HAVE_CURRENT_DATA) {
+              console.log('🔧 [usePlayerPlayback] Attempting to play audio after seek...');
               playPromiseRef.current = attemptPlay(audioRef.current);
               playPromiseRef.current?.then((ok) => {
                 if (!ok) {
+                   // If play failed (e.g. aborted), ensure state reflects that
                    setIsPlayingState(false);
                    onPlayerStateChange?.({ isPlaying: false });
                    return;
@@ -227,53 +192,108 @@ const usePlayerPlayback = ({
                 setIsPlayingState(true);
                 onPlayerStateChange?.({ isPlaying: true });
               }).catch(e => {
-                console.error("Error in play promise chain (seeked):", e);
+                // Should not happen as attemptPlay catches errors, but just in case
+                console.error("Error in play promise chain:", e);
                 setIsPlayingState(false);
                 onPlayerStateChange?.({ isPlaying: false });
               }).finally(() => {
                 isSeekingRef.current = false;
               });
             } else {
-              // Аудио уже воспроизводится или не готово
+              // Аудио уже воспроизводится или не готово - просто обновляем состояние
               const shouldBePlaying = !audioRef.current.paused && audioRef.current.readyState >= audioRef.current.HAVE_CURRENT_DATA;
               setIsPlayingState(shouldBePlaying);
               onPlayerStateChange?.({ isPlaying: shouldBePlaying });
               isSeekingRef.current = false;
             }
           } else {
-            // Убеждаемся что аудио на паузе
+            // Если не нужно воспроизводить, убеждаемся что аудио на паузе
             if (!audioRef.current.paused) {
-              audioRef.current.pause();
+              try {
+                audioRef.current.pause();
+              } catch (e) {
+                console.error('Error pausing audio after seek:', e);
+              }
             }
             setIsPlayingState(false);
             onPlayerStateChange?.({ isPlaying: false });
             isSeekingRef.current = false;
           }
-        };
-        
-        audioRef.current.addEventListener('seeked', onSeeked, { once: true });
-        
-        // Уменьшенный timeout для более быстрого отклика
-        setTimeout(() => {
-          if (isSeekingRef.current) {
-            logger.debug('usePlayerPlayback: Fallback timeout - clearing seeking flag');
-            isSeekingRef.current = false;
+        } else {
+          // Аудио не готово - используем старую логику с событием seeked
+          const onSeeked = () => {
+            audioRef.current?.removeEventListener('seeked', onSeeked);
             
-            // Если таймаут сработал (например, seek 0->0 не вызвал событие), 
-            // но мы хотели играть - пробуем запустить
-            if (playAfterJump && audioRef.current && audioRef.current.paused) {
-               console.log('[usePlayerPlayback] Seek timeout, attempting play');
-               attemptPlay(audioRef.current).then(ok => {
-                  if (ok) {
-                    setIsPlayingState(true);
-                    onPlayerStateChange?.({ isPlaying: true });
+            if (playAfterJump || wasPlaying) {
+              // Дополнительная проверка перед воспроизведением
+              if (audioRef.current.paused && audioRef.current.readyState >= audioRef.current.HAVE_CURRENT_DATA) {
+                playPromiseRef.current = attemptPlay(audioRef.current);
+                playPromiseRef.current?.then((ok) => {
+                  if (!ok) {
+                     setIsPlayingState(false);
+                     onPlayerStateChange?.({ isPlaying: false });
+                     return;
                   }
-               }).catch(e => {
-                  // NotAllowedError handled in attemptPlay
-               });
+                  setIsPlayingState(true);
+                  onPlayerStateChange?.({ isPlaying: true });
+                }).catch(e => {
+                  console.error("Error in play promise chain (seeked):", e);
+                  setIsPlayingState(false);
+                  onPlayerStateChange?.({ isPlaying: false });
+                }).finally(() => {
+                  isSeekingRef.current = false;
+                });
+              } else {
+                // Аудио уже воспроизводится или не готово
+                const shouldBePlaying = !audioRef.current.paused && audioRef.current.readyState >= audioRef.current.HAVE_CURRENT_DATA;
+                setIsPlayingState(shouldBePlaying);
+                onPlayerStateChange?.({ isPlaying: shouldBePlaying });
+                isSeekingRef.current = false;
+              }
+            } else {
+              // Убеждаемся что аудио на паузе
+              if (!audioRef.current.paused) {
+                try {
+                  audioRef.current.pause();
+                } catch (e) {
+                  console.error('Error pausing audio after seek (seeked):', e);
+                }
+              }
+              setIsPlayingState(false);
+              onPlayerStateChange?.({ isPlaying: false });
+              isSeekingRef.current = false;
             }
-          }
-        }, 500); // Уменьшено с 2000ms до 500ms
+          };
+          
+          audioRef.current.addEventListener('seeked', onSeeked, { once: true });
+          
+          // Уменьшенный timeout для более быстрого отклика
+          setTimeout(() => {
+            if (isSeekingRef.current) {
+              logger.debug('usePlayerPlayback: Fallback timeout - clearing seeking flag');
+              isSeekingRef.current = false;
+              
+              // Если таймаут сработал (например, seek 0->0 не вызвал событие), 
+              // но мы хотели играть - пробуем запустить
+              if (playAfterJump && audioRef.current && audioRef.current.paused) {
+                 console.log('[usePlayerPlayback] Seek timeout, attempting play');
+                 attemptPlay(audioRef.current).then(ok => {
+                    if (ok) {
+                      setIsPlayingState(true);
+                      onPlayerStateChange?.({ isPlaying: true });
+                    }
+                 }).catch(e => {
+                    // NotAllowedError handled in attemptPlay
+                 });
+              }
+            }
+          }, 500); // Уменьшено с 2000ms до 500ms
+        }
+      } catch (error) {
+        console.error('🔧 [usePlayerPlayback] Error during seek:', error);
+        isSeekingRef.current = false;
+        setIsPlayingState(false);
+        onPlayerStateChange?.({ isPlaying: false });
       }
     };
 
@@ -301,9 +321,43 @@ const usePlayerPlayback = ({
         playPromiseRef.current.catch(() => {});
       }
       
-      // Дополнительная проверка: не загружается ли аудио в данный момент
+      // Проверяем готовность аудио
       if (audioElement.readyState < audioElement.HAVE_CURRENT_DATA) {
-        logger.debug('usePlayerPlayback: Audio not ready, waiting for ready state');
+        logger.debug('usePlayerPlayback: Audio not ready, waiting for canplay');
+        
+        // Ждем события canplay перед попыткой воспроизведения
+        const onCanPlay = () => {
+          if (isPlayingState && audioElement.paused) {
+            playPromiseRef.current = attemptPlay(audioElement);
+            playPromiseRef.current?.then((ok) => {
+              if (!ok) return;
+              logger.debug('usePlayerPlayback: Resume playback successful after canplay');
+            }).catch(error => {
+              if (error.name !== 'AbortError') {
+                console.error("usePlayerPlayback: Resume playback error after canplay:", error);
+                toast({
+                  title: getLocaleString('playbackErrorTitle', currentLanguage),
+                  description: getLocaleString('playbackErrorDescription', currentLanguage),
+                  variant: "destructive",
+                });
+                // Обновляем состояние с защитой от цикла
+                isUpdatingPlayStateRef.current = true;
+                setIsPlayingState(false);
+                onPlayerStateChange?.({isPlaying: false});
+                setTimeout(() => { isUpdatingPlayStateRef.current = false; }, 50);
+              }
+            });
+          }
+          audioElement.removeEventListener('canplay', onCanPlay);
+        };
+        
+        audioElement.addEventListener('canplay', onCanPlay, { once: true });
+        
+        // Fallback timeout
+        setTimeout(() => {
+          audioElement.removeEventListener('canplay', onCanPlay);
+        }, 3000);
+        
         return;
       }
       
@@ -313,27 +367,31 @@ const usePlayerPlayback = ({
         logger.debug('usePlayerPlayback: Resume playback successful');
       }).catch(error => {
         // AbortError ожидаем при операциях seek/паузы - игнорируем
-        if (error.name !== 'AbortError') {
+        if (error.name !== 'AbortError' && error.name !== 'NotAllowedError') {
           console.error("usePlayerPlayback: Resume playback error:", error);
           toast({
             title: getLocaleString('playbackErrorTitle', currentLanguage),
             description: getLocaleString('playbackErrorDescription', currentLanguage),
             variant: "destructive",
           });
+          // Обновляем состояние с защитой от цикла
+          isUpdatingPlayStateRef.current = true;
+          setIsPlayingState(false);
+          onPlayerStateChange?.({isPlaying: false});
+          setTimeout(() => { isUpdatingPlayStateRef.current = false; }, 50);
         }
-        // Обновляем состояние с защитой от цикла
-        isUpdatingPlayStateRef.current = true;
-        setIsPlayingState(false);
-        onPlayerStateChange?.({isPlaying: false});
-        setTimeout(() => { isUpdatingPlayStateRef.current = false; }, 50);
       });
     } 
     // Если состояние изменилось на "пауза", но аудио играет - ставим на паузу
     else if (!isPlayingState && !audioElement.paused) {
       logger.debug('usePlayerPlayback: State says paused but audio playing, pausing');
-      audioElement.pause();
+      try {
+        audioElement.pause();
+      } catch (error) {
+        console.error('usePlayerPlayback: Error pausing audio:', error);
+      }
     }
-  }, [isPlayingState]);
+  }, [isPlayingState, toast, currentLanguage, setIsPlayingState, onPlayerStateChange]);
 
   // Синхронизация состояния с реальным состоянием аудио элемента (Audio -> React state)
   useEffect(() => {
@@ -493,12 +551,11 @@ const usePlayerPlayback = ({
           setTimeout(() => { isUpdatingPlayStateRef.current = false; }, 50);
           return;
         }
-        
         // Пытаемся запустить воспроизведение сразу
         const playPromise = attemptPlay(audioElement);
         playPromise?.then((ok) => {
           if (!ok) {
-             // Autoplay failed or aborted
+             // Autoplay failed or blocked - don't change state
              return;
           }
           logger.debug('usePlayerPlayback: Quick autoplay successful');
@@ -562,7 +619,7 @@ const usePlayerPlayback = ({
       
       // Check if metadata is already loaded (e.g. from cache)
       // We check this AFTER setting src and calling load()
-      // But we need to be careful not to trigger it twice if the event fires immediately
+      // But we need to be careful not to trigger it twice if the browser fires the event immediately
       if (audioElement.readyState >= 1) { // HAVE_METADATA
          console.log('[usePlayerPlayback] Metadata already loaded, triggering handler manually');
          // Use setTimeout to allow the event loop to process any pending events first
@@ -590,10 +647,6 @@ const usePlayerPlayback = ({
       return () => {
         audioElement.removeEventListener('loadedmetadata', handleLoadedMetadata);
         audioElement.removeEventListener('canplay', handleCanPlay);
-        
-        // If we are unmounting or changing episode, we should probably stop playback
-        // But only if we are actually changing the source
-        // We don't want to stop if we are just re-rendering
       };
     }
   }, [episodeData?.slug, episodeData?.audio_url]); // Зависим только от slug и audio_url

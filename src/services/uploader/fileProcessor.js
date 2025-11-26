@@ -40,7 +40,7 @@ export const startManualTranscription = async ({
     
     const { error: transcriptDbError } = await supabase
       .from('transcripts')
-      .insert(transcriptPayload)
+      .upsert(transcriptPayload, { onConflict: 'episode_slug, lang' })
       .select()
       .maybeSingle();
 
@@ -106,6 +106,14 @@ export const processSingleItem = async ({
   let bucketNameUsed;
   let userConfirmedOverwriteGlobal = forceOverwrite;
   let userOverwriteChoices = overwriteOptions || null;
+  
+  // Handle remote files
+  if (itemData.isRemote && itemData.publicUrl) {
+    workerFileUrl = itemData.publicUrl;
+    r2FileKey = itemData.publicUrl.split('/').pop();
+    bucketNameUsed = 'hostinger';
+    console.log(`Using remote URL: ${workerFileUrl}`);
+  }
   
   // Skip upload if we're reusing shared audio
   const skipUpload = !!(sharedAudioUrl && sharedR2Key);
@@ -203,30 +211,55 @@ export const processSingleItem = async ({
        toast({title: getLocaleString('overwritingEpisodeTitle', currentLanguage), description: getLocaleString('overwritingEpisodeDesc', currentLanguage, {slug: episodeSlug})});
     }
     
-    const audioForDuration = new Audio();
-    audioForDuration.src = URL.createObjectURL(file);
     let duration = 0;
-    try {
-      duration = await new Promise((resolve, reject) => {
-        audioForDuration.onloadedmetadata = () => resolve(audioForDuration.duration);
-        audioForDuration.onerror = (e) => {
-          console.error("Audio metadata load error:", e);
-          reject(new Error(getLocaleString('audioMetadataError', currentLanguage)));
-        };
-        setTimeout(() => reject(new Error('Timeout getting audio duration')), 7000);
-      });
-    } catch (e) { 
-      console.error("Error getting duration", e); 
-      duration = 0; 
-      toast({ title: getLocaleString('warning', currentLanguage), description: getLocaleString('audioMetadataError', currentLanguage) + " " + e.message, variant: "destructive" });
-    } finally {
-      URL.revokeObjectURL(audioForDuration.src);
+    const audioForDuration = new Audio();
+    let objectUrlToRevoke = null;
+
+    if (itemData.isRemote && workerFileUrl) {
+      audioForDuration.src = workerFileUrl;
+      // Try to get duration for remote file. 
+      // Note: This might fail if CORS headers are missing on the remote server.
+      audioForDuration.crossOrigin = "anonymous"; 
+    } else if (file && !itemData.isRemote) {
+      try {
+        objectUrlToRevoke = URL.createObjectURL(file);
+        audioForDuration.src = objectUrlToRevoke;
+      } catch (e) {
+        console.error("Error creating object URL:", e);
+      }
+    }
+
+    if (audioForDuration.src) {
+      try {
+        duration = await new Promise((resolve, reject) => {
+          audioForDuration.onloadedmetadata = () => resolve(audioForDuration.duration);
+          audioForDuration.onerror = (e) => {
+            console.warn("Audio metadata load error:", e);
+            // For remote files, failure to load metadata (e.g. CORS) shouldn't stop the process
+            if (itemData.isRemote) resolve(0);
+            else reject(new Error(getLocaleString('audioMetadataError', currentLanguage)));
+          };
+          // Longer timeout for remote files
+          setTimeout(() => reject(new Error('Timeout getting audio duration')), itemData.isRemote ? 20000 : 7000);
+        });
+      } catch (e) { 
+        console.error("Error getting duration", e); 
+        duration = 0; 
+        if (!itemData.isRemote) {
+          toast({ title: getLocaleString('warning', currentLanguage), description: getLocaleString('audioMetadataError', currentLanguage) + " " + e.message, variant: "destructive" });
+        }
+      } finally {
+        if (objectUrlToRevoke) {
+          URL.revokeObjectURL(objectUrlToRevoke);
+        }
+      }
     }
 
     // Provide fallback date if parsedDate is null to avoid database constraint violation
     const episodeDate = parsedDate || new Date().toISOString().split('T')[0];
 
     const episodePayload = {
+      id: crypto.randomUUID(), // Generate UUID client-side to avoid null constraint
       slug: episodeSlug,
       title: episodeTitle,
       lang: lang,
@@ -244,9 +277,18 @@ export const processSingleItem = async ({
     if (userConfirmedOverwriteGlobal) {
       const choices = userOverwriteChoices || { overwriteEpisodeInfo: true };
       if (choices.overwriteEpisodeInfo) {
+        // When overwriting, we don't want to change the ID if it exists.
+        // First check if it exists to get the ID.
+        const { data: existingEp } = await supabase.from('episodes').select('id').eq('slug', episodeSlug).maybeSingle();
+        
+        const payloadToUpsert = { ...episodePayload };
+        if (existingEp && existingEp.id) {
+            payloadToUpsert.id = existingEp.id;
+        }
+
         const upsertRes = await supabase
           .from('episodes')
-          .upsert(episodePayload, { onConflict: 'slug' })
+          .upsert(payloadToUpsert, { onConflict: 'slug' })
           .select('slug')
           .maybeSingle();
         upsertedEpisode = upsertRes.data;
@@ -261,9 +303,16 @@ export const processSingleItem = async ({
         upsertedEpisode = fetchRes.data || { slug: episodeSlug };
       }
     } else {
+      // Check if exists first to preserve ID if we are somehow here but it exists (race condition or logic flow)
+      const { data: existingEp } = await supabase.from('episodes').select('id').eq('slug', episodeSlug).maybeSingle();
+      const payloadToUpsert = { ...episodePayload };
+      if (existingEp && existingEp.id) {
+          payloadToUpsert.id = existingEp.id;
+      }
+
       const upsertRes = await supabase
         .from('episodes')
-        .upsert(episodePayload, { onConflict: 'slug' })
+        .upsert(payloadToUpsert, { onConflict: 'slug' })
         .select('slug')
         .maybeSingle();
       upsertedEpisode = upsertRes.data;
@@ -366,7 +415,7 @@ export const processSingleItem = async ({
             lang: 'en',
             status: 'pending_translation_from_es',
             updated_at: new Date().toISOString(),
-          }, { });
+          }, { onConflict: 'episode_slug, lang' });
 
         if (transcriptDbError) {
            if(transcriptDbError.message.includes('constraint matching the ON CONFLICT specification')) {

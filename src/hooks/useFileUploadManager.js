@@ -250,6 +250,79 @@ const useFileUploadManager = (currentLanguage) => {
     }
   }, [currentLanguage, toast]);
 
+  const addRemoteFilesByDate = useCallback(async (dateString) => {
+    try {
+      // dateString expected format: YYYY-MM-DD
+      const langs = ['ru', 'es'];
+      const newItemsPromises = langs.map(async (lang) => {
+        const fileName = `${dateString}_${lang.toUpperCase()}.mp3`;
+        const url = `https://silver-lemur-512881.hostingersite.com/wp-content/uploads/Audio/${fileName}`;
+        
+        // Create a mock file object
+        const mockFile = {
+          name: fileName,
+          lastModified: Date.now(),
+          size: 0,
+          type: 'audio/mpeg',
+          isMock: true
+        };
+
+        const itemData = await generateInitialItemData(mockFile, lang, currentLanguage, toast);
+        
+        return {
+          ...itemData,
+          uploadComplete: true,
+          publicUrl: url,
+          isRemote: true,
+          uploadProgress: 100
+        };
+      });
+
+      const newItems = await Promise.all(newItemsPromises);
+      
+      // Check conflicts
+      const itemsWithConflicts = [];
+      for (const item of newItems) {
+        if (item) {
+          try {
+            const conflicts = await conflictChecker.checkFileConflicts(item);
+            if (conflicts.hasFileConflict || conflicts.hasDBConflict) {
+              itemsWithConflicts.push({ item, conflicts });
+            }
+          } catch (error) {
+            console.warn('Error checking conflicts for', item.episodeSlug, error);
+          }
+        }
+      }
+
+      if (itemsWithConflicts.length > 0) {
+        const firstConflict = itemsWithConflicts[0];
+        setConflictDialog({
+          isOpen: true,
+          fileItem: firstConflict.item,
+          conflicts: firstConflict.conflicts
+        });
+        return;
+      }
+
+      setFilesToProcess(prev => [...prev, ...newItems]);
+
+      toast({
+        title: '✅ Удаленные файлы добавлены',
+        description: `Добавлено ${newItems.length} файлов за дату ${dateString}`,
+        duration: 3000
+      });
+
+    } catch (error) {
+      console.error('[addRemoteFilesByDate] Error:', error);
+      toast({
+        title: '❌ Ошибка',
+        description: error.message,
+        variant: 'destructive'
+      });
+    }
+  }, [currentLanguage, toast]);
+
   const processSingleItem = useCallback(async (itemData, forceOverwrite = false, overwriteOptions = null) => {
     // Если у элемента есть настройки замены, используем их
     const finalOverwriteOptions = itemData.overwriteSettings || overwriteOptions;
@@ -381,6 +454,7 @@ const useFileUploadManager = (currentLanguage) => {
     currentItemForOverwrite,
     conflictDialog,
     addFilesToQueue,
+    addRemoteFilesByDate,
     updateItemState,
     processSingleItem,
     handleProcessAllFiles,

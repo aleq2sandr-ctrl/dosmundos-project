@@ -63,6 +63,7 @@ const PodcastPlayer = ({
   const internalQuestions = episodeData?.questions || [];
   const internalTranscriptUtterances = episodeData?.transcript?.utterances || [];
   
+  // Use PlayerContext instead of local state for better synchronization
   const { 
     currentTime, 
     setCurrentTime,
@@ -74,16 +75,46 @@ const PodcastPlayer = ({
     seek, 
     playbackRate, 
     setPlaybackRate,
-    currentEpisode: contextEpisode
+    currentEpisode: contextEpisode,
+    audioRef: contextAudioRef,
+    playEpisode
   } = usePlayer();
+
+  // Use context audio ref as the primary source
+  const primaryAudioRef = contextAudioRef || audioRef;
+  
+  // Sync episode with PlayerContext when episodeData changes
+  useEffect(() => {
+    console.log('🎵 [PodcastPlayer] Episode sync effect:', {
+      episodeSlug: episodeData?.slug,
+      contextSlug: contextEpisode?.slug,
+      episodeAudioUrl,
+      jumpToTime: episodeData?.jumpToTime
+    });
+    
+    if (episodeData && episodeData.slug !== contextEpisode?.slug) {
+      const audioUrl = episodeAudioUrl || getAudioUrl(episodeData);
+      console.log('🎵 [PodcastPlayer] Playing new episode:', {
+        slug: episodeData.slug,
+        audioUrl,
+        jumpToTime: episodeData?.jumpToTime
+      });
+      
+      if (audioUrl) {
+        playEpisode({
+          ...episodeData,
+          audioUrl
+        }, episodeData.jumpToTime || 0);
+      } else {
+        console.error('🎵 [PodcastPlayer] No audio URL available for episode:', episodeData.slug);
+      }
+    }
+  }, [episodeData?.slug, episodeData?.jumpToTime, episodeAudioUrl, contextEpisode?.slug, playEpisode]);
 
   // Состояние для диалога скачивания текста
   const [isDownloadTextDialogOpen, setIsDownloadTextDialogOpen] = useState(false);
 
   const {
-    // isPlayingState, setIsPlayingState, // Use global state
-    // currentTimeState, setCurrentTimeState, // Use global state
-    // durationState, setDurationState, // Use global state
     currentPlaybackRateIndex, setCurrentPlaybackRateIndex,
     activeQuestionTitleState, setActiveQuestionTitleState,
     isAddQuestionPlayerDialogOpen, setIsAddQuestionPlayerDialogOpen,
@@ -123,40 +154,82 @@ const PodcastPlayer = ({
     handleCloseSpeakerAssignmentDialog
   } = useSpeakerAssignment(episodeData, onTranscriptUpdate, toast, currentLanguage, fetchTranscriptForEpisode, episodeSlug, langForContent);
 
-  usePlayerInitialization({
-    episodeData, audioRef, setIsPlayingState, setCurrentTimeState,
-    setActiveQuestionTitleState, setDurationState, setCurrentPlaybackRateIndex,
-    playbackRateOptions, onPlayerStateChange, lastJumpIdProcessedRef,
-    jumpToTime: episodeData?.jumpToTime,
-  });
+  // Skip usePlayerInitialization - PlayerContext handles initialization
+  // usePlayerInitialization({
+  //   episodeData, audioRef: primaryAudioRef, setIsPlayingState, setCurrentTimeState,
+  //   setActiveQuestionTitleState, setDurationState, setCurrentPlaybackRateIndex,
+  //   playbackRateOptions, onPlayerStateChange, lastJumpIdProcessedRef,
+  //   jumpToTime: episodeData?.jumpToTime,
+  // });
 
   // Only use usePlayerPlayback if we are the active episode
   const isCurrentEpisode = contextEpisode?.slug === episodeData?.slug;
 
-  usePlayerPlayback({
-    episodeData, audioRef, isPlayingState, setIsPlayingState,
-    playPromiseRef, isSeekingRef, toast, currentLanguage,
-    onPlayerStateChange, lastJumpIdProcessedRef, 
-    jumpToTime: episodeData?.jumpToTime, jumpId: episodeData?.jumpId,
-    playAfterJump: episodeData?.playAfterJump, setCurrentTimeState,
-    setShowPlayOverlay: setShowAutoplayOverlay,
-  });
+  // Skip usePlayerPlayback - PlayerContext handles playback
+  // usePlayerPlayback({
+  //   episodeData, audioRef: primaryAudioRef, isPlayingState, setIsPlayingState,
+  //   playPromiseRef, isSeekingRef, toast, currentLanguage,
+  //   onPlayerStateChange, lastJumpIdProcessedRef, 
+  //   jumpToTime: episodeData?.jumpToTime, jumpId: episodeData?.jumpId,
+  //   playAfterJump: episodeData?.playAfterJump, setCurrentTimeState,
+  //   setShowPlayOverlay: setShowAutoplayOverlay,
+  // });
 
-  const { handleTimeUpdate, handleLoadedMetadata } = usePlayerTimeUpdates({
-    audioRef, isSeekingRef, internalQuestions, currentLanguage,
-    setCurrentTimeState, setActiveQuestionTitleState, setDurationState,
-    onPlayerStateChange, skipEmptySegments, transcript: episodeData?.transcript, 
-  });
+  // Skip usePlayerTimeUpdates - PlayerContext handles time updates
+  // const { handleTimeUpdate, handleLoadedMetadata } = usePlayerTimeUpdates({
+  //   audioRef: primaryAudioRef, isSeekingRef, internalQuestions, currentLanguage,
+  //   setCurrentTimeState, setActiveQuestionTitleState, setDurationState,
+  //   onPlayerStateChange, skipEmptySegments, transcript: episodeData?.transcript, 
+  // });
+  
+  const handleTimeUpdate = () => {};
+  const handleLoadedMetadata = () => {};
 
-  const { 
-    handleProgressChange, handleSkip, navigateQuestion,
-    seekAudio, togglePlayPause
-  } = usePlayerNavigation({
-    audioRef, durationState, isPlayingState, setIsPlayingState,
-    onQuestionSelectJump, internalQuestions, currentTimeState,
-    toast, currentLanguage, currentPlaybackRateIndex,
-    setCurrentPlaybackRateIndex, playbackRateOptions, episodeData, onPlayerStateChange,
-  });
+  // Skip usePlayerNavigation - PlayerContext handles navigation
+  // const { 
+  //   handleProgressChange, handleSkip, navigateQuestion,
+  //   seekAudio, togglePlayPause
+  // } = usePlayerNavigation({
+  //   audioRef: primaryAudioRef, durationState, isPlayingState, setIsPlayingState,
+  //   onQuestionSelectJump, internalQuestions, currentTimeState,
+  //   toast, currentLanguage, currentPlaybackRateIndex,
+  //   setCurrentPlaybackRateIndex, playbackRateOptions, episodeData, onPlayerStateChange,
+  // });
+  
+  // Use PlayerContext methods instead
+  const handleProgressChange = (time) => {
+    seek(time);
+  };
+  
+  const handleSkip = (seconds) => {
+    const newTime = Math.max(0, Math.min(duration, currentTime + seconds));
+    seek(newTime);
+  };
+  
+  const navigateQuestion = (direction) => {
+    // Simple question navigation logic
+    if (!internalQuestions || internalQuestions.length === 0) return;
+    
+    const currentIndex = internalQuestions.findIndex(q => q.time <= currentTime);
+    const newIndex = direction === 1 ? 
+      Math.min(currentIndex + 1, internalQuestions.length - 1) :
+      Math.max(currentIndex - 1, 0);
+    
+    if (newIndex >= 0 && newIndex < internalQuestions.length) {
+      seek(internalQuestions[newIndex].time);
+    }
+  };
+  
+  const seekAudio = (time, playAfter = false) => {
+    seek(time);
+    if (playAfter && !isPlaying) {
+      togglePlay();
+    }
+  };
+  
+  const togglePlayPause = () => {
+    togglePlay();
+  };
   
   const handleQuestionsChange = useCallback((action, questionDataOrArray) => {
     // Check authentication for add, update, and delete operations
@@ -172,12 +245,14 @@ const PodcastPlayer = ({
     const index = playbackRateOptions.findIndex(opt => opt.value === rateValue);
     if (index !== -1) {
       setCurrentPlaybackRateIndex(index);
-      if (audioRef.current) {
-        audioRef.current.playbackRate = rateValue;
+      if (primaryAudioRef.current) {
+        primaryAudioRef.current.playbackRate = rateValue;
       }
+      // Use PlayerContext setPlaybackRate
+      setPlaybackRate(rateValue);
       onPlayerStateChange?.({ playbackRate: rateValue });
     }
-  }, [setCurrentPlaybackRateIndex, audioRef, onPlayerStateChange]);
+  }, [setCurrentPlaybackRateIndex, primaryAudioRef, setPlaybackRate, onPlayerStateChange]);
 
   useEffect(() => {
     if(typeof window !== 'undefined'){
@@ -285,9 +360,9 @@ const PodcastPlayer = ({
             className="absolute inset-0 z-20 flex items-center justify-center rounded-xl bg-slate-900/70 backdrop-blur-sm cursor-pointer"
             onClick={() => {
               try {
-                if (audioRef.current) {
-                  audioRef.current.muted = false;
-                  audioRef.current.play()?.then(() => {
+                if (primaryAudioRef.current) {
+                  primaryAudioRef.current.muted = false;
+                  primaryAudioRef.current.play()?.then(() => {
                     setIsPlayingState(true);
                     onPlayerStateChange?.({ isPlaying: true });
                     setShowAutoplayOverlay(false);
@@ -350,7 +425,7 @@ const PodcastPlayer = ({
           initialTime={addQuestionDialogInitialTime}
           episodeDate={episodeDate}
           segment={null}
-          audioRef={audioRef}
+          audioRef={primaryAudioRef}
           mainPlayerIsPlaying={isPlayingState}
           mainPlayerTogglePlayPause={togglePlayPause}
           mainPlayerSeekAudio={seekAudio}
