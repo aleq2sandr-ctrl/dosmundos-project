@@ -40,7 +40,7 @@ export const startManualTranscription = async ({
     
     const { error: transcriptDbError } = await supabase
       .from('transcripts')
-      .upsert(transcriptPayload, { onConflict: 'episode_slug, lang' })
+      .insert(transcriptPayload)
       .select()
       .maybeSingle();
 
@@ -366,7 +366,7 @@ export const processSingleItem = async ({
             lang: 'en',
             status: 'pending_translation_from_es',
             updated_at: new Date().toISOString(),
-          }, { onConflict: 'episode_slug, lang' });
+          }, { });
 
         if (transcriptDbError) {
            if(transcriptDbError.message.includes('constraint matching the ON CONFLICT specification')) {

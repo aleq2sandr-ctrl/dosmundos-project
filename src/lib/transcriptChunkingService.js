@@ -232,7 +232,6 @@ export const saveTranscriptInChunks = async (episodeSlug, lang, transcriptData, 
             },
             created_at: new Date().toISOString()
           }, { 
-            onConflict: 'episode_slug,lang,chunk_type,chunk_index' 
           });
 
         if (chunkError) {

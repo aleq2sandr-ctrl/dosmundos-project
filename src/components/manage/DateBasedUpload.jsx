@@ -29,8 +29,8 @@ const DateBasedUpload = ({ currentLanguage, onUploadComplete }) => {
   };
 
   const generateEpisodeTitle = (date, lang) => {
-    const prefix = getLocaleString('meditationTitlePrefix', currentLanguage);
-    const datePart = formatShortDate(date, currentLanguage);
+    const prefix = getLocaleString('meditationTitlePrefix', lang);
+    const datePart = formatShortDate(date, lang);
     return datePart ? `${prefix} ${datePart}` : prefix;
   };
 
@@ -88,7 +88,7 @@ const DateBasedUpload = ({ currentLanguage, onUploadComplete }) => {
           r2_object_key: `Audio/${date}_RU.mp3`,
           r2_bucket_name: 'dosmundos',
           file_has_lang_suffix: true,
-          duration: null // Will be updated later when audio is processed
+          duration: 0 // Set to 0 instead of null
         },
         {
           slug: generateEpisodeSlug(date, 'es'),
@@ -99,7 +99,7 @@ const DateBasedUpload = ({ currentLanguage, onUploadComplete }) => {
           r2_object_key: `Audio/${date}_ES.mp3`,
           r2_bucket_name: 'dosmundos',
           file_has_lang_suffix: true,
-          duration: null // Will be updated later when audio is processed
+          duration: 0 // Set to 0 instead of null
         }
       ];
 

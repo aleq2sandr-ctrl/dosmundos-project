@@ -37,6 +37,7 @@ const UploadPage = ({ currentLanguage }) => {
   const [episodes, setEpisodes] = useState([]);
   const [isLoadingEpisodes, setIsLoadingEpisodes] = useState(true);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [loadingFromDB, setLoadingFromDB] = useState(false);
 
   const {
     filesToProcess,
@@ -435,6 +436,7 @@ const UploadPage = ({ currentLanguage }) => {
 
   const handleLoadFromDB = async (episode) => {
     console.log('Load from DB:', episode);
+    setLoadingFromDB(true);
     
     try {
       toast({
@@ -468,6 +470,8 @@ const UploadPage = ({ currentLanguage }) => {
         variant: 'destructive',
         duration: 5000
       });
+    } finally {
+      setLoadingFromDB(false);
     }
   };
 
@@ -1193,7 +1197,7 @@ const UploadPage = ({ currentLanguage }) => {
             translatingFrom={translatingFrom}
             translationProgress={translationProgress}
             isTranscribing={isTranscribing}
-            loadingFromDB={false}
+            loadingFromDB={loadingFromDB}
             generatingFromText={false}
             processingQuestionsEpisodes={processingQuestionsEpisodes}
           />
