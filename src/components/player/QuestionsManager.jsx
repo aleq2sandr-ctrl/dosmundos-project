@@ -66,11 +66,20 @@ const QuestionsManager = ({
   }, [questions, duration]);
 
   useEffect(() => {
-    if (!disableAutomaticCollapse && Array.isArray(questions) && questions.length > 0) {
-      const playingQ = questions.find(q => currentTime >= q.time && (questions.indexOf(q) === questions.length - 1 || currentTime < questions[questions.indexOf(q) + 1].time));
+    if (Array.isArray(questions) && questions.length > 0) {
+      // Ensure questions are sorted by time to correctly identify the current one
+      const sortedQuestions = [...questions].sort((a, b) => a.time - b.time);
+      
+      const playingQ = sortedQuestions.find((q, index) => {
+        const nextQ = sortedQuestions[index + 1];
+        return currentTime >= q.time && (!nextQ || currentTime < nextQ.time);
+      });
+
       if (playingQ && playingQ.id !== activeQuestionId) {
         setActiveQuestionId(playingQ.id);
-        setExpandedById(prev => ({ ...prev, [playingQ.id]: true }));
+        if (!disableAutomaticCollapse) {
+          setExpandedById(prev => ({ ...prev, [playingQ.id]: true }));
+        }
       }
     }
   }, [currentTime, questions, activeQuestionId, disableAutomaticCollapse]);

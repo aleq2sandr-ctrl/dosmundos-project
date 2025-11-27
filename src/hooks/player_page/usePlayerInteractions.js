@@ -104,9 +104,10 @@ const usePlayerInteractions = (audioRef, playerControlsContainerRef, episodeSlug
   const handleFloatingPlayerSkip = useCallback((seconds) => {
     if (audioRef.current) {
       const newTime = audioRef.current.currentTime + seconds;
-      handleSeekToTime(newTime, null, playerState.isPlaying);
+      const isPlaying = !audioRef.current.paused;
+      handleSeekToTime(newTime, null, isPlaying);
     }
-  }, [audioRef, playerState.isPlaying, handleSeekToTime]);
+  }, [audioRef, handleSeekToTime]);
 
   const handleFloatingPlayPause = useCallback(() => {
     if (audioRef.current) {

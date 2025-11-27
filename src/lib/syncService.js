@@ -389,7 +389,8 @@ class SyncService {
             lang: audioObj?.lang || 'mixed',
             audio_url: audioObj?.audio_url,
             duration: audioObj?.duration || 0,
-            available_variants: audios.map(a => a.lang).filter(Boolean)
+            available_variants: audios.map(a => a.lang).filter(Boolean),
+            audio_variants: audios // Include full audio objects for switching
           };
           
           // Проверяем, что данные эпизода корректны

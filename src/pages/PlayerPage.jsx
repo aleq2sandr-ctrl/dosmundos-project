@@ -62,7 +62,7 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
   const playerControlsContainerRef = useRef(null);
   const [editingQuestion, setEditingQuestion] = useState(null);
   const [allEpisodesForPrefetch, setAllEpisodesForPrefetch] = useState([]);
-  const { playEpisode, audioRef, currentEpisode } = usePlayer();
+  const { playEpisode, audioRef, currentEpisode, currentTime, duration, isPlaying } = usePlayer();
   
   // Загрузка списка эпизодов для prefetch
   useEffect(() => {
@@ -447,11 +447,19 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
     
     const langForDisplay = episodeData.lang === 'all' ? currentLanguage : episodeData.lang;
     
-    // Если есть переведенное название из БД, используем его
-    let displayTitle;
-    if (episodeData.title && episodeData.title.trim() !== '') {
-      displayTitle = episodeData.title;
-    } else {
+    // Determine display title
+    let displayTitle = episodeData.title;
+
+    // Try to find translation for current language if available
+    if (episodeData.translations && Array.isArray(episodeData.translations)) {
+        const translation = episodeData.translations.find(t => t.lang === currentLanguage);
+        if (translation && translation.title) {
+            displayTitle = translation.title;
+        }
+    }
+
+    // If no title found, generate one
+    if (!displayTitle || displayTitle.trim() === '') {
       // Иначе генерируем название на основе префикса и даты
       const prefix = getLocaleString('meditationTitlePrefix', langForDisplay);
       let datePart = '';
@@ -483,6 +491,20 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
 
     return playerData;
   }, [episodeData, questions, transcript, jumpDetails, questionsUpdatedId, currentLanguage, handleTranscriptUpdate]);
+
+  const activeQuestionTitle = useMemo(() => {
+    if (!playerEpisodeDataMemo?.questions) return '';
+    const sorted = [...playerEpisodeDataMemo.questions].sort((a, b) => a.time - b.time);
+    let active = null;
+    for (const q of sorted) {
+      if (q.time <= currentTime) {
+        active = q;
+      } else {
+        break;
+      }
+    }
+    return active ? active.title : '';
+  }, [playerEpisodeDataMemo, currentTime]);
   
   const {
     isSpeakerAssignmentDialogOpen,
@@ -540,8 +562,8 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
       {showFloatingControls && (
         <FloatingPlayerControls
           episodeTitle={playerEpisodeDataMemo?.displayTitle || ''}
-          isPlaying={playerState.isPlaying}
-          activeQuestionTitle={playerState.activeQuestionTitle}
+          isPlaying={isPlaying}
+          activeQuestionTitle={activeQuestionTitle}
           onPlayPause={handleFloatingPlayPause}
           onSkipSeconds={handleFloatingPlayerSkip}
           currentLanguage={currentLanguage}
@@ -585,14 +607,14 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
           )}
            <QuestionsManager
             questions={playerEpisodeDataMemo.questions || []}
-            currentTime={playerState.currentTime}
-            duration={playerState.duration}
+            currentTime={currentTime}
+            duration={duration}
             onQuestionsChange={handleQuestionUpdate}
             onQuestionJump={(time, id, playAfterJumpParam) => handleSeekToTime(time, id, playAfterJumpParam)}
             episodeSlug={playerEpisodeDataMemo.slug}
             episodeDate={playerEpisodeDataMemo.date}
             audioRef={audioRef}
-            mainPlayerIsPlaying={playerState.isPlaying}
+            mainPlayerIsPlaying={isPlaying}
             mainPlayerTogglePlayPause={handleFloatingPlayPause} 
             mainPlayerSeekAudio={(time, play) => handleSeekToTime(time, null, play)}
             currentLanguage={currentLanguage}
@@ -638,10 +660,10 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
           }}
           currentLanguage={currentLanguage}
           audioRef={audioRef}
-          mainPlayerIsPlaying={playerState.isPlaying}
+          mainPlayerIsPlaying={isPlaying}
           mainPlayerTogglePlayPause={handleFloatingPlayPause}
           mainPlayerSeekAudio={handleSeekToTime}
-          duration={playerState.duration}
+          duration={duration}
         />
       )}
       {editingQuestion && (
@@ -665,10 +687,10 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
           }}
           currentLanguage={currentLanguage}
           audioRef={audioRef}
-          mainPlayerIsPlaying={playerState.isPlaying}
+          mainPlayerIsPlaying={isPlaying}
           mainPlayerTogglePlayPause={handleFloatingPlayPause}
           mainPlayerSeekAudio={handleSeekToTime}
-          duration={playerState.duration}
+          duration={duration}
           isEditing={true}
           disableTimeEditing={editingQuestion.id === 'intro-virtual'}
           hideDelete={editingQuestion.id === 'intro-virtual'}
