@@ -18,6 +18,7 @@ export const PlayerProvider = ({ children }) => {
   const [duration, setDuration] = useState(0);
   const [isGlobalPlayerVisible, setIsGlobalPlayerVisible] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1);
+  const [autoplayBlocked, setAutoplayBlocked] = useState(false);
 
   // Play a specific episode
   const playEpisode = useCallback((episode, startTime = 0) => {
@@ -41,6 +42,7 @@ export const PlayerProvider = ({ children }) => {
       setCurrentTime(startTime);
       setIsPlaying(true);
       setIsGlobalPlayerVisible(true);
+      setAutoplayBlocked(false); // Reset blocked state on new episode
       
       if (audioRef.current) {
         console.log('🎵 [PlayerContext] Setting audio src:', audioUrl);
@@ -56,9 +58,13 @@ export const PlayerProvider = ({ children }) => {
           if (audioRef.current && audioRef.current.readyState >= audioRef.current.HAVE_CURRENT_DATA) {
             audioRef.current.play().then(() => {
               console.log('🎵 [PlayerContext] Play successful');
+              setAutoplayBlocked(false);
             }).catch(e => {
               console.error("[PlayerContext] Play error:", e);
               setIsPlaying(false);
+              if (e.name === 'NotAllowedError') {
+                setAutoplayBlocked(true);
+              }
             });
           } else {
             // Retry after a short delay
@@ -102,18 +108,26 @@ export const PlayerProvider = ({ children }) => {
       if (audioRef.current.readyState >= audioRef.current.HAVE_CURRENT_DATA) {
         audioRef.current.play().then(() => {
           setIsPlaying(true);
+          setAutoplayBlocked(false);
         }).catch(e => {
           console.error('[PlayerContext] Play error:', e);
           setIsPlaying(false);
+          if (e.name === 'NotAllowedError') {
+            setAutoplayBlocked(true);
+          }
         });
       } else {
         // Wait for audio to be ready, then play
         const onCanPlay = () => {
           audioRef.current?.play().then(() => {
             setIsPlaying(true);
+            setAutoplayBlocked(false);
           }).catch(e => {
             console.error('[PlayerContext] Play error after canplay:', e);
             setIsPlaying(false);
+            if (e.name === 'NotAllowedError') {
+              setAutoplayBlocked(true);
+            }
           });
           audioRef.current?.removeEventListener('canplay', onCanPlay);
         };
@@ -261,7 +275,9 @@ export const PlayerProvider = ({ children }) => {
       setPlaybackRate: setRate,
       isGlobalPlayerVisible,
       setIsGlobalPlayerVisible,
-      closeGlobalPlayer
+      closeGlobalPlayer,
+      autoplayBlocked,
+      setAutoplayBlocked
     }}>
       {children}
       <audio

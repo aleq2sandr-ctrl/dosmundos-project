@@ -76,8 +76,17 @@ const PodcastPlayer = ({
     setPlaybackRate,
     currentEpisode: contextEpisode,
     audioRef: contextAudioRef,
-    playEpisode
+    playEpisode,
+    autoplayBlocked,
+    setAutoplayBlocked
   } = usePlayer();
+
+  // Sync autoplay blocked state
+  useEffect(() => {
+    if (autoplayBlocked) {
+      setShowAutoplayOverlay(true);
+    }
+  }, [autoplayBlocked]);
 
   // Audio Track State
   const [selectedAudioLang, setSelectedAudioLang] = useState(episodeLang || 'mixed');
@@ -424,6 +433,7 @@ const PodcastPlayer = ({
                     setIsPlayingState(true);
                     onPlayerStateChange?.({ isPlaying: true });
                     setShowAutoplayOverlay(false);
+                    if (setAutoplayBlocked) setAutoplayBlocked(false);
                   }).catch(() => {});
                 }
               } catch {}
