@@ -315,11 +315,16 @@ export const applyRollback = async (edit) => {
         }
 
         // Get the current transcript
-        const { data: transcriptData, error: fetchError } = await supabase
+        let query = supabase
           .from('transcripts')
           .select('*')
-          .eq('episode_slug', metadata.episodeSlug)
-          .maybeSingle();
+          .eq('episode_slug', metadata.episodeSlug);
+
+        if (metadata.lang) {
+          query = query.eq('lang', metadata.lang);
+        }
+
+        const { data: transcriptData, error: fetchError } = await query.maybeSingle();
 
         if (fetchError) throw fetchError;
         if (!transcriptData) {
@@ -499,7 +504,7 @@ export const applyRollback = async (edit) => {
           }
 
           const { error: insertError } = await supabase
-            .from('questions')
+            .from('timecodes')
             .insert(originalQuestion);
 
           if (insertError) throw insertError;
@@ -513,7 +518,7 @@ export const applyRollback = async (edit) => {
         } else if (action === 'add') {
           // For add, delete the question
           const { error: deleteError } = await supabase
-            .from('questions')
+            .from('timecodes')
             .delete()
             .eq('id', questionId);
 
@@ -546,7 +551,7 @@ export const applyRollback = async (edit) => {
           }
 
           const { error: updateError } = await supabase
-            .from('questions')
+            .from('timecodes')
             .update(updateData)
             .eq('id', questionId);
 

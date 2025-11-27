@@ -120,18 +120,20 @@ export const processSingleItem = async ({
 
   try {
     if (!skipUpload && !forceOverwrite) {
-      const { data: existingEpisode, error: checkError } = await supabase
-        .from('episodes')
-        .select('slug, audio_url, r2_object_key, r2_bucket_name')
-        .eq('slug', episodeSlug)
+      // V3: Check episode_audios instead of episodes
+      const { data: existingAudio, error: checkError } = await supabase
+        .from('episode_audios')
+        .select('audio_url')
+        .eq('episode_slug', episodeSlug)
+        .eq('lang', lang)
         .maybeSingle();
 
       if (checkError) {
-         console.error("Supabase check episode error:", checkError);
+         console.error("Supabase check audio error:", checkError);
          throw new Error(getLocaleString('errorCheckingEpisodeDB', currentLanguage, {errorMessage: checkError.message}));
       }
 
-      if (existingEpisode) {
+      if (existingAudio) {
         const userConfirmedDialog = await openOverwriteDialog(itemData);
         if (!userConfirmedDialog) {
           updateItemState(itemData.id, { isUploading: false, uploadError: getLocaleString('uploadCancelledEpisodeExists', currentLanguage) });
@@ -145,11 +147,9 @@ export const processSingleItem = async ({
         }
         userConfirmedOverwriteGlobal = true; 
         
-        console.log("Found existing episode in DB:", {
-          slug: existingEpisode.slug,
-          audio_url: existingEpisode.audio_url,
-          r2_object_key: existingEpisode.r2_object_key,
-          r2_bucket_name: existingEpisode.r2_bucket_name
+        console.log("Found existing audio in DB:", {
+          slug: episodeSlug,
+          audio_url: existingAudio.audio_url
         });
         // Don't use old URLs from DB when overwriting - they might be outdated
         // We'll determine the correct URL based on overwrite choices
@@ -160,9 +160,10 @@ export const processSingleItem = async ({
           bucketNameUsed = null;
         } else {
           // Use existing file info
-          workerFileUrl = existingEpisode.audio_url;
-          r2FileKey = existingEpisode.r2_object_key;
-          bucketNameUsed = existingEpisode.r2_bucket_name;
+          workerFileUrl = existingAudio.audio_url;
+          // r2FileKey and bucketNameUsed are no longer stored/needed from DB
+          r2FileKey = null; 
+          bucketNameUsed = null;
         }
       }
     }
@@ -200,8 +201,9 @@ export const processSingleItem = async ({
        const choices = userOverwriteChoices || { overwriteServerFile: true, overwriteEpisodeInfo: true, overwriteTranscript: true, overwriteQuestions: true };
        
        if (choices.overwriteQuestions) {
-         const { error: qDelError } = await supabase.from('questions').delete().eq('episode_slug', episodeSlug).eq('lang', lang);
-         if (qDelError) console.warn(`Error deleting old questions for ${episodeSlug} (${lang}): ${qDelError.message}`);
+         // V3: Use timecodes table
+         const { error: qDelError } = await supabase.from('timecodes').delete().eq('episode_slug', episodeSlug).eq('lang', lang);
+         if (qDelError) console.warn(`Error deleting old timecodes for ${episodeSlug} (${lang}): ${qDelError.message}`);
        }
        if (choices.overwriteTranscript) {
          const { error: tDelError } = await supabase.from('transcripts').delete().eq('episode_slug', episodeSlug).eq('lang', lang);
@@ -258,42 +260,52 @@ export const processSingleItem = async ({
     // Provide fallback date if parsedDate is null to avoid database constraint violation
     const episodeDate = parsedDate || new Date().toISOString().split('T')[0];
 
+    // V3: Split payload into parts
+    // 1. Main Episode
     const episodePayload = {
-      id: crypto.randomUUID(), // Generate UUID client-side to avoid null constraint
       slug: episodeSlug,
-      title: episodeTitle,
-      lang: lang,
       date: episodeDate,
-      audio_url: workerFileUrl,
-      r2_object_key: r2FileKey,
-      r2_bucket_name: bucketNameUsed,
-      storage_provider: bucketNameUsed === 'hostinger' ? 'hostinger' : (bucketNameUsed === 'vps' ? 'vps' : 'r2'),
-      hostinger_file_key: bucketNameUsed === 'hostinger' ? r2FileKey : null,
-      duration: Math.round(duration || 0),
-      file_has_lang_suffix: itemData.fileHasLangSuffix,
+      updated_at: new Date().toISOString()
     };
     
-    let upsertedEpisode;
+    let upsertedEpisode = { slug: episodeSlug };
+
     if (userConfirmedOverwriteGlobal) {
       const choices = userOverwriteChoices || { overwriteEpisodeInfo: true };
       if (choices.overwriteEpisodeInfo) {
-        // When overwriting, we don't want to change the ID if it exists.
-        // First check if it exists to get the ID.
-        const { data: existingEp } = await supabase.from('episodes').select('id').eq('slug', episodeSlug).maybeSingle();
-        
-        const payloadToUpsert = { ...episodePayload };
-        if (existingEp && existingEp.id) {
-            payloadToUpsert.id = existingEp.id;
-        }
-
-        const upsertRes = await supabase
+        // Upsert Episode
+        const { error: epError } = await supabase
           .from('episodes')
-          .upsert(payloadToUpsert, { onConflict: 'slug' })
-          .select('slug')
-          .maybeSingle();
-        upsertedEpisode = upsertRes.data;
-        if (upsertRes.error) throw new Error(getLocaleString('supabaseEpisodeError', currentLanguage, {errorMessage: upsertRes.error.message}));
+          .upsert(episodePayload, { onConflict: 'slug' });
+        
+        if (epError) throw new Error(getLocaleString('supabaseEpisodeError', currentLanguage, {errorMessage: epError.message}));
+
+        // Upsert Translation (Title)
+        const { error: transError } = await supabase
+          .from('episode_translations')
+          .upsert({
+            episode_slug: episodeSlug,
+            lang: lang,
+            title: episodeTitle,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'episode_slug,lang' });
+          
+        if (transError) console.warn('Error upserting translation:', transError);
+
+        // Upsert Audio
+        const { error: audioError } = await supabase
+          .from('episode_audios')
+          .upsert({
+            episode_slug: episodeSlug,
+            lang: lang,
+            audio_url: workerFileUrl,
+            duration: Math.round(duration)
+          }, { onConflict: 'episode_slug,lang' });
+
+        if (audioError) console.warn('Error upserting audio:', audioError);
+
       } else {
+        // Just check existence
         const fetchRes = await supabase
           .from('episodes')
           .select('slug')
@@ -303,20 +315,29 @@ export const processSingleItem = async ({
         upsertedEpisode = fetchRes.data || { slug: episodeSlug };
       }
     } else {
-      // Check if exists first to preserve ID if we are somehow here but it exists (race condition or logic flow)
-      const { data: existingEp } = await supabase.from('episodes').select('id').eq('slug', episodeSlug).maybeSingle();
-      const payloadToUpsert = { ...episodePayload };
-      if (existingEp && existingEp.id) {
-          payloadToUpsert.id = existingEp.id;
-      }
-
-      const upsertRes = await supabase
+      // New Episode Logic
+      // Upsert Episode
+      const { error: epError } = await supabase
         .from('episodes')
-        .upsert(payloadToUpsert, { onConflict: 'slug' })
-        .select('slug')
-        .maybeSingle();
-      upsertedEpisode = upsertRes.data;
-      if (upsertRes.error) throw new Error(getLocaleString('supabaseEpisodeError', currentLanguage, {errorMessage: upsertRes.error.message}));
+        .upsert(episodePayload, { onConflict: 'slug' });
+      
+      if (epError) throw new Error(getLocaleString('supabaseEpisodeError', currentLanguage, {errorMessage: epError.message}));
+
+      // Upsert Translation
+      await supabase.from('episode_translations').upsert({
+        episode_slug: episodeSlug,
+        lang: lang,
+        title: episodeTitle,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'episode_slug,lang' });
+
+      // Upsert Audio
+      await supabase.from('episode_audios').upsert({
+        episode_slug: episodeSlug,
+        lang: lang,
+        audio_url: workerFileUrl,
+        duration: Math.round(duration)
+      }, { onConflict: 'episode_slug,lang' });
     }
     
     if (timingsText.trim() && upsertedEpisode.slug) {
@@ -340,7 +361,7 @@ export const processSingleItem = async ({
             });
             
             return {
-              episode_slug: enSlug,
+              episode_slug: enSlug, // V3: Same slug, different lang
               lang: 'en',
               title: translatedTitle.trim(),
               time: q.time // Сохраняем исходное время без изменений
@@ -348,10 +369,11 @@ export const processSingleItem = async ({
           }));
 
           if (translatedQuestionsForEn.length > 0) {
-            const { error: enQDelError } = await supabase.from('questions').delete().eq('episode_slug', enSlug).eq('lang', 'en');
+            // V3: Use timecodes table
+            const { error: enQDelError } = await supabase.from('timecodes').delete().eq('episode_slug', enSlug).eq('lang', 'en');
             if (enQDelError) console.warn(`Error deleting old EN questions for ${enSlug}: ${enQDelError.message}`);
             
-            const { error: enQError } = await supabase.from('questions').insert(translatedQuestionsForEn).select();
+            const { error: enQError } = await supabase.from('timecodes').insert(translatedQuestionsForEn).select();
             if (enQError) console.warn(`Error saving translated EN questions for ${enSlug}: ${enQError.message}`);
             else {
               toast({title: "English Questions Translated", description: `Questions for ${enSlug} translated to English.`, variant: "default"});
@@ -367,12 +389,14 @@ export const processSingleItem = async ({
         const allCurrentItems = getAllItems();
         const correspondingEnItem = allCurrentItems.find(item => item.originalFileId === originalFileId && item.lang === 'en' && item.sourceLangForEn === 'es');
         if (correspondingEnItem) {
-          await logTranslatedQuestions(questionsToInsert, episodeSlug, correspondingEnItem.episodeSlug);
+          // V3: Pass the same slug for EN, as slugs are now language-agnostic
+          await logTranslatedQuestions(questionsToInsert, episodeSlug, episodeSlug);
         }
       }
 
       if (questionsToInsert.length > 0) {
-        const { error: questionsError } = await supabase.from('questions').insert(questionsToInsert).select();
+        // V3: Use timecodes table
+        const { error: questionsError } = await supabase.from('timecodes').insert(questionsToInsert).select();
         if (questionsError) console.warn(`Error saving questions for ${episodeSlug} (${lang}): ${questionsError.message}`);
       }
       }

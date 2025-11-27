@@ -218,7 +218,7 @@ const useTranslationManager = (currentLanguage, toast, episodes, setEpisodes) =>
 
       // 5. Переводим вопросы (если есть)
       const { data: sourceQuestions, error: questionsError } = await supabase
-        .from('questions')
+        .from('timecodes')
         .select('*')
         .eq('episode_slug', sourceEpisode.slug)
         .eq('lang', sourceLang);
@@ -283,7 +283,7 @@ const useTranslationManager = (currentLanguage, toast, episodes, setEpisodes) =>
           // Удаляем старые вопросы для целевого языка (или всегда, если overwrite)
           if (overwrite) {
             await supabase
-              .from('questions')
+              .from('timecodes')
               .delete()
               .eq('episode_slug', targetSlug)
               .eq('lang', targetLang);
@@ -291,7 +291,7 @@ const useTranslationManager = (currentLanguage, toast, episodes, setEpisodes) =>
 
           // Вставляем новые переведенные вопросы
           const { error: questionsInsertError } = await supabase
-            .from('questions')
+            .from('timecodes')
             .insert(translatedQuestions);
 
           if (questionsInsertError) {
@@ -339,7 +339,7 @@ const useTranslationManager = (currentLanguage, toast, episodes, setEpisodes) =>
           .single();
 
         const { count: questionsCount } = await supabase
-          .from('questions')
+          .from('timecodes')
           .select('*', { count: 'exact', head: true })
           .eq('episode_slug', targetSlug)
           .eq('lang', targetLang);

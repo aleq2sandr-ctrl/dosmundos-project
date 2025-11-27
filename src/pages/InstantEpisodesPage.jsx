@@ -28,7 +28,21 @@ const InstantEpisodesPage = ({ currentLanguage, onLanguageChange }) => {
 
   // Обработка данных эпизодов
   const processEpisodesData = useCallback(async (episodesData, fromCache = false, questionsData = null) => {
-    const langFilteredEpisodes = episodesData.filter(ep => 
+    // Re-map episodes to update title based on currentLanguage if translations exist
+    const processedEpisodes = episodesData.map(ep => {
+        if (ep.translations && Array.isArray(ep.translations)) {
+            const titleObj = ep.translations.find(t => t.lang === currentLanguage) 
+                          || ep.translations.find(t => t.lang === 'es') 
+                          || ep.translations[0];
+            return {
+                ...ep,
+                title: titleObj?.title || ep.title
+            };
+        }
+        return ep;
+    });
+
+    const langFilteredEpisodes = processedEpisodes.filter(ep => 
       ep.lang === currentLanguage || ep.lang === 'all'
     );
     
@@ -100,21 +114,66 @@ const InstantEpisodesPage = ({ currentLanguage, onLanguageChange }) => {
     
     try {
       console.log('🔍 [InstantEpisodesPage] Загрузка данных из Supabase...');
-      const { data: episodesData, error: episodesError } = await supabase
+      
+      // V3: Fetch from episodes with joins
+      const { data: rawEpisodes, error: episodesError } = await supabase
         .from('episodes')
-        .select('slug, title, lang, audio_url, duration, date, created_at, file_has_lang_suffix, r2_object_key, r2_bucket_name')
+        .select(`
+          slug,
+          date,
+          created_at,
+          episode_translations (
+            title,
+            lang
+          ),
+          episode_audios (
+            audio_url,
+            lang,
+            duration
+          )
+        `)
         .order('date', { ascending: false });
 
       console.log('📊 [InstantEpisodesPage] Результат запроса episodes:', { 
-        dataCount: episodesData?.length || 0, 
+        dataCount: rawEpisodes?.length || 0, 
         error: episodesError,
-        data: episodesData?.slice(0, 3) // Первые 3 записи для проверки
+        data: rawEpisodes?.slice(0, 3)
       });
 
       if (episodesError) throw episodesError;
+
+      // Transform V3 data to flat structure for compatibility
+      const episodesData = rawEpisodes.map(ep => {
+        const translations = ep.episode_translations || [];
+        const audios = ep.episode_audios || [];
+        
+        // Pick title: current language -> es -> first
+        const titleObj = translations.find(t => t.lang === currentLanguage) 
+                      || translations.find(t => t.lang === 'es') 
+                      || translations[0];
+        
+        // Pick audio: current language -> es -> mixed -> first
+        const audioObj = audios.find(a => a.lang === currentLanguage)
+                      || audios.find(a => a.lang === 'es')
+                      || audios.find(a => a.lang === 'mixed')
+                      || audios[0];
+
+        return {
+            slug: ep.slug,
+            date: ep.date,
+            created_at: ep.created_at,
+            title: titleObj?.title || ep.slug,
+            translations: translations, // Store translations for dynamic language switching
+            lang: 'all', // V3 episodes are language-agnostic containers
+            audio_url: audioObj?.audio_url,
+            duration: audioObj?.duration || 0,
+            available_variants: audios.map(a => a.lang) // Helper for UI to show available langs
+          };
+      });
       
+      // V3: Use timecodes table instead of questions
       const { data: questionsData, error: questionsError } = await supabase
-        .from('questions')
+        .from('timecodes')
         .select('episode_slug, id, title, lang, time')
         .order('time', { ascending: true }); 
       
@@ -141,14 +200,56 @@ const InstantEpisodesPage = ({ currentLanguage, onLanguageChange }) => {
   // Фоновая загрузка свежих данных
   const loadFreshDataInBackground = useCallback(async () => {
     try {
-      const { data: episodesData, error: episodesError } = await supabase
+      // V3: Fetch from episodes with joins
+      const { data: rawEpisodes, error: episodesError } = await supabase
         .from('episodes')
-        .select('slug, title, lang, audio_url, duration, date, created_at, file_has_lang_suffix, r2_object_key, r2_bucket_name')
+        .select(`
+          slug,
+          date,
+          created_at,
+          episode_translations (
+            title,
+            lang
+          ),
+          episode_audios (
+            audio_url,
+            lang,
+            duration
+          )
+        `)
         .order('date', { ascending: false });
 
-      if (!episodesError && episodesData) {
+      if (!episodesError && rawEpisodes) {
+        // Transform V3 data
+        const episodesData = rawEpisodes.map(ep => {
+          const translations = ep.episode_translations || [];
+          const audios = ep.episode_audios || [];
+          
+          const titleObj = translations.find(t => t.lang === currentLanguage) 
+                        || translations.find(t => t.lang === 'es') 
+                        || translations[0];
+          
+          const audioObj = audios.find(a => a.lang === currentLanguage)
+                        || audios.find(a => a.lang === 'es')
+                        || audios.find(a => a.lang === 'mixed')
+                        || audios[0];
+
+          return {
+            slug: ep.slug,
+            date: ep.date,
+            created_at: ep.created_at,
+            title: titleObj?.title || ep.slug,
+            translations: translations, // Store translations for dynamic language switching
+            lang: 'all',
+            audio_url: audioObj?.audio_url,
+            duration: audioObj?.duration || 0,
+            available_variants: audios.map(a => a.lang)
+          };
+        });
+
+        // V3: Use timecodes table
         const { data: questionsData } = await supabase
-          .from('questions')
+          .from('timecodes')
           .select('episode_slug, id, title, lang, time')
           .order('time', { ascending: true });
 
@@ -165,7 +266,7 @@ const InstantEpisodesPage = ({ currentLanguage, onLanguageChange }) => {
     } catch (err) {
       console.debug('Background refresh failed:', err);
     }
-  }, [currentLanguage]);
+  }, [currentLanguage, episodes.length, processEpisodesData]);
 
   // Фоновая загрузка вопросов
   const loadQuestionsInBackground = async (episodesList) => {
@@ -267,7 +368,7 @@ const InstantEpisodesPage = ({ currentLanguage, onLanguageChange }) => {
         // Используем стабильную функцию для избежания бесконечных ререндеров
         loadFreshDataInBackground();
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'questions' }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'timecodes' }, () => {
         // Используем стабильную функцию для избежания бесконечных ререндеров
         loadFreshDataInBackground();
       })

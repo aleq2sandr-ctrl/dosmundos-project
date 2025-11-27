@@ -133,7 +133,7 @@ class SyncService {
         case 'transcript':
           await offlineDataService.saveTranscript(data);
           break;
-        case 'questions':
+        case 'timecodes':
           await offlineDataService.saveQuestions(data.questions, data.episodeSlug, data.lang);
           break;
         default:
@@ -202,9 +202,9 @@ class SyncService {
                   id: serverData.id,
                   episode_slug: serverData.episode_slug || params.episodeSlug,
                   lang: serverData.lang || params.lang,
-                  utterances: Array.isArray(serverData.utterances) ? serverData.utterances : [],
-                  words: Array.isArray(serverData.words) ? serverData.words : [],
-                  text: serverData.text || '',
+                  utterances: Array.isArray(serverData.utterances) ? serverData.utterances : (serverData.edited_transcript_data?.utterances || []),
+                  words: Array.isArray(serverData.words) ? serverData.words : (serverData.edited_transcript_data?.words || []),
+                  text: serverData.text || serverData.edited_transcript_data?.text || '',
                   status: serverData.status || 'completed',
                   created_at: serverData.created_at || new Date().toISOString(),
                   updated_at: serverData.updated_at || new Date().toISOString(),
@@ -214,7 +214,7 @@ class SyncService {
               }
               break;
             }
-            case 'questions':
+            case 'timecodes':
               // Проверяем, что вопросы - это массив
               if (Array.isArray(serverData)) {
                 await offlineDataService.saveQuestions(
@@ -262,7 +262,7 @@ class SyncService {
           case 'transcript':
             cachedData = await offlineDataService.getTranscript(params.episodeSlug, params.lang);
             break;
-          case 'questions':
+          case 'timecodes':
             cachedData = await offlineDataService.getQuestions(params.episodeSlug, params.lang);
             break;
           case 'episodes':
@@ -290,7 +290,7 @@ class SyncService {
     switch (type) {
       case 'transcript':
         return await this.syncTranscriptToServer(data, operation);
-      case 'questions':
+      case 'timecodes':
         return await this.syncQuestionsToServer(data, operation);
       case 'episode':
         return await this.syncEpisodeToServer(data, operation);
@@ -326,9 +326,22 @@ class SyncService {
       case 'episode': {
         // console.log('[Sync] Loading episode from server:', params.slug);
         const fetchEpisode = async () => {
-          const { data: episodeData, error: episodeError } = await supabase
+          const { data: rawEpisode, error: episodeError } = await supabase
             .from('episodes')
-            .select('*')
+            .select(`
+              slug,
+              date,
+              created_at,
+              episode_translations (
+                title,
+                lang
+              ),
+              episode_audios (
+                audio_url,
+                lang,
+                duration
+              )
+            `)
             .eq('slug', params.slug)
             .maybeSingle();
           
@@ -337,10 +350,47 @@ class SyncService {
              throw episodeError;
           }
           
-          if (!episodeData) {
+          if (!rawEpisode) {
              // console.warn('[Sync] Episode not found on server:', params.slug);
              throw new Error('Episode not found on server');
           }
+
+          // Transform V2 data to flat structure
+          const translations = rawEpisode.episode_translations || [];
+          const audios = rawEpisode.episode_audios || [];
+          
+          // Use provided lang or fallback to 'es' or first available
+          const targetLang = params.lang || 'es';
+          
+          // Debug logging for title selection
+          if (params.slug === '2025-10-22') {
+             console.log('[Sync] Selecting title for 2025-10-22:', {
+                targetLang,
+                availableTranslations: translations.map(t => t.lang),
+                found: translations.find(t => t.lang === targetLang)
+             });
+          }
+
+          const titleObj = translations.find(t => t.lang === targetLang) 
+                        || translations.find(t => t.lang === 'es') 
+                        || translations[0];
+          
+          const audioObj = audios.find(a => a.lang === targetLang)
+                        || audios.find(a => a.lang === 'es')
+                        || audios.find(a => a.lang === 'mixed')
+                        || audios[0];
+
+          const episodeData = {
+            slug: rawEpisode.slug,
+            date: rawEpisode.date,
+            created_at: rawEpisode.created_at,
+            title: titleObj?.title || rawEpisode.slug,
+            translations: translations, // Include all translations for client-side flexibility
+            lang: audioObj?.lang || 'mixed',
+            audio_url: audioObj?.audio_url,
+            duration: audioObj?.duration || 0,
+            available_variants: audios.map(a => a.lang).filter(Boolean)
+          };
           
           // Проверяем, что данные эпизода корректны
           if (typeof episodeData === 'object' && episodeData.slug) {
@@ -392,10 +442,10 @@ class SyncService {
         return await fetchWithRetry(fetchTranscript);
       }
 
-      case 'questions': {
+      case 'timecodes': {
         const fetchQuestions = async () => {
           const { data: questionsData, error: questionsError } = await supabase
-            .from('questions')
+            .from('timecodes')
             .select('*')
             .eq('episode_slug', params.episodeSlug)
             .eq('lang', params.lang)
@@ -422,14 +472,29 @@ class SyncService {
         const fetchEpisodes = async () => {
           const { data: episodesData, error: episodesError } = await supabase
             .from('episodes')
-            .select('*')
+            .select(`
+              *,
+              episode_translations (
+                lang,
+                title
+              ),
+              episode_audios (
+                lang,
+                audio_url,
+                duration
+              )
+            `)
             .order('date', { ascending: false });
           
           if (episodesError) throw episodesError;
           
           // Проверяем, что данные эпизодов корректны
           if (Array.isArray(episodesData)) {
-            return episodesData.filter(ep => 
+            return episodesData.map(ep => ({
+              ...ep,
+              translations: ep.episode_translations || [],
+              audios: ep.episode_audios || []
+            })).filter(ep => 
               ep && typeof ep === 'object' && ep.slug
             );
           }
@@ -511,7 +576,7 @@ class SyncService {
       case 'create': {
         // Удаляем существующие вопросы и создаем новые
         const { error: deleteError } = await supabase
-          .from('questions')
+          .from('timecodes')
           .delete()
           .eq('episode_slug', data.episodeSlug)
           .eq('lang', data.lang);
@@ -520,7 +585,7 @@ class SyncService {
 
         if (data.questions && data.questions.length > 0) {
           const { error: insertError } = await supabase
-            .from('questions')
+            .from('timecodes')
             .insert(data.questions);
 
           if (insertError) throw insertError;

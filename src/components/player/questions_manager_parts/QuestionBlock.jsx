@@ -217,6 +217,7 @@ const QuestionBlock = React.memo(({
           filePath: null,
           metadata: {
             episodeSlug: episodeSlug,
+            lang: currentLanguage,
             segmentId: segmentId,
             action: 'ChangeSpeaker',
             oldSpeaker: oldSpeakerId,

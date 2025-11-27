@@ -53,7 +53,7 @@ const useOfflineEpisodeData = (episodeSlug, currentLanguage, toast) => {
     setError(null);
 
     try {
-      const result = await syncService.loadData('episode', { slug: epSlug });
+      const result = await syncService.loadData('episode', { slug: epSlug, lang: currentLanguage });
       
       if (result.data && typeof result.data === 'object' && result.data.slug) {
         setEpisodeData(result.data);
@@ -164,7 +164,7 @@ const useOfflineEpisodeData = (episodeSlug, currentLanguage, toast) => {
     setQuestionsLoading(true);
 
     try {
-      const result = await syncService.loadData('questions', {
+      const result = await syncService.loadData('timecodes', {
         episodeSlug: epSlug,
         lang: langForQuestions
       });
@@ -328,7 +328,7 @@ const useOfflineEpisodeData = (episodeSlug, currentLanguage, toast) => {
         lang: langForQuestions
       };
 
-      await syncService.saveData('questions', questionsData, 'update');
+      await syncService.saveData('timecodes', questionsData, 'update');
       
       setQuestions(updatedQuestions);
       setQuestionsUpdatedId(Date.now());
@@ -404,7 +404,9 @@ const useOfflineEpisodeData = (episodeSlug, currentLanguage, toast) => {
   useEffect(() => {
     if (!episodeData || !episodeSlug) return;
 
-    const langForTranscript = episodeData.lang === 'all' ? currentLanguage : episodeData.lang;
+    // Always try to load transcript for the current language, 
+    // regardless of audio language (which might be 'mixed' or fallback)
+    const langForTranscript = currentLanguage;
     
     // Загружаем данные с обработкой ошибок
     const loadData = async () => {

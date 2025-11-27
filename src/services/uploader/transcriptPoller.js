@@ -328,7 +328,8 @@ export const pollTranscriptStatus = async (itemData, updateItemState, currentLan
 
       // Kick off EN translation from ES after marking UI complete
       if (lang === 'es') {
-        const englishSlug = episodeSlug.replace('_es', '_en');
+        // V3: Use the same slug for EN, as slugs are language-agnostic
+        const englishSlug = episodeSlug; 
         
         logger.info('[pollTranscriptStatus] Processing Spanish transcript completion', { 
           spanishSlug: episodeSlug, 
@@ -336,64 +337,20 @@ export const pollTranscriptStatus = async (itemData, updateItemState, currentLan
           willCreateEnglish: true 
         });
         
-        // Проверяем, есть ли уже английский эпизод
-        const { data: enEpisodeLang } = await supabase.from('episodes').select('slug').eq('slug', englishSlug).single();
+        // Check if English transcript already exists
+        const { data: enTranscript } = await supabase
+          .from('transcripts')
+          .select('status')
+          .eq('episode_slug', englishSlug)
+          .eq('lang', 'en')
+          .maybeSingle();
         
-        if (enEpisodeLang) {
-          // Английский эпизод уже существует, запускаем перевод
-          logger.info('[pollTranscriptStatus] English episode exists, starting translation', { spanishSlug: episodeSlug, englishSlug });
-          await handleSpanishTranscriptCompletion(assemblyResult, englishSlug, currentLanguage, toast, updateItemState, originalFileId);
+        if (enTranscript && enTranscript.status === 'completed') {
+          logger.info('[pollTranscriptStatus] English transcript already exists', { englishSlug });
         } else {
-          // Английского эпизода нет, создаем его и запускаем перевод
-          logger.info('[pollTranscriptStatus] Creating English episode and starting translation', { spanishSlug: episodeSlug, englishSlug });
-          
-          try {
-            // Получаем данные испанского эпизода для создания английского
-            const { data: spanishEpisode } = await supabase
-              .from('episodes')
-              .select('title, date, audio_url, r2_object_key, r2_bucket_name, duration, file_has_lang_suffix')
-              .eq('slug', episodeSlug)
-              .eq('lang', 'es')
-              .single();
-            
-            if (spanishEpisode) {
-              logger.debug('[pollTranscriptStatus] Spanish episode data retrieved', { 
-                spanishSlug: episodeSlug, 
-                englishSlug, 
-                hasTitle: !!spanishEpisode.title,
-                hasAudio: !!spanishEpisode.audio_url 
-              });
-              
-              // Создаем английский эпизод
-              const { error: createError } = await supabase
-                .from('episodes')
-                .upsert({
-                  slug: englishSlug,
-                  title: spanishEpisode.title,
-                  lang: 'en',
-                  date: spanishEpisode.date,
-                  audio_url: spanishEpisode.audio_url,
-                  r2_object_key: spanishEpisode.r2_object_key,
-                  r2_bucket_name: spanishEpisode.r2_bucket_name,
-                  duration: spanishEpisode.duration,
-                  file_has_lang_suffix: spanishEpisode.file_has_lang_suffix
-                }, { 
-                  onConflict: 'slug' // Используем upsert вместо insert для безопасного создания
-                });
-              
-              if (createError) {
-                logger.warn('[pollTranscriptStatus] Failed to create English episode', { error: createError.message });
-              } else {
-                logger.info('[pollTranscriptStatus] English episode created successfully', { englishSlug });
-                // Теперь запускаем перевод
-                await handleSpanishTranscriptCompletion(assemblyResult, englishSlug, currentLanguage, toast, updateItemState, originalFileId);
-              }
-            } else {
-              logger.warn('[pollTranscriptStatus] Could not find Spanish episode data for creating English version', { episodeSlug });
-            }
-          } catch (createError) {
-            logger.error('[pollTranscriptStatus] Error creating English episode', { error: createError?.message || String(createError) });
-          }
+          // Start translation
+          logger.info('[pollTranscriptStatus] Starting translation to English', { englishSlug });
+          await handleSpanishTranscriptCompletion(assemblyResult, englishSlug, currentLanguage, toast, updateItemState, originalFileId);
         }
       }
 
@@ -427,7 +384,8 @@ export const startPollingForItem = (itemData, updateItemState, currentLanguage, 
 
   if (itemData.lang === 'en' && itemData.sourceLangForEn === 'es') {
     if(itemData.transcriptionStatus === 'pending_translation_from_es'){
-       const spanishSlug = itemData.episodeSlug.replace('_en', '_es');
+       // V3: Use same slug
+       const spanishSlug = itemData.episodeSlug;
                supabase.from('transcripts').select('status, edited_transcript_data').eq('episode_slug', spanishSlug).eq('lang', 'es').single()
           .then(({data: esTranscript, error}) => {
             if(!error && esTranscript && esTranscript.status === 'completed'){

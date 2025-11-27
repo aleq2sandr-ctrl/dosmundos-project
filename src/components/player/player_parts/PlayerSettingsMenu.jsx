@@ -12,7 +12,7 @@ import {
   DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu";
 import { Button } from '@/components/ui/button';
-import { Settings, ScrollText, Download, PlusCircle, Gauge, FileText } from 'lucide-react';
+import { Settings, ScrollText, Download, PlusCircle, Gauge, FileText, Volume2 } from 'lucide-react';
 import { getLocaleString } from '@/lib/locales';
 
 const PlayerSettingsMenu = ({
@@ -26,7 +26,15 @@ const PlayerSettingsMenu = ({
   currentPlaybackRateValue,
   onSetPlaybackRate,
   isOfflineMode = false,
+  availableAudioVariants = [],
+  selectedAudioLang,
+  onAudioTrackChange
 }) => {
+  // Filter variants to show only relevant audio tracks (e.g. exclude mixed if we have specific ones, or just show all)
+  // Actually, we just want to show RU and ES if they exist.
+  // If we have 'mixed', it usually means it's the only one.
+  const showAudioTracks = availableAudioVariants.length > 1 && !availableAudioVariants.some(v => (typeof v === 'string' ? v : v.lang) === 'mixed');
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -53,6 +61,33 @@ const PlayerSettingsMenu = ({
         </DropdownMenuCheckboxItem>
         
         <DropdownMenuSeparator className="bg-slate-700" />
+
+        {showAudioTracks && (
+          <>
+            <DropdownMenuLabel className="text-purple-300 flex items-center">
+                <Volume2 className="mr-2 h-4 w-4" />
+                {getLocaleString('audioTrack', currentLanguage) || 'Audio Track'}
+            </DropdownMenuLabel>
+            <DropdownMenuRadioGroup value={selectedAudioLang} onValueChange={onAudioTrackChange}>
+                {availableAudioVariants.map(variant => {
+                    // Ensure variant is an object or string
+                    const lang = (variant && typeof variant === 'object') ? variant.lang : variant;
+                    if (!lang) return null;
+                    
+                    return (
+                        <DropdownMenuRadioItem 
+                            key={lang} 
+                            value={lang}
+                            className="focus:bg-slate-700 data-[state=checked]:bg-purple-600/30"
+                        >
+                            {lang === 'ru' ? 'Русский' : (lang === 'es' ? 'Español' : lang.toUpperCase())}
+                        </DropdownMenuRadioItem>
+                    );
+                })}
+            </DropdownMenuRadioGroup>
+            <DropdownMenuSeparator className="bg-slate-700" />
+          </>
+        )}
 
         <DropdownMenuLabel className="text-purple-300 flex items-center">
             <Gauge className="mr-2 h-4 w-4" />

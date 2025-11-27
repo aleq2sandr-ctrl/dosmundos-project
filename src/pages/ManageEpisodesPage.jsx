@@ -367,45 +367,72 @@ const EpisodeManagementSection = ({ currentLanguage }) => {
         .from('episodes')
         .select(`
           slug, 
-          title, 
-          lang, 
-          date, 
-          r2_object_key, 
-          r2_bucket_name, 
-          file_has_lang_suffix, 
-          audio_url,
-          duration
+          date,
+          episode_audios (
+            lang,
+            audio_url,
+            duration,
+            r2_object_key,
+            r2_bucket_name
+          ),
+          episode_translations (
+            lang,
+            title
+          )
         `)
         .order('date', { ascending: false });
 
       if (error) throw error;
 
+      // Flatten the data to match the expected format
+      const flattenedEpisodes = [];
+      
+      data.forEach(ep => {
+        // For each audio (language version), create an entry
+        if (ep.episode_audios && ep.episode_audios.length > 0) {
+            ep.episode_audios.forEach(audio => {
+                const translation = ep.episode_translations?.find(t => t.lang === audio.lang);
+                flattenedEpisodes.push({
+                    slug: ep.slug, // Base slug
+                    date: ep.date,
+                    lang: audio.lang,
+                    audio_url: audio.audio_url,
+                    duration: audio.duration,
+                    r2_object_key: audio.r2_object_key,
+                    r2_bucket_name: audio.r2_bucket_name,
+                    title: translation?.title || ep.slug,
+                    file_has_lang_suffix: true 
+                });
+            });
+        }
+      });
+
       // Get transcript statuses
-      const episodeSlugs = [...new Set(data.map(ep => ep.slug))];
+      const episodeSlugs = [...new Set(flattenedEpisodes.map(ep => ep.slug))];
       const { data: transcriptsData } = await supabase
         .from('transcripts')
         .select('episode_slug, lang, status, assemblyai_transcript_id')
         .in('episode_slug', episodeSlugs);
 
-      // Get questions count - fix the query to properly count questions per episode and language
-      const { data: questionsData } = await supabase
-        .from('questions')
+      // Get timecodes count
+      const { data: timecodesData } = await supabase
+        .from('timecodes')
         .select('episode_slug, lang')
         .in('episode_slug', episodeSlugs);
 
-      console.log('Questions data fetched:', questionsData);
+      console.log('Timecodes data fetched:', timecodesData);
       console.log('Episode slugs:', episodeSlugs);
       console.log('Episodes data:', data);
 
-      const episodesWithData = data.map(episode => {
+      const episodesWithData = flattenedEpisodes.map(episode => {
         const transcript = transcriptsData?.find(t => t.episode_slug === episode.slug && t.lang === episode.lang);
         
-        // Count questions for this specific episode slug and language
-        const questionsCount = questionsData?.filter(q => 
+        // Count timecodes for this specific episode slug and language
+        const questionsCount = timecodesData?.filter(q => 
           q.episode_slug === episode.slug && q.lang === episode.lang
         ).length || 0;
         
-        console.log(`Episode ${episode.slug} (${episode.lang}): ${questionsCount} questions`);
+        console.log(`Episode ${episode.slug} (${episode.lang}): ${questionsCount} timecodes`);
         
         return {
           ...episode,
@@ -456,16 +483,17 @@ const EpisodeManagementSection = ({ currentLanguage }) => {
 
   // Group episodes by date extracted from filename for proper file matching
   const groupedEpisodes = episodes.reduce((groups, episode) => {
-    // Extract date from slug for proper grouping (e.g., "2024-11-13_ru" -> "2024-11-13")
+    // Extract date from slug for proper grouping (e.g., "2024-11-13")
     let dateKey = 'unknown';
 
-    // Try to extract date from slug first (most reliable for file matching)
-    const slugDateMatch = episode.slug.match(/^(\d{4}-\d{2}-\d{2})_/);
-    if (slugDateMatch) {
-      dateKey = slugDateMatch[1];
-    } else if (episode.date) {
-      // Fallback to episode.date if slug doesn't contain date
+    if (episode.date) {
       dateKey = episode.date;
+    } else {
+      // Fallback to slug parsing if date is missing
+      const slugDateMatch = episode.slug.match(/^(\d{4}-\d{2}-\d{2})/);
+      if (slugDateMatch) {
+        dateKey = slugDateMatch[1];
+      }
     }
 
     if (!groups[dateKey]) {
@@ -980,7 +1008,7 @@ const EpisodeManagementSection = ({ currentLanguage }) => {
       }
 
       // Save questions to database
-      await supabase.from('questions').delete().eq('episode_slug', episode.slug).eq('lang', episode.lang);
+      await supabase.from('timecodes').delete().eq('episode_slug', episode.slug).eq('lang', episode.lang);
       
       const questionsToInsert = questions.map((q, index) => ({
         episode_slug: episode.slug,
@@ -989,7 +1017,7 @@ const EpisodeManagementSection = ({ currentLanguage }) => {
         time: Number(q.time ?? 0)
       }));
 
-      await supabase.from('questions').insert(questionsToInsert);
+      await supabase.from('timecodes').insert(questionsToInsert);
 
       setEpisodes(prev => prev.map(ep => 
         ep.slug === episode.slug && ep.lang === episode.lang
@@ -1104,8 +1132,6 @@ const EpisodeManagementSection = ({ currentLanguage }) => {
           lang: 'en',
           date: spanishEpisode.date,
           audio_url: spanishEpisode.audio_url,
-          r2_object_key: spanishEpisode.r2_object_key,
-          r2_bucket_name: spanishEpisode.r2_bucket_name,
           duration: spanishEpisode.duration,
           file_has_lang_suffix: true,
         };
@@ -1139,17 +1165,14 @@ const EpisodeManagementSection = ({ currentLanguage }) => {
 
   const handleTranslateQuestionsToEnglish = async (baseSlug, sourceLang) => {
     const srcLabel = sourceLang === 'ru' ? getLocaleString('russian', currentLanguage) : getLocaleString('spanish', currentLanguage);
-    const srcSlug = `${baseSlug}_${sourceLang}`;
-    const enSlug = `${baseSlug}_en`;
     
-    setTransferringQuestionsEpisodes(prev => new Set(prev).add(`${enSlug}-en-${sourceLang}`));
+    setTransferringQuestionsEpisodes(prev => new Set(prev).add(`${baseSlug}-en-${sourceLang}`));
     
     try {
       const { data: sourceEpisode } = await supabase
         .from('episodes')
         .select('slug')
-        .eq('slug', srcSlug)
-        .eq('lang', sourceLang)
+        .eq('slug', baseSlug)
         .maybeSingle();
         
       if (!sourceEpisode) {
@@ -1157,9 +1180,9 @@ const EpisodeManagementSection = ({ currentLanguage }) => {
       }
 
       const { data: questionsData } = await supabase
-        .from('questions')
+        .from('timecodes')
         .select('title, time')
-        .eq('episode_slug', srcSlug)
+        .eq('episode_slug', baseSlug)
         .eq('lang', sourceLang)
         .order('time');
         
@@ -1181,61 +1204,32 @@ const EpisodeManagementSection = ({ currentLanguage }) => {
         };
       }));
 
-      // Ensure English episode exists
-      const { data: enEpisodeExists } = await supabase
-        .from('episodes')
-        .select('slug')
-        .eq('slug', enSlug)
-        .eq('lang', 'en')
-        .maybeSingle();
-        
-      if (!enEpisodeExists) {
-        const { data: baseEp } = await supabase
-          .from('episodes')
-          .select('slug, title, date, audio_url, r2_object_key, r2_bucket_name, duration, file_has_lang_suffix')
-          .eq('slug', srcSlug)
-          .maybeSingle();
-          
-        const payload = {
-          slug: enSlug,
-          title: baseEp?.title || '',
-          lang: 'en',
-          date: baseEp?.date || null,
-          audio_url: baseEp?.audio_url || null,
-          r2_object_key: baseEp?.r2_object_key || null,
-          r2_bucket_name: baseEp?.r2_bucket_name || null,
-          duration: baseEp?.duration || 0,
-          file_has_lang_suffix: true,
-        };
-        await supabase.from('episodes').insert(payload);
-      }
-
       // Save translated questions
-      await supabase.from('questions').delete().eq('episode_slug', enSlug).eq('lang', 'en');
+      await supabase.from('timecodes').delete().eq('episode_slug', baseSlug).eq('lang', 'en');
       
       const toInsert = translatedQuestions.map((q, i) => ({
-        episode_slug: enSlug,
+        episode_slug: baseSlug,
         lang: 'en',
         title: q.title,
         time: Number.isFinite(q.time) ? q.time : i * 10
       }));
       
-      await supabase.from('questions').insert(toInsert);
+      await supabase.from('timecodes').insert(toInsert);
 
       setEpisodes(prev => prev.map(ep => 
-        ep.slug === enSlug && ep.lang === 'en' 
+        ep.slug === baseSlug && ep.lang === 'en' 
           ? { ...ep, questionsCount: toInsert.length }
           : ep
       ));
 
-      setTranslatedQuestions(prev => new Set(prev).add(`${enSlug}-en-${sourceLang}`));
+      setTranslatedQuestions(prev => new Set(prev).add(`${baseSlug}-en-${sourceLang}`));
 
       toast({ title: getLocaleString('questionsTranslated', currentLanguage), description: getPluralizedLocaleString('questionsTranslatedCreated', currentLanguage, toInsert.length) });
       
     } catch (error) {
       toast({ title: getLocaleString('errorGeneric', currentLanguage), description: `${getLocaleString('questionsTranslationError', currentLanguage)}: ${error.message}`, variant: 'destructive' });
     } finally {
-      setTransferringQuestionsEpisodes(prev => { const s = new Set(prev); s.delete(`${enSlug}-en-${sourceLang}`); return s; });
+      setTransferringQuestionsEpisodes(prev => { const s = new Set(prev); s.delete(`${baseSlug}-en-${sourceLang}`); return s; });
     }
   };
 
@@ -1247,14 +1241,34 @@ const EpisodeManagementSection = ({ currentLanguage }) => {
 
     for (const episode of episodesToDelete) {
       try {
-        const { slug, lang, r2_object_key, r2_bucket_name } = episode;
+        const { slug, lang } = episode;
         
-        // Delete questions for specific language
-        await supabase.from('questions').delete().eq('episode_slug', slug).eq('lang', lang);
+        // Delete timecodes for specific language
+        await supabase.from('timecodes').delete().eq('episode_slug', slug).eq('lang', lang);
         // Delete transcripts for specific language  
         await supabase.from('transcripts').delete().eq('episode_slug', slug).eq('lang', lang);
-        // Delete episode for specific language
-        await supabase.from('episodes').delete().eq('slug', slug).eq('lang', lang);
+        
+        // Delete audio and translation for specific language
+        await supabase.from('episode_audios').delete().eq('episode_slug', slug).eq('lang', lang);
+        await supabase.from('episode_translations').delete().eq('episode_slug', slug).eq('lang', lang);
+        
+        // Check if any other languages exist for this episode
+        const { count } = await supabase
+            .from('episode_audios')
+            .select('*', { count: 'exact', head: true })
+            .eq('episode_slug', slug);
+            
+        if (count === 0) {
+            // If no more audios, check translations too.
+            const { count: transCount } = await supabase
+                .from('episode_translations')
+                .select('*', { count: 'exact', head: true })
+                .eq('episode_slug', slug);
+                
+            if (transCount === 0) {
+                await supabase.from('episodes').delete().eq('slug', slug);
+            }
+        }
         
         successCount++;
       } catch (error) {
@@ -1286,7 +1300,7 @@ const EpisodeManagementSection = ({ currentLanguage }) => {
 
     try {
       const { slug, lang } = episodeToDeleteQuestions;
-      await supabase.from('questions').delete().eq('episode_slug', slug).eq('lang', lang);
+      await supabase.from('timecodes').delete().eq('episode_slug', slug).eq('lang', lang);
       
       toast({ 
         title: getLocaleString('questionsDeleted', currentLanguage), 
@@ -1302,7 +1316,7 @@ const EpisodeManagementSection = ({ currentLanguage }) => {
     } catch (error) {
       toast({ 
         title: getLocaleString('errorGeneric', currentLanguage), 
-        description: `${getLocaleString('questionsDeleteError', currentLanguage)}: ${error.message}`, 
+        description: `Error deleting questions: ${error.message}`, 
         variant: 'destructive' 
       });
     } finally {

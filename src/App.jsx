@@ -73,9 +73,17 @@ const RouteTracker = () => {
 // Компонент для редиректа старых URL эпизодов
 const OldEpisodeRedirect = () => {
   const { episodeSlug } = useParams();
+  const location = useLocation();
   const savedLang = localStorage.getItem('podcastLang') || 'ru';
   
-  return <Navigate to={`/${savedLang}/episode/${episodeSlug}`} replace />;
+  return <Navigate to={`/${savedLang}/${episodeSlug}${location.search}${location.hash}`} replace />;
+};
+
+// Компонент для редиректа старых URL эпизодов с языком (/ru/episode/slug -> /ru/slug)
+const LegacyEpisodeRedirect = () => {
+  const { lang, episodeSlug } = useParams();
+  const location = useLocation();
+  return <Navigate to={`/${lang}/${episodeSlug}${location.search}${location.hash}`} replace />;
 };
 
 // Wrapper для получения языка из URL
@@ -188,9 +196,7 @@ const AppLayout = ({ user }) => {
             </LanguageRouteWrapper>
           } />
           <Route path="/:lang/episode/:episodeSlug" element={
-            <LanguageRouteWrapper>
-              <PlayerPage user={user} />
-            </LanguageRouteWrapper>
+            <LegacyEpisodeRedirect />
           } />
           <Route path="/:lang/manage" element={
             <LanguageRouteWrapper>
@@ -222,6 +228,14 @@ const AppLayout = ({ user }) => {
               <OfflineSettingsPage onBack={() => window.history.back()} />
             </LanguageRouteWrapper>
           } />
+          
+          {/* Short URL for episodes: /lang/slug */}
+          <Route path="/:lang/:episodeSlug" element={
+            <LanguageRouteWrapper>
+              <PlayerPage user={user} />
+            </LanguageRouteWrapper>
+          } />
+
           <Route path="*" element={
             <LanguageRouteWrapper>
               <NotFoundPage />

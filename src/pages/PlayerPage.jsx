@@ -70,12 +70,30 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
       try {
         const { data, error } = await supabase
           .from('episodes')
-          .select('slug, audio_url, lang, date')
+          .select(`
+            slug,
+            date,
+            episode_audios (
+              audio_url,
+              lang
+            )
+          `)
           .order('date', { ascending: false })
           .limit(50); // Ограничиваем для производительности
         
         if (!error && data) {
-          setAllEpisodesForPrefetch(data);
+          // Transform V2 data to flat structure for compatibility
+          const flattenedData = data.map(ep => {
+             // Try to find audio for current language, fallback to first available
+             const audio = ep.episode_audios?.find(a => a.lang === appCurrentLanguage) || ep.episode_audios?.[0];
+             return {
+               slug: ep.slug,
+               date: ep.date,
+               audio_url: audio?.audio_url,
+               lang: audio?.lang || 'mixed'
+             };
+          });
+          setAllEpisodesForPrefetch(flattenedData);
         }
       } catch (error) {
         console.debug('Failed to fetch episodes for prefetch:', error);
@@ -221,7 +239,7 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
       // Create or update a real intro question (time locked to 0)
       const langForQuestions = episodeData.lang === 'all' ? currentLanguage : episodeData.lang;
       const { data: existingIntro, error: fetchErr } = await supabase
-        .from('questions')
+        .from('timecodes')
         .select('*')
         .eq('episode_slug', episodeData.slug)
         .eq('lang', langForQuestions)
@@ -245,10 +263,10 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
 
       let dbError;
       if (existingIntro && existingIntro.id) {
-        const { error } = await supabase.from('questions').update({ title: payload.title }).eq('id', existingIntro.id);
+        const { error } = await supabase.from('timecodes').update({ title: payload.title }).eq('id', existingIntro.id);
         dbError = error;
       } else {
-        const { error } = await supabase.from('questions').insert(payload).select().single();
+        const { error } = await supabase.from('timecodes').insert(payload).select().single();
         dbError = error;
       }
 
@@ -277,7 +295,7 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
         is_intro: questionData.isIntro || false,
         is_full_transcript: questionData.isFullTranscript || false
       };
-      const { error } = await supabase.from('questions').insert(questionPayload).select().single();
+      const { error } = await supabase.from('timecodes').insert(questionPayload).select().single();
       dbError = error;
     } else if (action === 'update') {
       const questionPayload = { 
@@ -287,10 +305,10 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
         is_intro: questionData.isIntro || false,
         is_full_transcript: questionData.isFullTranscript || false
       };
-      const { error } = await supabase.from('questions').update(questionPayload).eq('id', questionData.id).select().single();
+      const { error } = await supabase.from('timecodes').update(questionPayload).eq('id', questionData.id).select().single();
       dbError = error;
     } else if (action === 'delete') {
-      const { error } = await supabase.from('questions').delete().eq('id', questionData.id);
+      const { error } = await supabase.from('timecodes').delete().eq('id', questionData.id);
       dbError = error;
     }
 

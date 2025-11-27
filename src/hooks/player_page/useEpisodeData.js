@@ -203,7 +203,7 @@ const useEpisodeData = (episodeSlug, currentLanguage, toast) => {
   const fetchQuestionsForEpisode = useCallback(async (epSlug, langForQuestions) => {
     try {
       const { data, error: questionsError } = await supabase
-        .from('questions')
+        .from('timecodes')
         .select('id, time, title, lang, created_at, episode_slug, is_intro, is_full_transcript')
         .eq('episode_slug', epSlug)
         .eq('lang', langForQuestions)
@@ -261,9 +261,22 @@ const useEpisodeData = (episodeSlug, currentLanguage, toast) => {
     setLoading(true);
     setError(null);
     try {
+      // Fetch episode with all its variants (audio tracks)
       const { data: episode, error: episodeError } = await supabase
         .from('episodes')
-        .select('slug, title, lang, audio_url, duration, date, created_at, r2_object_key, r2_bucket_name')
+        .select(`
+          slug,
+          date,
+          created_at,
+          episode_audios (
+            lang,
+            audio_url
+          ),
+          episode_translations (
+            lang,
+            title
+          )
+        `)
         .eq('slug', episodeSlug)
         .maybeSingle();
 
@@ -274,35 +287,66 @@ const useEpisodeData = (episodeSlug, currentLanguage, toast) => {
         setLoading(false);
         return;
       }
-      
 
-      // Используем getAudioUrl для получения правильного URL
-      const finalAudioUrl = getAudioUrl(episode) || r2Service.getCompatibleUrl(
-        episode.audio_url,
-        episode.r2_object_key,
-        episode.r2_bucket_name
-      );
+      // Process variants to find the best match for current language
+      const audios = episode.episode_audios || [];
+      const translations = episode.episode_translations || [];
+      
+      // Find variant for current language, or fallback to ES, or Mixed, or just the first one
+      let activeAudio = audios.find(v => v.lang === currentLanguage);
+      
+      // If no direct match (e.g. user is on EN, but we only have RU/ES audio),
+      // logic requested: default to ES for translated languages
+      if (!activeAudio) {
+        activeAudio = audios.find(v => v.lang === 'es');
+      }
+      // If still no ES, try Mixed
+      if (!activeAudio) {
+        activeAudio = audios.find(v => v.lang === 'mixed');
+      }
+      // Fallback to any
+      if (!activeAudio && audios.length > 0) {
+        activeAudio = audios[0];
+      }
+
+      // Find title from translations
+      const activeTranslation = translations.find(t => t.lang === currentLanguage) 
+                             || translations.find(t => t.lang === 'es')
+                             || translations[0];
+
+      // Construct the episode object compatible with the player
+      const episodeData = {
+        ...episode,
+        // Flatten active variant properties for backward compatibility
+        title: activeTranslation?.title || episode.slug,
+        lang: activeAudio?.lang || 'mixed',
+        audio_url: activeAudio?.audio_url,
+        duration: 0, // Duration removed from V3 for now
+        // Store all variants for the player to allow switching
+        available_variants: audios
+      };
       
       // Сразу устанавливаем данные эпизода и снимаем основной лоадер
-      setEpisodeData({ ...episode, audio_url: finalAudioUrl });
+      setEpisodeData(episodeData);
       setLoading(false);
 
       // Подгружаем вопросы/транскрипт неблокирующе, с отдельными флагами загрузки
-      const langForContent = episode.lang === 'all' ? currentLanguage : episode.lang;
+      // For content (transcript/questions), we use the requested currentLanguage
+      // even if the audio is different.
       setQuestionsLoading(true);
       setTranscriptLoading(true);
       
       (async () => {
         try {
-          await fetchQuestionsForEpisode(episode.slug, langForContent);
+          await fetchQuestionsForEpisode(episode.slug, currentLanguage);
         } finally {
           setQuestionsLoading(false);
         }
       })();
-      
+
       (async () => {
         try {
-          await fetchTranscriptForEpisode(episode.slug, langForContent);
+          await fetchTranscriptForEpisode(episode.slug, currentLanguage);
         } finally {
           setTranscriptLoading(false);
         }

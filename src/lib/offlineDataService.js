@@ -4,7 +4,7 @@ import { sanitizeTranscriptForSave } from './transcriptValidator.js';
 class OfflineDataService {
   constructor() {
     this.dbName = 'PodcastAppDB';
-    this.version = 2;
+    this.version = 3;
     this.db = null;
     this.fallbackStorage = new Map(); // Fallback для случаев, когда IndexedDB недоступен
     this.useFallback = false;
@@ -150,12 +150,16 @@ class OfflineDataService {
             transcriptStore.createIndex('lang', 'lang');
           }
 
-          // Хранилище вопросов
-          if (!db.objectStoreNames.contains('questions')) {
-            const questionStore = db.createObjectStore('questions', { keyPath: 'id', autoIncrement: true });
-            questionStore.createIndex('episode_slug', 'episode_slug');
-            questionStore.createIndex('lang', 'lang');
-            questionStore.createIndex('time', 'time');
+          // Хранилище таймкодов (бывшие вопросы)
+          if (db.objectStoreNames.contains('questions')) {
+            db.deleteObjectStore('questions');
+          }
+
+          if (!db.objectStoreNames.contains('timecodes')) {
+            const timecodeStore = db.createObjectStore('timecodes', { keyPath: 'id', autoIncrement: true });
+            timecodeStore.createIndex('episode_slug', 'episode_slug');
+            timecodeStore.createIndex('lang', 'lang');
+            timecodeStore.createIndex('time', 'time');
           }
 
           // Хранилище аудиофайлов (метаданные)
@@ -520,7 +524,7 @@ class OfflineDataService {
     }
   }
 
-  // --- ВОПРОСЫ ---
+  // --- ТАЙМКОДЫ ---
   
   async saveQuestions(questions, episodeSlug, lang) {
     if (!Array.isArray(questions)) {
@@ -530,7 +534,7 @@ class OfflineDataService {
 
     // Если используем fallback хранилище
     if (this.useFallback) {
-      const key = `questions_${episodeSlug}_${lang}`;
+      const key = `timecodes_${episodeSlug}_${lang}`;
       // Сортируем вопросы по времени перед сохранением
       const sortedQuestions = [...questions].sort((a, b) => (a.time || 0) - (b.time || 0));
       const questionsData = {
@@ -552,13 +556,13 @@ class OfflineDataService {
         return 0; // Нет вопросов для сохранения
       }
 
-      const transaction = await this.getTransaction(['questions'], 'readwrite');
+      const transaction = await this.getTransaction(['timecodes'], 'readwrite');
       
       if (!transaction) {
         // If transaction creation failed (e.g. fallback mode activated), use fallback
-        this.compactLog(`🔄 Transaction failed, falling back to fallback storage for questions: ${episodeSlug}`, 'fallback');
+        this.compactLog(`🔄 Transaction failed, falling back to fallback storage for timecodes: ${episodeSlug}`, 'fallback');
         this.useFallback = true;
-        const key = `questions_${episodeSlug}_${lang}`;
+        const key = `timecodes_${episodeSlug}_${lang}`;
         const questionsData = {
           questions: questions,
           episode_slug: episodeSlug,
@@ -570,7 +574,7 @@ class OfflineDataService {
         return questions.length;
       }
 
-      const store = transaction.objectStore('questions');
+      const store = transaction.objectStore('timecodes');
       
       // Сортируем вопросы по времени перед сохранением
       const sortedQuestions = [...questions].sort((a, b) => (a.time || 0) - (b.time || 0));
@@ -609,7 +613,7 @@ class OfflineDataService {
   async getQuestions(episodeSlug, lang) {
     // Если используем fallback хранилище
     if (this.useFallback) {
-      const key = `questions_${episodeSlug}_${lang}`;
+      const key = `timecodes_${episodeSlug}_${lang}`;
       const questionsData = this.fallbackStorage.get(key);
       if (questionsData && questionsData.questions) {
         return questionsData.questions.sort((a, b) => (a.time || 0) - (b.time || 0));
@@ -618,11 +622,11 @@ class OfflineDataService {
     }
 
     try {
-      const transaction = await this.getTransaction(['questions']);
+      const transaction = await this.getTransaction(['timecodes']);
       
       if (!transaction) {
         // Fallback if transaction failed
-        const key = `questions_${episodeSlug}_${lang}`;
+        const key = `timecodes_${episodeSlug}_${lang}`;
         const questionsData = this.fallbackStorage.get(key);
         if (questionsData && questionsData.questions) {
           return questionsData.questions.sort((a, b) => (a.time || 0) - (b.time || 0));
@@ -630,7 +634,7 @@ class OfflineDataService {
         return [];
       }
 
-      const store = transaction.objectStore('questions');
+      const store = transaction.objectStore('timecodes');
       const index = store.index('episode_slug');
       
       return new Promise((resolve, reject) => {
@@ -652,22 +656,22 @@ class OfflineDataService {
   async deleteQuestions(episodeSlug, lang) {
     // Если используем fallback хранилище
     if (this.useFallback) {
-      const key = `questions_${episodeSlug}_${lang}`;
+      const key = `timecodes_${episodeSlug}_${lang}`;
       this.fallbackStorage.delete(key);
       return true;
     }
 
     try {
-      const transaction = await this.getTransaction(['questions'], 'readwrite');
+      const transaction = await this.getTransaction(['timecodes'], 'readwrite');
       
       if (!transaction) {
         // Fallback if transaction failed
-        const key = `questions_${episodeSlug}_${lang}`;
+        const key = `timecodes_${episodeSlug}_${lang}`;
         this.fallbackStorage.delete(key);
         return true;
       }
 
-      const store = transaction.objectStore('questions');
+      const store = transaction.objectStore('timecodes');
       const index = store.index('episode_slug');
       
       return new Promise((resolve, reject) => {
@@ -953,7 +957,7 @@ class OfflineDataService {
   
   async clearExpiredData(maxAge = 7 * 24 * 60 * 60 * 1000) { // 7 дней по умолчанию
     const cutoffTime = Date.now() - maxAge;
-    const stores = ['episodes', 'transcripts', 'questions', 'audioFiles'];
+    const stores = ['episodes', 'transcripts', 'timecodes', 'audioFiles'];
     
     for (const storeName of stores) {
       const transaction = await this.getTransaction([storeName], 'readwrite');
@@ -1037,18 +1041,18 @@ class OfflineDataService {
         console.warn('Error counting transcripts:', error);
       }
 
-      // Подсчитываем количество вопросов
+      // Подсчитываем количество таймкодов
       try {
-        const questionTransaction = await this.getTransaction(['questions']);
+        const questionTransaction = await this.getTransaction(['timecodes']);
         if (questionTransaction) {
-          const questionStore = questionTransaction.objectStore('questions');
+          const questionStore = questionTransaction.objectStore('timecodes');
           const questionRequest = questionStore.count();
           questionRequest.onsuccess = () => {
             stats.questionCount = questionRequest.result;
           };
         }
       } catch (error) {
-        console.warn('Error counting questions:', error);
+        console.warn('Error counting timecodes:', error);
       }
 
       // Подсчитываем количество элементов в очереди синхронизации

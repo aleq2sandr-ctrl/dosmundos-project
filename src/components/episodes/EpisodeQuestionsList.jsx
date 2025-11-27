@@ -17,8 +17,11 @@ const EpisodeQuestionsList = React.memo(({ questions, episodeSlug, currentLangua
     );
   }
 
-  const handleQuestionClick = (questionId) => {
-    navigate(`/${langPrefix}/episode/${episodeSlug}#question-${questionId}&play=true`);
+  const handleQuestionClick = (question) => {
+    // Use compact URL format: /lang/slug#seconds
+    // This is shorter and auto-plays by default
+    const timeSeconds = Math.floor(question.time || 0);
+    navigate(`/${langPrefix}/${episodeSlug}#${timeSeconds}`);
   };
 
   // Сортируем вопросы по времени как fallback
@@ -36,7 +39,7 @@ const EpisodeQuestionsList = React.memo(({ questions, episodeSlug, currentLangua
             className="animate-slide-in-left"
           >
             <button 
-              onClick={() => handleQuestionClick(question.id)}
+              onClick={() => handleQuestionClick(question)}
               className="text-xs text-slate-300 hover:text-purple-200 hover:underline flex items-start gap-1.5 text-left w-full"
             >
               <HelpCircle className="h-3 w-3 text-purple-400 shrink-0 mt-0.5" />

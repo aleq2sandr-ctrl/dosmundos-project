@@ -114,7 +114,7 @@ class CacheIntegration {
         
         for (const [episodeSlug, langs] of Object.entries(questionsByEpisode)) {
           for (const [lang, questions] of Object.entries(langs)) {
-            await optimizedCacheService.smartCache('questions', `${episodeSlug}:${lang}`, { questions, episodeSlug, lang }, 'high');
+            await optimizedCacheService.smartCache('timecodes', `${episodeSlug}:${lang}`, { questions, episodeSlug, lang }, 'high');
           }
         }
       }
@@ -134,7 +134,7 @@ class CacheIntegration {
       results.episode = await optimizedCacheService.smartGet('episodes', episodeSlug);
       
       // Загружаем вопросы
-      results.questions = await optimizedCacheService.smartGet('questions', `${episodeSlug}:${currentLanguage}`);
+      results.questions = await optimizedCacheService.smartGet('timecodes', `${episodeSlug}:${currentLanguage}`);
       
       // Загружаем транскрипт
       const transcriptLang = results.episode?.lang === 'all' ? currentLanguage : results.episode?.lang;
@@ -162,7 +162,7 @@ class CacheIntegration {
       
       if (questionsData) {
         const transcriptLang = episodeData?.lang === 'all' ? currentLanguage : episodeData?.lang;
-        await optimizedCacheService.smartCache('questions', `${episodeData.slug}:${currentLanguage}`, { 
+        await optimizedCacheService.smartCache('timecodes', `${episodeData.slug}:${currentLanguage}`, { 
           questions: questionsData, 
           episodeSlug: episodeData.slug, 
           lang: currentLanguage 
@@ -190,7 +190,7 @@ class CacheIntegration {
         // Добавляем в очередь фоновой загрузки
         const transcriptLang = episode.lang === 'all' ? currentLanguage : episode.lang;
         optimizedCacheService.addToBackgroundQueue('transcript', `${episode.slug}:${transcriptLang}`, 'low');
-        optimizedCacheService.addToBackgroundQueue('questions', `${episode.slug}:${currentLanguage}`, 'low');
+        optimizedCacheService.addToBackgroundQueue('timecodes', `${episode.slug}:${currentLanguage}`, 'low');
       }
 
       logger.debug(`[CacheIntegration] Preloaded data for ${recentEpisodes.length} episodes`);

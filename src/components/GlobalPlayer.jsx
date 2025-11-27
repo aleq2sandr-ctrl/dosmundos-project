@@ -17,14 +17,29 @@ const GlobalPlayer = ({ currentLanguage }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Determine the correct title based on current language
+  const displayTitle = React.useMemo(() => {
+    if (!currentEpisode) return '';
+    
+    // Try to find translation for current language
+    if (currentEpisode.translations && Array.isArray(currentEpisode.translations)) {
+      const translation = currentEpisode.translations.find(t => t.lang === currentLanguage);
+      if (translation && translation.title) return translation.title;
+    }
+    
+    // Fallback to the title in the object (which was set based on the language at the time of loading)
+    return currentEpisode.title || currentEpisode.slug;
+  }, [currentEpisode, currentLanguage]);
+
   if (!isGlobalPlayerVisible || !currentEpisode) return null;
 
   // Don't show global player if we are already on the player page for this episode
-  const isPlayerPage = location.pathname.includes(`/episode/${currentEpisode.slug}`);
+  // Check if current path ends with the slug (handling both /episode/slug and /slug)
+  const isPlayerPage = location.pathname.endsWith(`/${currentEpisode.slug}`);
   if (isPlayerPage) return null;
 
   const handleNavigateToEpisode = () => {
-    navigate(`/${currentLanguage}/episode/${currentEpisode.slug}`);
+    navigate(`/${currentLanguage}/${currentEpisode.slug}`);
   };
 
   const progress = duration ? (currentTime / duration) * 100 : 0;
@@ -47,13 +62,13 @@ const GlobalPlayer = ({ currentLanguage }) => {
           {currentEpisode.image && (
             <img 
               src={currentEpisode.image} 
-              alt={currentEpisode.title} 
+              alt={displayTitle} 
               className="w-10 h-10 rounded object-cover ring-1 ring-white/10 group-hover:ring-purple-500/50 transition-all"
             />
           )}
           <div className="min-w-0 overflow-hidden">
             <h3 className="text-sm font-medium text-white truncate group-hover:text-purple-400 transition-colors">
-              {currentEpisode.title}
+              {displayTitle}
             </h3>
             <p className="text-xs text-slate-400 truncate">
               {currentEpisode.author || 'Dos Mundos'}

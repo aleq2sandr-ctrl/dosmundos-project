@@ -19,26 +19,26 @@ const usePlayerInteractions = (audioRef, playerControlsContainerRef, episodeSlug
     if (hash) {
       // Обновленное регулярное выражение для поддержки &play=true без разделителя
       const segmentMatch = hash.match(/^#segment-(\d+(?:\.\d+)?)(?:&play=true)?$/);
-      const questionMatch = hash.match(/^#question-([\w-]+)(?:&play=true)?$/);
+      // Allow any characters in question ID until & or end of string
+      const questionMatch = hash.match(/^#question-([^&]+)(?:&play=true)?$/);
+      
+      // New compact formats: #123 (seconds), #12:34 (mm:ss)
+      const secondsMatch = hash.match(/^#(\d+(?:\.\d+)?)$/);
+      const timeMatch = hash.match(/^#(\d+):(\d+)$/);
 
-      logger.debug('usePlayerInteractions: segmentMatch', segmentMatch);
-      logger.debug('usePlayerInteractions: questionMatch', questionMatch);
+      logger.debug('usePlayerInteractions: matches', { segmentMatch, questionMatch, secondsMatch, timeMatch });
 
       if (segmentMatch) {
         const time = parseFloat(segmentMatch[1]) / 1000; 
         const play = hash.includes('&play=true');
-        console.log('🔧 [usePlayerInteractions] Segment jump:', { hash, time, play, segmentId: segmentMatch[1] });
-        logger.debug('usePlayerInteractions: Setting segment jump details', { time, play, segmentId: segmentMatch[1] });
         setJumpDetails({ time: time, id: `segment-${segmentMatch[1]}`, questionId: null, playAfterJump: play, segmentToHighlight: parseFloat(segmentMatch[1]) });
       } else if (questionMatch) {
         const questionId = questionMatch[1];
         const play = hash.includes('&play=true');
         let question = questions.find(q => String(q.id) === questionId || q.slug === questionId);
-        logger.debug('usePlayerInteractions: Found question for jump', { questionId, question, play });
         if (question) {
           setJumpDetails({ time: question.time, id: `question-${questionId}`, questionId: questionId, playAfterJump: play, segmentToHighlight: null });
         } else {
-          // Если вопросы ещё не подгрузились, повторим попытку позже
           const retry = setTimeout(() => {
             const q2 = questions.find(q => String(q.id) === questionId || q.slug === questionId);
             if (q2) {
@@ -47,16 +47,27 @@ const usePlayerInteractions = (audioRef, playerControlsContainerRef, episodeSlug
             clearTimeout(retry);
           }, 600);
         }
+      } else if (secondsMatch) {
+        // Compact seconds format: #123 -> 123 seconds. Auto-play by default.
+        const time = parseFloat(secondsMatch[1]);
+        setJumpDetails({ time: time, id: `time-${time}`, questionId: null, playAfterJump: true, segmentToHighlight: time * 1000 });
+      } else if (timeMatch) {
+        // Compact mm:ss format: #12:34 -> 12m 34s. Auto-play by default.
+        const minutes = parseInt(timeMatch[1], 10);
+        const seconds = parseInt(timeMatch[2], 10);
+        const totalSeconds = minutes * 60 + seconds;
+        setJumpDetails({ time: totalSeconds, id: `time-${totalSeconds}`, questionId: null, playAfterJump: true, segmentToHighlight: totalSeconds * 1000 });
       }
     } else {
       // Нет якоря — включаем автозапуск с начала один раз
       if (!didDefaultAutoplayRef.current) {
         didDefaultAutoplayRef.current = true;
-        const newHash = '#segment-0&play=true';
+        // Use compact format for default start
+        const newHash = '#0';
         if (location.hash !== newHash) {
           navigate(`${location.pathname}${newHash}`, { replace: true, state: location.state });
         }
-        setJumpDetails({ time: 0, id: 'segment-0', questionId: null, playAfterJump: true, segmentToHighlight: 0 });
+        setJumpDetails({ time: 0, id: 'time-0', questionId: null, playAfterJump: true, segmentToHighlight: 0 });
       }
     }
   }, [location.hash, questions, episodeSlug]);
@@ -64,18 +75,14 @@ const usePlayerInteractions = (audioRef, playerControlsContainerRef, episodeSlug
   const handleSeekToTime = useCallback((time, id = null, playAfterJump = false, questionId = null) => {
     logger.debug('usePlayerInteractions: handleSeekToTime called', { time, id, playAfterJump, questionId });
     
-    // Оптимизация: обновляем состояние сразу, не дожидаясь URL
-    setJumpDetails({ time, id: id || `segment-${Math.round(time * 1000)}`, questionId, playAfterJump, segmentToHighlight: Math.round(time * 1000) });
-    
     const segmentStartTimeMs = Math.round(time * 1000);
-    let newHash = '';
-    if (id && typeof id === 'string' && id.startsWith('question-')) {
-        newHash = `#${id}${playAfterJump ? '&play=true' : ''}`;
-    } else {
-        newHash = `#segment-${segmentStartTimeMs}${playAfterJump ? '&play=true' : ''}`;
-    }
+    // Оптимизация: обновляем состояние сразу
+    setJumpDetails({ time, id: id || `time-${time}`, questionId, playAfterJump, segmentToHighlight: segmentStartTimeMs });
+    
+    // Always use compact format: #seconds (integer)
+    // This replaces the verbose #question-ID&play=true format
+    const newHash = `#${Math.floor(time)}`;
       
-    // Обновляем URL только если он действительно изменился
     if (location.hash !== newHash) {
         if (newHash) {
             navigate(`${location.pathname}${newHash}`, { replace: true, state: location.state });

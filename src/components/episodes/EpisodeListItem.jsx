@@ -31,7 +31,7 @@ const EpisodeListItem = React.memo(({ episode, currentLanguage, questionsCount, 
   return (
     <li className="bg-slate-800/70 rounded-xl shadow-lg hover:shadow-purple-500/20 transition-all duration-300 ease-in-out border border-slate-700/50 hover:border-purple-500/60 animate-fade-in-up">
       <div className="p-4">
-        <Link to={`/${langPrefix}/episode/${episode.slug}`} className="block group mb-2">
+        <Link to={`/${langPrefix}/${episode.slug}`} className="block group mb-2">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-2">
             <h2 className="text-lg font-semibold group-hover:text-purple-200 transition-colors truncate flex-grow text-purple-300" title={displayTitle}>
               {displayTitle}

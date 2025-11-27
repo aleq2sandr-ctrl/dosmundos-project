@@ -38,14 +38,16 @@ const SearchResultItem = ({ item, searchTerm, type, episodeTitle, langPrefix }) 
 
   if (type === 'question') {
     displayTitle = `${item.questionTitle} (${episodeTitle})`;
-    linkTarget = `/${langPrefix}/episode/${item.episodeSlug}#question-${item.questionId}&play=true`;
+    const timeSeconds = Math.floor(item.segmentStart / 1000);
+    linkTarget = `/${langPrefix}/${item.episodeSlug}#${timeSeconds}`;
   } else { // textInEpisode
     if (item.questionContext) {
       displayTitle = `${getLocaleString('question', item.currentLanguage)}: ${item.questionContext} (${episodeTitle})`;
     } else {
       displayTitle = `(${episodeTitle})`; 
     }
-    linkTarget = `/${langPrefix}/episode/${item.episodeSlug}#segment-${item.segmentStart}&play=true`;
+    const timeSeconds = Math.floor(item.segmentStart / 1000);
+    linkTarget = `/${langPrefix}/${item.episodeSlug}#${timeSeconds}`;
   }
   
   const textToHighlight = type === 'question' ? item.questionTitle : item.segmentText;
@@ -97,13 +99,18 @@ const DeepSearchPage = ({ currentLanguage }) => {
 
 
   const formatEpisodeTitleForDisplay = (title, episodeDate, episodeLang, langForDisplay) => {
+    // If we have a specific title (e.g. from translation), use it
+    if (title && title.trim() !== '') {
+        return title;
+    }
+
     const effectiveLang = episodeLang === 'all' ? langForDisplay : episodeLang;
     const prefix = getLocaleString('meditationTitlePrefix', effectiveLang);
     let datePart = '';
     if (episodeDate) {
       datePart = formatShortDate(episodeDate, effectiveLang);
     }
-    return datePart ? `${prefix} ${datePart}` : title || prefix;
+    return datePart ? `${prefix} ${datePart}` : prefix;
   };
 
   const fetchDeepSearchResults = useCallback(async (query) => {
@@ -122,18 +129,36 @@ const DeepSearchPage = ({ currentLanguage }) => {
     try {
       const { data: dbEpisodes, error: episodesError } = await supabase
         .from('episodes')
-        .select('slug, title, date, lang')
+        .select(`
+          slug, 
+          title, 
+          date, 
+          lang,
+          episode_translations (
+            title,
+            lang
+          )
+        `)
         .or(`lang.eq.${currentLanguage},lang.eq.all`);
       if (episodesError) throw episodesError;
 
       const tempEpisodeTitlesMap = dbEpisodes.reduce((acc, ep) => {
-        acc[ep.slug] = formatEpisodeTitleForDisplay(ep.title, ep.date, ep.lang, currentLanguage);
+        // Try to find translation for current language
+        let displayTitle = ep.title;
+        if (ep.episode_translations && Array.isArray(ep.episode_translations)) {
+            const translation = ep.episode_translations.find(t => t.lang === currentLanguage);
+            if (translation && translation.title) {
+                displayTitle = translation.title;
+            }
+        }
+        
+        acc[ep.slug] = formatEpisodeTitleForDisplay(displayTitle, ep.date, ep.lang, currentLanguage);
         return acc;
       }, {});
       setEpisodeTitlesMap(tempEpisodeTitlesMap);
       
       const { data: dbQuestions, error: questionsError } = await supabase
-        .from('questions')
+        .from('timecodes')
         .select('id, episode_slug, title, lang, time')
         .or(`lang.eq.${currentLanguage},lang.eq.all`);
       if (questionsError) throw questionsError;

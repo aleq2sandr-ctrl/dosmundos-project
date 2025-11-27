@@ -501,6 +501,7 @@
   "contextQuestion": "Context (question)",
   "question": "Question",
   "playbackSpeed": "Playback Speed",
+  "audioTrack": "Audio Track",
   "noEpisodesFound": "Meditations not found.",
   "deselectAll": "Deselect all",
   "deleteSelected": "Delete selected",

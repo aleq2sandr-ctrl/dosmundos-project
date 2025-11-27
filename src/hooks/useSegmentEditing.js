@@ -78,6 +78,7 @@ const useSegmentEditing = (
             filePath: null,
             metadata: {
               episodeSlug: episodeSlug,
+              lang: currentLanguage,
               segmentId: segmentId,
               segmentStart: editingSegment.start,
               segmentEnd: editingSegment.end,
@@ -245,6 +246,7 @@ const useSegmentEditing = (
             filePath: null,
             metadata: {
               episodeSlug: episodeSlug,
+              lang: currentLanguage,
               segmentId: segmentId,
               action: actionType,
               actionDetail: actionDetail,

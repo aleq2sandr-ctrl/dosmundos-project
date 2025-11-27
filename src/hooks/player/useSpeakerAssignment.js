@@ -104,6 +104,7 @@ const useSpeakerAssignment = (episodeData, onTranscriptUpdate, toastInstance, cu
             filePath: null,
             metadata: {
               episodeSlug: episodeSlug,
+              lang: currentLanguage,
               segmentId: segmentId,
               action: actionType,
               oldSpeaker: oldSpeakerId,

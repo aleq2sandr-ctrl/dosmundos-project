@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import PlayerHeader from '@/components/player/player_parts/PlayerHeader';
@@ -80,16 +79,30 @@ const PodcastPlayer = ({
     playEpisode
   } = usePlayer();
 
+  // Audio Track State
+  const [selectedAudioLang, setSelectedAudioLang] = useState(episodeLang || 'mixed');
+
+  const handleAudioTrackChange = useCallback((lang) => {
+    console.log('🎵 [PodcastPlayer] Audio track changed to:', lang);
+    setSelectedAudioLang(lang);
+    // If we need to actually switch the audio source, we might need to trigger a reload
+    // or notify the parent. For now, we just update the UI state.
+    // In a full implementation, this would likely trigger a URL change or audio source update.
+  }, []);
+
   // Use context audio ref as the primary source
   const primaryAudioRef = contextAudioRef || audioRef;
   
+  const lastJumpIdRef = useRef(null);
+
   // Sync episode with PlayerContext when episodeData changes
   useEffect(() => {
     console.log('🎵 [PodcastPlayer] Episode sync effect:', {
       episodeSlug: episodeData?.slug,
       contextSlug: contextEpisode?.slug,
       episodeAudioUrl,
-      jumpToTime: episodeData?.jumpToTime
+      jumpToTime: episodeData?.jumpToTime,
+      jumpId: episodeData?.jumpId
     });
     
     if (episodeData && episodeData.slug !== contextEpisode?.slug) {
@@ -105,11 +118,27 @@ const PodcastPlayer = ({
           ...episodeData,
           audioUrl
         }, episodeData.jumpToTime || 0);
+        lastJumpIdRef.current = episodeData.jumpId;
       } else {
         console.error('🎵 [PodcastPlayer] No audio URL available for episode:', episodeData.slug);
       }
+    } else if (episodeData && episodeData.slug === contextEpisode?.slug) {
+        // Handle seeking within the same episode
+        if (episodeData.jumpId && episodeData.jumpId !== lastJumpIdRef.current) {
+            console.log('🎵 [PodcastPlayer] Seeking in current episode:', {
+                to: episodeData.jumpToTime,
+                id: episodeData.jumpId
+            });
+            
+            seek(episodeData.jumpToTime);
+            lastJumpIdRef.current = episodeData.jumpId;
+            
+            if (episodeData.playAfterJump && !isPlaying) {
+                togglePlay();
+            }
+        }
     }
-  }, [episodeData?.slug, episodeData?.jumpToTime, episodeAudioUrl, contextEpisode?.slug, playEpisode]);
+  }, [episodeData?.slug, episodeData?.jumpToTime, episodeData?.jumpId, episodeAudioUrl, contextEpisode?.slug, playEpisode, seek, isPlaying, togglePlay]);
 
   // Состояние для диалога скачивания текста
   const [isDownloadTextDialogOpen, setIsDownloadTextDialogOpen] = useState(false);
@@ -210,13 +239,42 @@ const PodcastPlayer = ({
     // Simple question navigation logic
     if (!internalQuestions || internalQuestions.length === 0) return;
     
-    const currentIndex = internalQuestions.findIndex(q => q.time <= currentTime);
-    const newIndex = direction === 1 ? 
-      Math.min(currentIndex + 1, internalQuestions.length - 1) :
-      Math.max(currentIndex - 1, 0);
+    // Ensure questions are sorted by time
+    const sortedQuestions = [...internalQuestions].sort((a, b) => a.time - b.time);
     
-    if (newIndex >= 0 && newIndex < internalQuestions.length) {
-      seek(internalQuestions[newIndex].time);
+    // Find the current active question index
+    let currentIndex = -1;
+    for (let i = 0; i < sortedQuestions.length; i++) {
+      if (sortedQuestions[i].time <= currentTime + 0.5) {
+        currentIndex = i;
+      } else {
+        break;
+      }
+    }
+    
+    let newIndex;
+    if (direction === 1) {
+        // Next question
+        if (currentIndex >= sortedQuestions.length - 1) return;
+        newIndex = currentIndex + 1;
+    } else {
+        // Previous question
+        if (currentIndex <= 0) {
+            newIndex = 0;
+        } else {
+            // If we are more than 3 seconds into the current question, restart it
+            // Otherwise go to previous
+            const currentQuestionTime = sortedQuestions[currentIndex].time;
+            if (currentTime - currentQuestionTime > 3) {
+                newIndex = currentIndex;
+            } else {
+                newIndex = currentIndex - 1;
+            }
+        }
+    }
+    
+    if (newIndex >= 0 && newIndex < sortedQuestions.length) {
+      seek(sortedQuestions[newIndex].time);
     }
   };
   
@@ -402,6 +460,10 @@ const PodcastPlayer = ({
           onOpenAddQuestionDialog={handleOpenAddQuestionDialogFromPlayer}
           episodeDate={episodeDate}
           isOfflineMode={isOfflineMode}
+          // Audio Track Props
+          availableAudioVariants={episodeData?.available_variants || []}
+          selectedAudioLang={selectedAudioLang}
+          onAudioTrackChange={handleAudioTrackChange}
         />
       </div>
     </div>

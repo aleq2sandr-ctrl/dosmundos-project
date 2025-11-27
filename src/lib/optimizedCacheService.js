@@ -5,7 +5,7 @@ class OptimizedCacheService {
   constructor() {
     this.cacheStrategies = {
       'transcript': { ttl: 24 * 60 * 60 * 1000, maxSize: 50, priority: 'high' },
-      'questions': { ttl: 12 * 60 * 60 * 1000, maxSize: 100, priority: 'high' },
+      'timecodes': { ttl: 12 * 60 * 60 * 1000, maxSize: 100, priority: 'high' },
       'episodes': { ttl: 6 * 60 * 60 * 1000, maxSize: 200, priority: 'critical' },
       'audio_metadata': { ttl: 7 * 24 * 60 * 60 * 1000, maxSize: 500, priority: 'normal' }
     };
@@ -81,7 +81,7 @@ class OptimizedCacheService {
         case 'transcript':
           await offlineDataService.saveTranscript(enhancedData);
           break;
-        case 'questions':
+        case 'timecodes':
           if (data.questions && data.episodeSlug && data.lang) {
             await offlineDataService.saveQuestions(data.questions, data.episodeSlug, data.lang);
           }
@@ -162,7 +162,7 @@ class OptimizedCacheService {
           cachedData = await offlineDataService.getTranscript(episodeSlug, lang);
           break;
         }
-        case 'questions': {
+        case 'timecodes': {
           const [qEpisodeSlug, qLang] = key.split(':');
           cachedData = await offlineDataService.getQuestions(qEpisodeSlug, qLang);
           break;
@@ -245,7 +245,7 @@ class OptimizedCacheService {
         case 'transcript':
           await offlineDataService.saveTranscript(enhancedData);
           break;
-        case 'questions':
+        case 'timecodes':
           if (data.questions && data.episodeSlug && data.lang) {
             await offlineDataService.saveQuestions(data.questions, data.episodeSlug, data.lang);
           }
@@ -271,7 +271,7 @@ class OptimizedCacheService {
         // Предзагружаем транскрипт и вопросы для видимых эпизодов
         const transcriptLang = episode.lang === 'all' ? currentLanguage : episode.lang;
         this.addToBackgroundQueue('transcript', `${episode.slug}:${transcriptLang}`, 'high');
-        this.addToBackgroundQueue('questions', `${episode.slug}:${currentLanguage}`, 'high');
+        this.addToBackgroundQueue('timecodes', `${episode.slug}:${currentLanguage}`, 'high');
       }
 
       // Затем загружаем недавние эпизоды (средний приоритет)
@@ -285,7 +285,7 @@ class OptimizedCacheService {
         
         const transcriptLang = episode.lang === 'all' ? currentLanguage : episode.lang;
         this.addToBackgroundQueue('transcript', `${episode.slug}:${transcriptLang}`, 'normal');
-        this.addToBackgroundQueue('questions', `${episode.slug}:${currentLanguage}`, 'normal');
+        this.addToBackgroundQueue('timecodes', `${episode.slug}:${currentLanguage}`, 'normal');
       }
 
       logger.debug(`[OptimizedCache] Priority load completed for ${visibleEpisodes.length} visible and ${recentEpisodes.length} recent episodes`);
@@ -464,7 +464,7 @@ class OptimizedCacheService {
   getStoreName(type) {
     const storeMap = {
       'transcript': 'transcripts',
-      'questions': 'questions',
+      'timecodes': 'timecodes',
       'episodes': 'episodes',
       'audio_metadata': 'audioFiles'
     };
@@ -475,7 +475,7 @@ class OptimizedCacheService {
     switch (type) {
       case 'transcript':
         return item.id;
-      case 'questions':
+      case 'timecodes':
         return item.id;
       case 'episodes':
         return item.slug;

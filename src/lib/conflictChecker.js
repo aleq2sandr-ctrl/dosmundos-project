@@ -104,7 +104,7 @@ export const checkFileConflicts = async (item) => {
 
       // Проверка существования вопросов
       const { data: questions, error: questionsError } = await supabase
-        .from('questions')
+        .from('timecodes')
         .select('id')
         .eq('episode_slug', episodeSlug)
         .eq('lang', lang)

@@ -68,14 +68,14 @@ class TimeOldService {
       const lang = deduped[0]?.lang;
       if (episodeSlug && lang) {
         await supabase
-          .from('questions')
+          .from('timecodes')
           .delete()
           .eq('episode_slug', episodeSlug)
           .eq('lang', lang);
       }
 
       const { error } = await supabase
-        .from('questions')
+        .from('timecodes')
         .insert(deduped);
 
       if (error) {

@@ -44,20 +44,20 @@ const logService = {
     let afterRevertValue = logEntry.before_value;
 
     if (logEntry.entity_type === 'question') {
-        const { data: currentData, error: fetchError } = await supabase.from('questions').select('*').eq('id', logEntry.entity_id).single();
+        const { data: currentData, error: fetchError } = await supabase.from('timecodes').select('*').eq('id', logEntry.entity_id).single();
         if (fetchError && fetchError.code !== 'PGRST116') { 
           return { error: new Error(`Failed to fetch current question state for revert: ${fetchError.message}`) };
         }
         beforeRevertValue = currentData;
 
         if (logEntry.action_type === 'create') {
-            const { error } = await supabase.from('questions').delete().eq('id', logEntry.entity_id);
+            const { error } = await supabase.from('timecodes').delete().eq('id', logEntry.entity_id);
             revertError = error;
         } else if (logEntry.action_type === 'update') {
-            const { error } = await supabase.from('questions').update(logEntry.before_value).eq('id', logEntry.entity_id);
+            const { error } = await supabase.from('timecodes').update(logEntry.before_value).eq('id', logEntry.entity_id);
             revertError = error;
         } else if (logEntry.action_type === 'delete') {
-            const { error } = await supabase.from('questions').insert(logEntry.before_value);
+            const { error } = await supabase.from('timecodes').insert(logEntry.before_value);
             revertError = error;
         }
     } else if (logEntry.entity_type === 'transcript') {

@@ -20,7 +20,7 @@ const useSupabaseSubscriptions = (
     try {
       questionsChannel = supabase.channel(`db-questions-changes-for-${episodeSlug}`)
         .on('postgres_changes', 
-          { event: '*', schema: 'public', table: 'questions', filter: `episode_slug=eq.${episodeSlug}` }, 
+          { event: '*', schema: 'public', table: 'timecodes', filter: `episode_slug=eq.${episodeSlug}` }, 
           (payload) => {
             const langForContent = episodeData?.lang === 'all' ? currentLanguage : episodeData?.lang;
             if (langForContent && payload.new?.lang === langForContent) {

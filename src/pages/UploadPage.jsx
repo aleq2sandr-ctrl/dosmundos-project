@@ -352,94 +352,74 @@ const UploadPage = ({ currentLanguage }) => {
   };
 
   const handleDeleteEpisode = async (episode) => {
-    if (!episode?.id) {
-      console.error('No episode ID provided for deletion');
+    if (!episode?.slug || !episode?.lang) {
+      console.error('No episode slug or lang provided for deletion');
       return;
     }
 
     try {
-      // Определяем, является ли это переведенным эпизодом
-      const isTranslatedEpisode = !['es', 'ru'].includes(episode.lang);
+      // 1. Delete transcript
+      const { error: transcriptError } = await supabase
+        .from('transcripts')
+        .delete()
+        .eq('episode_slug', episode.slug)
+        .eq('lang', episode.lang);
+
+      if (transcriptError) throw transcriptError;
+
+      // 2. Delete timecodes/questions
+      const { error: questionsError } = await supabase
+        .from('timecodes')
+        .delete()
+        .eq('episode_slug', episode.slug)
+        .eq('lang', episode.lang);
+
+      if (questionsError) throw questionsError;
+
+      // 3. Delete audio record
+      const { error: audioError } = await supabase
+        .from('episode_audios')
+        .delete()
+        .eq('episode_slug', episode.slug)
+        .eq('lang', episode.lang);
+        
+      if (audioError) throw audioError;
+
+      // 4. Delete translation (title/desc)
+      const { error: translationError } = await supabase
+        .from('episode_translations')
+        .delete()
+        .eq('episode_slug', episode.slug)
+        .eq('lang', episode.lang);
+
+      if (translationError) throw translationError;
+
+      // 5. Check if any translations remain for this slug
+      const { data: remainingTranslations, error: checkError } = await supabase
+        .from('episode_translations')
+        .select('id')
+        .eq('episode_slug', episode.slug);
       
-      if (isTranslatedEpisode) {
-        // Для переведенных эпизодов удаляем только данные перевода
-        // Удаляем транскрипт перевода
-        const { error: transcriptError } = await supabase
-          .from('transcripts')
-          .delete()
-          .eq('episode_slug', episode.slug)
-          .eq('lang', episode.lang);
-
-        if (transcriptError) throw transcriptError;
-
-        // Удаляем вопросы перевода
-        const { error: questionsError } = await supabase
-          .from('questions')
-          .delete()
-          .eq('episode_slug', episode.slug)
-          .eq('lang', episode.lang);
-
-        if (questionsError) throw questionsError;
-
-        // Удаляем сам эпизод перевода (но не оригинальный)
-        const { error: episodeError } = await supabase
-          .from('episodes')
-          .delete()
-          .eq('id', episode.id);
-
-        if (episodeError) throw episodeError;
-
-        // Обновляем локальное состояние
-        setEpisodes(prev => prev.filter(ep => ep.id !== episode.id));
-
-        toast({
-          title: 'Перевод удален',
-          description: `Перевод "${episode.title}" успешно удален`,
-          duration: 3000,
-        });
-
-      } else {
-        // Для оригинальных эпизодов (ES/RU) удаляем все
-        const { error: episodeError } = await supabase
-          .from('episodes')
-          .delete()
-          .eq('id', episode.id);
-
-        if (episodeError) throw episodeError;
-
-        // Удаляем все связанные транскрипты
-        const { error: transcriptError } = await supabase
-          .from('transcripts')
-          .delete()
-          .eq('episode_slug', episode.slug);
-
-        if (transcriptError) throw transcriptError;
-
-        // Удаляем все связанные вопросы
-        const { error: questionsError } = await supabase
-          .from('questions')
-          .delete()
-          .eq('episode_slug', episode.slug);
-
-        if (questionsError) throw questionsError;
-
-        // Обновляем локальное состояние
-        setEpisodes(prev => prev.filter(ep => ep.id !== episode.id));
-
-        toast({
-          title: 'Эпизод удален',
-          description: `Эпизод "${episode.title}" и все переводы успешно удалены`,
-          duration: 3000,
-        });
+      // If no translations remain, we delete the parent episode container
+      if (!checkError && (!remainingTranslations || remainingTranslations.length === 0)) {
+         await supabase.from('episodes').delete().eq('slug', episode.slug);
       }
+
+      // Update local state
+      setEpisodes(prev => prev.filter(ep => !(ep.slug === episode.slug && ep.lang === episode.lang)));
+
+      toast({
+        title: 'Episode deleted',
+        description: `Episode "${episode.title}" (${episode.lang}) successfully deleted`,
+        duration: 3000,
+      });
 
     } catch (error) {
       console.error('Error deleting episode:', error);
       toast({
-        title: 'Ошибка удаления',
-        description: `Не удалось удалить: ${error.message}`,
+        title: 'Error',
+        description: 'Failed to delete episode',
         variant: 'destructive',
-        duration: 5000,
       });
     }
   };
@@ -558,7 +538,7 @@ const UploadPage = ({ currentLanguage }) => {
 
       // Удаляем старые вопросы
       await supabase
-        .from('questions')
+        .from('timecodes')
         .delete()
         .eq('episode_slug', episode.slug)
         .eq('lang', episode.lang);
@@ -572,7 +552,7 @@ const UploadPage = ({ currentLanguage }) => {
       }));
 
       // Вставляем новые вопросы
-      await supabase.from('questions').insert(questionsToInsert);
+      await supabase.from('timecodes').insert(questionsToInsert);
 
       // Обновляем локальное состояние
       setEpisodes(prev => prev.map(ep => 
@@ -833,26 +813,31 @@ const UploadPage = ({ currentLanguage }) => {
   const loadEpisodes = useCallback(async () => {
     setIsLoadingEpisodes(true);
     try {
-      const { data: episodesData, error: episodesError } = await supabase
+      // V3: Fetch with joins
+      const { data: rawEpisodes, error: episodesError } = await supabase
         .from('episodes')
         .select(`
-          id,
           slug,
-          title,
-          lang,
           date,
-          audio_url,
-          r2_object_key,
-          r2_bucket_name,
-          duration,
-          created_at
+          created_at,
+          episode_audios (
+            lang,
+            audio_url,
+            duration,
+            r2_object_key,
+            r2_bucket_name
+          ),
+          episode_translations (
+            lang,
+            title
+          )
         `)
         .order('created_at', { ascending: false })
-        .limit(100);
+        .limit(50);
 
       if (episodesError) throw episodesError;
 
-      const episodeSlugs = [...new Set(episodesData.map(e => e.slug))];
+      const episodeSlugs = rawEpisodes.map(e => e.slug);
 
       const { data: transcriptsData, error: transcriptsError } = await supabase
         .from('transcripts')
@@ -866,7 +851,7 @@ const UploadPage = ({ currentLanguage }) => {
       
       // Используем fallback: загружаем все вопросы и считаем на клиенте
       const { data: questionsData } = await supabase
-        .from('questions')
+        .from('timecodes')
         .select('episode_slug, lang')
         .in('episode_slug', episodeSlugs);
       
@@ -877,17 +862,42 @@ const UploadPage = ({ currentLanguage }) => {
         });
       }
 
-      const episodesWithData = episodesData.map(episode => {
-        const transcript = transcriptsData?.find(
-          t => t.episode_slug === episode.slug && t.lang === episode.lang
-        );
-        const questionsCount = questionsCounts[`${episode.slug}-${episode.lang}`] || 0;
+      // Flatten and map data
+      const episodesWithData = [];
+      
+      rawEpisodes.forEach(ep => {
+        // If no audios, we might still want to show it if it has translations? 
+        // But UploadPage is mostly about files. 
+        // Let's iterate over audios as primary variants.
+        const audios = ep.episode_audios || [];
+        
+        if (audios.length === 0) {
+             // Handle case with no audio but maybe just a container?
+             // For now, skip.
+        }
 
-        return {
-          ...episode,
-          transcript: transcript || null,
-          questionsCount,
-        };
+        audios.forEach(audio => {
+            const translation = ep.episode_translations?.find(t => t.lang === audio.lang);
+            const transcript = transcriptsData?.find(
+                t => t.episode_slug === ep.slug && t.lang === audio.lang
+            );
+            const questionsCount = questionsCounts[`${ep.slug}-${audio.lang}`] || 0;
+
+            episodesWithData.push({
+                id: `${ep.slug}-${audio.lang}`, // Synthetic ID for UI
+                slug: ep.slug,
+                date: ep.date,
+                created_at: ep.created_at,
+                lang: audio.lang,
+                audio_url: audio.audio_url,
+                duration: audio.duration,
+                r2_object_key: audio.r2_object_key,
+                r2_bucket_name: audio.r2_bucket_name,
+                title: translation?.title || ep.slug,
+                transcript: transcript || null,
+                questionsCount
+            });
+        });
       });
 
       setEpisodes(episodesWithData);
