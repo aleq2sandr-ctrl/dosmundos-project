@@ -24,6 +24,7 @@ import { getAudioUrl } from '@/lib/audioUrl';
 import { usePlayer } from '@/contexts/PlayerContext';
 import assemblyAIService from '@/lib/assemblyAIService';
 import { generateQuestionsOpenAI } from '@/lib/openAIService';
+import { saveFullTranscriptToStorage } from '@/lib/transcriptStorageService';
 
 
 const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {

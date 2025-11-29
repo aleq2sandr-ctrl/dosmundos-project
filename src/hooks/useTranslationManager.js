@@ -199,15 +199,41 @@ const useTranslationManager = (currentLanguage, toast, episodes, setEpisodes) =>
         }
         const compactTranslated = buildEditedTranscriptData(translatedTranscript);
         
+        // Upload raw translated data to storage
+        const fileName = `${targetSlug}-${targetLang}-translation-raw.json`;
+        const rawJson = JSON.stringify(translatedTranscript);
+        const { error: uploadError } = await supabase.storage
+          .from('transcript')
+          .upload(fileName, rawJson, {
+            contentType: 'application/json',
+            upsert: true
+          });
+
+        let storageUrl = null;
+        if (!uploadError) {
+          const { data: { publicUrl } } = supabase.storage
+            .from('transcript')
+            .getPublicUrl(fileName);
+          storageUrl = publicUrl;
+        } else {
+          console.warn(`Translation raw upload failed for ${targetSlug}-${targetLang}:`, uploadError.message);
+        }
+
+        const upsertPayload = [{
+          episode_slug: targetSlug,
+          lang: targetLang,
+          title: compactTranslated.text?.slice(0, 100) + '...', // Simple title from text
+          status: 'completed',
+          edited_transcript_data: compactTranslated,
+          provider: 'openai-translation',
+          provider_id: new Date().toISOString(),
+          ...(storageUrl && { storage_url: storageUrl }),
+          updated_at: new Date().toISOString()
+        }];
+
         const { error: transcriptUpsertError } = await supabase
           .from('transcripts')
-          .upsert([{
-            episode_slug: targetSlug,
-            lang: targetLang,
-            status: 'completed',
-            edited_transcript_data: compactTranslated,
-            updated_at: new Date().toISOString()
-          }], {
+          .upsert(upsertPayload, {
             onConflict: 'episode_slug,lang'
           });
 

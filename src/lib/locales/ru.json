@@ -842,5 +842,6 @@
   "audioTrackSpanish": "Испанский",
   "audioTrackMixed": "Смешанный",
   "recognizeText": "Распознать текст",
-  "recognizeQuestions": "Распознать вопросы"
+  "recognizeQuestions": "Распознать вопросы",
+  "transcribing": "Транскрибирую..."
 }

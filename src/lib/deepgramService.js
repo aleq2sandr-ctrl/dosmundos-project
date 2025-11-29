@@ -163,6 +163,25 @@ export const saveTranscriptionResult = async (episodeSlug, lang, transcriptionDa
       updated_at: new Date().toISOString()
     };
 
+    // Upload raw transcription data to storage
+    const fileName = `${episodeSlug}-${lang}-deepgram-raw.json`;
+    const rawJson = JSON.stringify(transcriptionData);
+    const { error: uploadError } = await supabase.storage
+      .from('transcript')
+      .upload(fileName, rawJson, {
+        contentType: 'application/json',
+        upsert: true
+      });
+
+    if (!uploadError) {
+      const { data: { publicUrl } } = supabase.storage
+        .from('transcript')
+        .getPublicUrl(fileName);
+      transcriptPayload.storage_url = publicUrl;
+    } else {
+      console.warn(`Raw data upload failed for ${episodeSlug}-${lang}:`, uploadError.message);
+    }
+
     const { error } = await supabase
       .from('transcripts')
       .upsert(transcriptPayload, { onConflict: 'episode_slug,lang' });
@@ -172,16 +191,18 @@ export const saveTranscriptionResult = async (episodeSlug, lang, transcriptionDa
       throw error;
     }
 
-    // Generate AI summary
+    // Generate AI summary using OpenAI
     try {
-      const summary = await generateSummary(transcriptPayload.edited_transcript_data.text);
-      if (summary) {
-        await supabase
-          .from('transcripts')
-          .update({ short_description: summary })
-          .eq('episode_slug', episodeSlug)
-          .eq('lang', lang);
-      }
+      // TODO: Integrate real OpenAI summary generation
+      // const summary = await openAIService.generateSummary(transcriptPayload.edited_transcript_data.text);
+      // if (summary) {
+      //   await supabase
+      //     .from('transcripts')
+      //     .update({ short_description: summary })
+      //     .eq('episode_slug', episodeSlug)
+      //     .eq('lang', lang);
+      // }
+      console.log('Summary generation TODO: implement with openAIService');
     } catch (summaryError) {
       console.warn('Summary generation failed:', summaryError);
     }

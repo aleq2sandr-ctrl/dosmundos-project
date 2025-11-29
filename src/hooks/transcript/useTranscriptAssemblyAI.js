@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabaseClient';
 import assemblyAIService from '@/lib/assemblyAIService.js';
 import { getLocaleString } from '@/lib/locales';
 import { processTranscriptData, buildEditedTranscriptData, getFullTextFromUtterances } from '@/hooks/transcript/transcriptProcessingUtils';
-import { saveTranscriptInChunks } from '@/lib/transcriptChunkingService';
+import { saveFullTranscriptToStorage } from '@/lib/transcriptStorageService';
 import logger from '@/lib/logger';
 
 
@@ -77,33 +77,69 @@ const useTranscriptAssemblyAI = (
           console.warn('Non-fatal: could not set transcript status to completed promptly:', e);
         }
 
-        // 2) In the background, try to save compact edited data (small)
+        // 2) In the background, try to save compact edited data (small) + raw to storage + summary
         ;(async () => {
           try {
             const processed = processTranscriptData(result);
             const compactEdited = buildEditedTranscriptData(processed);
             logger.debug('[useTranscriptAssemblyAI] Saving compact edited_transcript_data', { dbTranscriptId, utterances: compactEdited?.utterances?.length || 0, textLen: getFullTextFromUtterances(compactEdited?.utterances || []).length });
-            const { error: editUpdateError } = await supabase
+
+            // Get episode_slug and lang for storage filename
+            const { data: transcriptInfo, error: infoError } = await supabase
               .from('transcripts')
-              .update({ edited_transcript_data: compactEdited })
-              .eq('id', dbTranscriptId);
-            if (editUpdateError) {
-              console.warn('Warning: Could not update edited_transcript_data:', editUpdateError);
+              .select('episode_slug, lang')
+              .eq('id', dbTranscriptId)
+              .single();
+
+            if (infoError || !transcriptInfo) {
+              logger.warn('[useTranscriptAssemblyAI] Could not get transcript info:', infoError?.message);
             } else {
-              logger.info('[useTranscriptAssemblyAI] edited_transcript_data saved', { dbTranscriptId });
+              // Upload raw result to storage
+              const fileName = `${transcriptInfo.episode_slug}-${transcriptInfo.lang}-assemblyai-raw.json`;
+              const rawJson = JSON.stringify(result);
+              const { error: uploadError } = await supabase.storage
+                .from('transcript')
+                .upload(fileName, rawJson, {
+                  contentType: 'application/json',
+                  upsert: true
+                });
+
+              let storageUrl = null;
+              if (!uploadError) {
+                const { data: { publicUrl } } = supabase.storage
+                  .from('transcript')
+                  .getPublicUrl(fileName);
+                storageUrl = publicUrl;
+                logger.info('[useTranscriptAssemblyAI] Raw uploaded:', storageUrl);
+              } else {
+                logger.warn(`Raw upload failed:`, uploadError.message);
+              }
+
+              // Update with edited + storage_url
+              const updatePayload = { edited_transcript_data: compactEdited };
+              if (storageUrl) {
+                updatePayload.storage_url = storageUrl;
+              }
+              const { error: editUpdateError } = await supabase
+                .from('transcripts')
+                .update(updatePayload)
+                .eq('id', dbTranscriptId);
+              
+              if (editUpdateError) {
+                console.warn('Warning: Could not update edited_transcript_data/storage_url:', editUpdateError);
+              } else {
+                logger.info('[useTranscriptAssemblyAI] edited_transcript_data and storage_url saved', { dbTranscriptId });
+              }
             }
           } catch (e) {
-            console.warn('Non-fatal: error building/saving compact edited transcript:', e?.message || e);
+            console.warn('Non-fatal: error building/saving compact edited transcript/storage:', e?.message || e);
           }
         })();
 
-        // 3) Finally, try to save full transcript payload using chunking service
+        // 3) Save full transcript to storage (replaces chunking)
         ;(async () => {
           try {
-            const approxSize = (() => { try { return JSON.stringify(result)?.length || 0; } catch (_) { return 0; } })();
-            logger.debug('[useTranscriptAssemblyAI] Saving full transcript using chunking service', { dbTranscriptId, approxSize });
-            
-            // Получаем episode_slug и lang для чанкования
+            // Получаем episode_slug и lang 
             const { data: transcriptInfo, error: infoError } = await supabase
               .from('transcripts')
               .select('episode_slug, lang')
@@ -111,36 +147,19 @@ const useTranscriptAssemblyAI = (
               .single();
             
             if (infoError || !transcriptInfo) {
-              logger.warn('[useTranscriptAssemblyAI] Could not get transcript info for chunking:', infoError?.message);
+              logger.warn('[useTranscriptAssemblyAI] Could not get transcript info for storage save:', infoError?.message);
               return;
             }
             
-            // Используем сервис чанкования
-            const chunkingResult = await saveTranscriptInChunks(
+            await saveFullTranscriptToStorage(
               transcriptInfo.episode_slug, 
               transcriptInfo.lang, 
-              result, 
-              {
-                maxChunkSize: 30000, // 30KB чанки для бесплатного плана
-                maxChunks: 100,
-                saveFullData: true,
-                saveCompactData: false
-              }
+              result
             );
             
-            if (chunkingResult.success) {
-              logger.info('[useTranscriptAssemblyAI] Transcript saved in chunks successfully', { 
-                dbTranscriptId, 
-                chunksSaved: chunkingResult.chunksSaved 
-              });
-            } else {
-              logger.warn('[useTranscriptAssemblyAI] Failed to save transcript in chunks', { 
-                dbTranscriptId, 
-                error: chunkingResult.error 
-              });
-            }
+            logger.info('[useTranscriptAssemblyAI] Full transcript saved to storage successfully', { dbTranscriptId });
           } catch (e) {
-            console.warn('Non-fatal: error saving full transcript:', e?.message || e);
+            logger.warn('[useTranscriptAssemblyAI] Non-fatal error saving full transcript to storage:', e?.message || e);
           }
         })();
       } else if (result.status === 'error') {

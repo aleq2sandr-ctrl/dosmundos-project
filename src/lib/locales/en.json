@@ -868,5 +868,6 @@
   "syncQueueDescription": "Manage pending synchronization tasks",
   "syncQueueEmpty": "Sync queue is empty",
   "manualSync": "Manual Sync",
-  "refreshStats": "Refresh Stats"
+  "refreshStats": "Refresh Stats",
+  "transcribing": "Transcribing..."
 }
