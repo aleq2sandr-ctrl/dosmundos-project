@@ -52,14 +52,12 @@ const InstantEpisodesPage = ({ currentLanguage, onLanguageChange }) => {
       const counts = {};
       const years = new Set();
       langFilteredEpisodes.forEach(ep => {
-        if (ep.date) {
-          years.add(new Date(ep.date).getFullYear().toString());
-        }
-        counts[ep.slug] = counts[ep.slug] || {};
-        ['ru', 'es', 'en', 'de', 'fr', 'pl'].forEach(lang => {
-          counts[ep.slug][lang] = 0; // Временно 0, обновим позже
-        });
-      });
+      if (ep.date) {
+        years.add(new Date(ep.date).getFullYear().toString());
+      }
+      counts[ep.slug] = counts[ep.slug] || {};
+      counts[ep.slug][currentLanguage] = 0; // считаем только для активного языка
+    });
       
       setAvailableYears(Array.from(years).sort((a,b) => Number(b) - Number(a)));
       setEpisodeQuestionsCount(counts);
@@ -84,16 +82,14 @@ const InstantEpisodesPage = ({ currentLanguage, onLanguageChange }) => {
         years.add(new Date(ep.date).getFullYear().toString());
       }
       counts[ep.slug] = counts[ep.slug] || {};
-      ['ru', 'es', 'en', 'de', 'fr', 'pl'].forEach(lang => {
-         const episodeQuestions = (questionsData || []).filter(q => 
-           q.episode_slug === ep.slug && 
-           q.lang === lang && 
-           (q.is_intro || q.is_full_transcript || q.id === 'intro-virtual' || (q.title && q.title.trim() !== ''))
-         );
-         // Сортируем вопросы по времени
-         episodeQuestions.sort((a, b) => (a.time || 0) - (b.time || 0));
-         counts[ep.slug][lang] = episodeQuestions.length;
-      });
+      const episodeQuestions = (questionsData || []).filter(q => 
+        q.episode_slug === ep.slug && 
+        q.lang === currentLanguage && 
+        (q.is_intro || q.is_full_transcript || q.id === 'intro-virtual' || (q.title && q.title.trim() !== ''))
+      );
+      // Сортируем вопросы по времени
+      episodeQuestions.sort((a, b) => (a.time || 0) - (b.time || 0));
+      counts[ep.slug][currentLanguage] = episodeQuestions.length;
     });
     
     setAvailableYears(Array.from(years).sort((a,b) => Number(b) - Number(a)));
@@ -122,7 +118,7 @@ const InstantEpisodesPage = ({ currentLanguage, onLanguageChange }) => {
           slug,
           date,
           created_at,
-          episode_translations (
+          transcripts (
             title,
             lang
           ),
@@ -144,7 +140,7 @@ const InstantEpisodesPage = ({ currentLanguage, onLanguageChange }) => {
 
       // Transform V3 data to flat structure for compatibility
       const episodesData = rawEpisodes.map(ep => {
-        const translations = ep.episode_translations || [];
+        const translations = ep.transcripts || [];
         const audios = ep.episode_audios || [];
         
         // Pick title: current language -> es -> first
@@ -172,17 +168,35 @@ const InstantEpisodesPage = ({ currentLanguage, onLanguageChange }) => {
       });
       
       // V3: Use timecodes table instead of questions
-      const { data: questionsData, error: questionsError } = await supabase
-        .from('timecodes')
-        .select('episode_slug, id, title, lang, time')
-        .order('time', { ascending: true }); 
-      
-      console.log('📊 [InstantEpisodesPage] Результат запроса questions:', { 
-        dataCount: questionsData?.length || 0, 
+      let questionsData = null;
+      let questionsError = null;
+
+      try {
+        const slugs = episodesData.map(e => e.slug);
+        const result = await supabase
+          .from('timecodes')
+          .select('episode_slug, id, title, lang, time')
+          .in('episode_slug', slugs)
+          .eq('lang', currentLanguage)
+          .order('time', { ascending: true });
+
+        questionsData = result.data;
+        questionsError = result.error;
+      } catch (err) {
+        console.warn('⚠️ [InstantEpisodesPage] Timecodes query failed, continuing without questions:', err.message);
+        questionsData = [];
+        questionsError = null;
+      }
+
+      console.log('📊 [InstantEpisodesPage] Результат запроса questions:', {
+        dataCount: questionsData?.length || 0,
         error: questionsError
       });
-      
-      if (questionsError) throw questionsError;
+
+      if (questionsError) {
+        console.warn('⚠️ [InstantEpisodesPage] Timecodes query error, continuing without questions:', questionsError.message);
+        questionsData = []; // Continue with empty questions data
+      }
 
       // Сохраняем в кэш
       await cacheIntegration.saveEpisodesPageData(episodesData, questionsData);
@@ -207,7 +221,7 @@ const InstantEpisodesPage = ({ currentLanguage, onLanguageChange }) => {
           slug,
           date,
           created_at,
-          episode_translations (
+          transcripts (
             title,
             lang
           ),
@@ -222,7 +236,7 @@ const InstantEpisodesPage = ({ currentLanguage, onLanguageChange }) => {
       if (!episodesError && rawEpisodes) {
         // Transform V3 data
         const episodesData = rawEpisodes.map(ep => {
-          const translations = ep.episode_translations || [];
+          const translations = ep.transcripts || [];
           const audios = ep.episode_audios || [];
           
           const titleObj = translations.find(t => t.lang === currentLanguage) 
@@ -248,10 +262,20 @@ const InstantEpisodesPage = ({ currentLanguage, onLanguageChange }) => {
         });
 
         // V3: Use timecodes table
-        const { data: questionsData } = await supabase
-          .from('timecodes')
-          .select('episode_slug, id, title, lang, time')
-          .order('time', { ascending: true });
+        let questionsData = [];
+        try {
+          const slugs = episodesData.map(e => e.slug);
+          const result = await supabase
+            .from('timecodes')
+            .select('episode_slug, id, title, lang, time')
+            .in('episode_slug', slugs)
+            .eq('lang', currentLanguage)
+            .order('time', { ascending: true });
+          questionsData = result.data || [];
+        } catch (err) {
+          console.debug('Background timecodes query failed:', err.message);
+          questionsData = [];
+        }
 
         // Обновляем кэш в фоне
         await cacheIntegration.saveEpisodesPageData(episodesData, questionsData);
@@ -274,11 +298,9 @@ const InstantEpisodesPage = ({ currentLanguage, onLanguageChange }) => {
       const allQuestions = [];
 
       for (const episode of episodesList) {
-        for (const lang of ['ru', 'es', 'en', 'de', 'fr', 'pl']) {
-          const cachedQuestions = await cacheIntegration.loadPlayerPageData(episode.slug, lang);
-          if (cachedQuestions.questions) {
-            allQuestions.push(...cachedQuestions.questions);
-          }
+        const cachedQuestions = await cacheIntegration.loadPlayerPageData(episode.slug, currentLanguage);
+        if (cachedQuestions.questions) {
+          allQuestions.push(...cachedQuestions.questions);
         }
       }
       
@@ -306,16 +328,14 @@ const InstantEpisodesPage = ({ currentLanguage, onLanguageChange }) => {
     const counts = {};
     episodesList.forEach(ep => {
       counts[ep.slug] = counts[ep.slug] || {};
-      ['ru', 'es', 'en', 'de', 'fr', 'pl'].forEach(lang => {
-         const episodeQuestions = (questionsList || []).filter(q => 
-           q.episode_slug === ep.slug && 
-           q.lang === lang && 
-           (q.is_intro || q.is_full_transcript || q.id === 'intro-virtual' || (q.title && q.title.trim() !== ''))
-         );
-         // Сортируем вопросы по времени
-         episodeQuestions.sort((a, b) => (a.time || 0) - (b.time || 0));
-         counts[ep.slug][lang] = episodeQuestions.length;
-      });
+      const episodeQuestions = (questionsList || []).filter(q => 
+        q.episode_slug === ep.slug && 
+        q.lang === currentLanguage && 
+        (q.is_intro || q.is_full_transcript || q.id === 'intro-virtual' || (q.title && q.title.trim() !== ''))
+      );
+      // Сортируем вопросы по времени
+      episodeQuestions.sort((a, b) => (a.time || 0) - (b.time || 0));
+      counts[ep.slug][currentLanguage] = episodeQuestions.length;
     });
     setEpisodeQuestionsCount(counts);
   };

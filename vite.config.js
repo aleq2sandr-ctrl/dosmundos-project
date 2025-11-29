@@ -226,6 +226,21 @@ export default defineConfig({
 				target: process.env.VITE_DEV_API_PROXY_TARGET || 'http://localhost:3000',
 				changeOrigin: true,
 				secure: false
+			},
+			'/supabase-rest': {
+				target: 'https://supabase.dosmundos.pe',
+				changeOrigin: true,
+				secure: true,
+				configure: (proxy, options) => {
+					proxy.on('proxyReq', (proxyReq, req, res) => {
+						req.headers.forEach((value, key) => {
+							proxyReq.setHeader(key, value);
+						});
+					});
+					proxy.on('error', (err, req, res) => {
+						console.error('Supabase proxy error:', err);
+					});
+				}
 			}
 		}
 	},

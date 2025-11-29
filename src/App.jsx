@@ -9,8 +9,6 @@ import { TelegramProvider } from '@/contexts/TelegramContext';
 import { getLocaleString } from '@/lib/locales';
 import InstantEpisodesPage from '@/pages/InstantEpisodesPage';
 import PlayerPage from '@/pages/PlayerPage';
-import ManagePage from '@/pages/ManageEpisodesPage';
-import UploadPage from '@/pages/UploadPage';
 import NotFoundPage from '@/pages/NotFoundPage';
 import DeepSearchPage from '@/pages/DeepSearchPage';
 import OfflineSettingsPage from '@/pages/OfflineSettingsPage';
@@ -144,8 +142,6 @@ const AppLayout = ({ user }) => {
           
           {/* Старые маршруты без языкового префикса - редиректим */}
           <Route path="/episodes" element={<Navigate to="/ru/episodes" replace />} />
-          <Route path="/manage" element={<Navigate to="/ru/manage" replace />} />
-          <Route path="/upload" element={<Navigate to="/ru/upload" replace />} />
           <Route path="/deep-search" element={<Navigate to="/ru/deep-search" replace />} />
           <Route path="/edit" element={<Navigate to="/ru/edit" replace />} />
           <Route path="/analytics" element={<Navigate to="/ru/analytics" replace />} />
@@ -197,16 +193,6 @@ const AppLayout = ({ user }) => {
           } />
           <Route path="/:lang/episode/:episodeSlug" element={
             <LegacyEpisodeRedirect />
-          } />
-          <Route path="/:lang/manage" element={
-            <LanguageRouteWrapper>
-              <ManagePage />
-            </LanguageRouteWrapper>
-          } />
-          <Route path="/:lang/upload" element={
-            <LanguageRouteWrapper>
-              <UploadPage />
-            </LanguageRouteWrapper>
           } />
           <Route path="/:lang/deep-search" element={
             <LanguageRouteWrapper>

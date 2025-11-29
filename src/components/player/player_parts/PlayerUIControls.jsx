@@ -7,16 +7,16 @@ import { formatFullTime } from '@/lib/utils';
 import { getLocaleString } from '@/lib/locales';
 import PlayerSettingsMenu from './PlayerSettingsMenu';
 
-const PlayerUIControls = React.memo(({ 
-  activeQuestionTitle, 
-  isPlaying, 
-  currentLanguage, 
-  currentTime, 
-  duration, 
-  onProgressChange, 
-  questions, 
-  onQuestionSelectJump, 
-  onNavigateQuestion, 
+const PlayerUIControls = React.memo(({
+  activeQuestionTitle,
+  isPlaying,
+  currentLanguage,
+  currentTime,
+  duration,
+  onProgressChange,
+  questions,
+  onQuestionSelectJump,
+  onNavigateQuestion,
   onTogglePlayPause,
   onSkip,
   playerControlsContainerRef,
@@ -32,7 +32,13 @@ const PlayerUIControls = React.memo(({
   isOfflineMode = false,
   availableAudioVariants = [],
   selectedAudioLang,
-  onAudioTrackChange
+  onAudioTrackChange,
+  hasTranscript = false,
+  hasQuestions = false,
+  onRecognizeText,
+  onRecognizeQuestions,
+  isRecognizingText = false,
+  isRecognizingQuestions = false
 }) => {
   
   return (
@@ -69,6 +75,12 @@ const PlayerUIControls = React.memo(({
             availableAudioVariants={availableAudioVariants}
             selectedAudioLang={selectedAudioLang}
             onAudioTrackChange={onAudioTrackChange}
+            hasTranscript={hasTranscript}
+            hasQuestions={hasQuestions}
+            onRecognizeText={onRecognizeText}
+            onRecognizeQuestions={onRecognizeQuestions}
+            isRecognizingText={isRecognizingText}
+            isRecognizingQuestions={isRecognizingQuestions}
           />
           <Button variant="ghost" size="icon" onClick={() => onNavigateQuestion(-1)} className="text-white/80 hover:text-white hover:bg-white/15 h-9 w-9 sm:h-10 sm:w-10 md:h-11 md:w-11" aria-label={getLocaleString('previousQuestion', currentLanguage)}>
             <ChevronLeft className="h-5 w-5 sm:h-5 sm:w-5 md:h-6 md:w-6" />

@@ -79,15 +79,47 @@ export const PlayerProvider = ({ children }) => {
         console.error('🎵 [PlayerContext] No audioRef.current available');
       }
     } else {
-      console.log('🎵 [PlayerContext] Same episode, ensuring playback');
-      // If same episode, just ensure it's playing
-      if (!isPlaying) {
-        togglePlay();
-      } else {
-        // If playing and seeking to different time
-        if (Math.abs(audioRef.current.currentTime - startTime) > 0.5) {
+      // Same episode slug - but audio track may have changed
+      const newAudioUrl = episode.audioUrl || episode.audio_url;
+      const currentAudioUrl = currentEpisode?.audioUrl || currentEpisode?.audio_url;
+
+      if (newAudioUrl && newAudioUrl !== currentAudioUrl) {
+        console.log('🎵 [PlayerContext] Same episode, switching audio track');
+        // Update current episode object to reflect new audio URL/lang
+        setCurrentEpisode(prev => ({ ...prev, ...episode }));
+        setCurrentTime(startTime);
+        setIsPlaying(true);
+        setIsGlobalPlayerVisible(true);
+        setAutoplayBlocked(false);
+
+        if (audioRef.current) {
+          audioRef.current.src = newAudioUrl;
           audioRef.current.currentTime = startTime;
-          setCurrentTime(startTime);
+          audioRef.current.playbackRate = playbackRate;
+          audioRef.current.load();
+
+          audioRef.current.play().then(() => {
+            console.log('🎵 [PlayerContext] Track switch play successful');
+            setAutoplayBlocked(false);
+          }).catch(e => {
+            console.error('[PlayerContext] Play error after track switch:', e);
+            setIsPlaying(false);
+            if (e.name === 'NotAllowedError') {
+              setAutoplayBlocked(true);
+            }
+          });
+        }
+      } else {
+        console.log('🎵 [PlayerContext] Same episode, ensuring playback');
+        // If same episode, just ensure it's playing
+        if (!isPlaying) {
+          togglePlay();
+        } else {
+          // If playing and seeking to different time
+          if (Math.abs(audioRef.current.currentTime - startTime) > 0.5) {
+            audioRef.current.currentTime = startTime;
+            setCurrentTime(startTime);
+          }
         }
       }
     }

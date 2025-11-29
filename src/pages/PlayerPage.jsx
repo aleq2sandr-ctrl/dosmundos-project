@@ -5,7 +5,7 @@ import { useToast } from '@/components/ui/use-toast';
 import PodcastPlayer from '@/components/PodcastPlayer'; 
 import QuestionsManager from '@/components/player/QuestionsManager';
 import FloatingPlayerControls from '@/components/player/FloatingPlayerControls';
-import { getLocaleString } from '@/lib/locales';
+import { getLocaleString, getPluralizedLocaleString } from '@/lib/locales';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { formatShortDate } from '@/lib/utils';
@@ -22,6 +22,8 @@ import { saveEditToHistory } from '@/services/editHistoryService';
 import useAudioPrefetch from '@/hooks/player/useAudioPrefetch';
 import { getAudioUrl } from '@/lib/audioUrl';
 import { usePlayer } from '@/contexts/PlayerContext';
+import assemblyAIService from '@/lib/assemblyAIService';
+import { generateQuestionsOpenAI } from '@/lib/openAIService';
 
 
 const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
@@ -62,6 +64,8 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
   const playerControlsContainerRef = useRef(null);
   const [editingQuestion, setEditingQuestion] = useState(null);
   const [allEpisodesForPrefetch, setAllEpisodesForPrefetch] = useState([]);
+  const [isRecognizingText, setIsRecognizingText] = useState(false);
+  const [isRecognizingQuestions, setIsRecognizingQuestions] = useState(false);
   const { playEpisode, audioRef, currentEpisode, currentTime, duration, isPlaying } = usePlayer();
   
   // Загрузка списка эпизодов для prefetch
@@ -389,43 +393,75 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
     if (!episodeData || !episodeData.slug) return;
     const langForContent = episodeData.lang === 'all' ? currentLanguage : episodeData.lang;
 
-    // Split large payloads to avoid HTTP2 errors
-    const compactEdited = {
-      utterances: newTranscriptData.utterances || []
-    };
+    console.log('🔊 [Transcript] Updating transcript with', newTranscriptData.utterances?.length || 0, 'utterances');
     
-    // Retry logic for large payloads
-    let retryCount = 0;
-    const maxRetries = 3;
+    // Save chunks to transcript_chunks table
+    const chunkSize = 50; // utterances per chunk
+    const chunks = [];
     
-    while (retryCount < maxRetries) {
-      try {
-        const { error: updateError } = await supabase
-          .from('transcripts')
-          .update({ edited_transcript_data: compactEdited, status: 'completed' })
-          .eq('episode_slug', episodeData.slug)
-          .eq('lang', langForContent);
+    for (let i = 0; i < newTranscriptData.utterances.length; i += chunkSize) {
+      const chunk = newTranscriptData.utterances.slice(i, i + chunkSize);
+      chunks.push({
+        episode_slug: episodeData.slug,
+        lang: langForContent,
+        chunk_type: 'edited_transcript',
+        chunk_index: Math.floor(i / chunkSize),
+        chunk_data: { utterances: chunk }
+      });
+    }
+    
+    console.log('🔊 [Transcript] Creating', chunks.length, 'edited chunks of', chunkSize, 'utterances each');
+    
+    // Update metadata first
+    const { error: updateError } = await supabase
+      .from('transcripts')
+      .update({ 
+        edited_transcript_data: { utterance_count: newTranscriptData.utterances.length },
+        updated_at: new Date().toISOString()
+      })
+      .eq('episode_slug', episodeData.slug)
+      .eq('lang', langForContent);
 
-        if (updateError) {
-          console.error("Error updating transcript:", updateError);
-          toast({ title: getLocaleString('errorGeneric', currentLanguage), description: `Failed to update transcript: ${updateError.message}`, variant: "destructive" });
-        } else {
-          setTranscript(newTranscriptData); 
-        }
-        break; // Success, exit retry loop
-      } catch (err) {
-        retryCount++;
-        if (retryCount >= maxRetries) {
-          toast({ title: getLocaleString('errorGeneric', currentLanguage), description: `Failed to update transcript: ${err.message}`, variant: "destructive" });
-        } else {
-          console.warn(`Retry ${retryCount}/${maxRetries} for transcript update:`, err.message);
-          await new Promise(resolve => setTimeout(resolve, 1000 * retryCount)); // Exponential backoff
-        }
+    if (updateError) {
+      console.error("Error updating transcript metadata:", updateError);
+      toast({ title: getLocaleString('errorGeneric', currentLanguage), description: `Failed to update transcript: ${updateError.message}`, variant: "destructive" });
+      return;
+    }
+    
+    // Clear existing edited chunks and save new ones
+    const { error: deleteError } = await supabase
+      .from('transcript_chunks')
+      .delete()
+      .eq('episode_slug', episodeData.slug)
+      .eq('lang', langForContent)
+      .eq('chunk_type', 'edited_transcript');
+      
+    if (deleteError) {
+      console.error("Error clearing old edited chunks:", deleteError);
+    }
+    
+    // Save new chunks in batches
+    const batchSize = 5; // chunks per batch
+    for (let i = 0; i < chunks.length; i += batchSize) {
+      const batch = chunks.slice(i, i + batchSize);
+      console.log(`🔊 [Transcript] Saving edited batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(chunks.length/batchSize)}`);
+      
+      const { error: chunkError } = await supabase
+        .from('transcript_chunks')
+        .upsert(batch, { onConflict: 'episode_slug,lang,chunk_type,chunk_index' });
+        
+      if (chunkError) {
+        console.error("Error saving edited transcript chunks:", chunkError);
+        toast({ title: getLocaleString('errorGeneric', currentLanguage), description: `Failed to save chunks: ${chunkError.message}`, variant: "destructive" });
+        return;
       }
     }
+    
+    console.log('🔊 [Transcript] All edited chunks saved successfully!');
+    setTranscript(newTranscriptData); 
+    toast({ title: getLocaleString('success', currentLanguage), description: 'Транскрипт обновлен!' });
   }, [episodeData, currentLanguage, toast, setTranscript]);
 
-  // Адаптер для совместимости с useSegmentEditing
   const handleSegmentEdit = useCallback(async (newUtterances, actionType, originalSegment, updatedSegment) => {
     if (!episodeData || !episodeData.slug || !transcript) return;
     
@@ -522,6 +558,255 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
     playerEpisodeDataMemo?.lang
   );
 
+  // Recognition handlers
+  const handleRecognizeText = useCallback(async () => {
+    if (!episodeData?.slug) return;
+
+    // Check if we have audio URL
+    const audioUrl = getAudioUrl(episodeData);
+    if (!audioUrl) {
+      toast({
+        title: getLocaleString('errorGeneric', currentLanguage),
+        description: getLocaleString('audioFileNotAvailable', currentLanguage) || 'Аудио файл недоступен',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const langForTranscription = episodeData.lang === 'all' ? currentLanguage : episodeData.lang;
+
+    // Check for existing transcript record
+    const { data: existingTranscript } = await supabase
+      .from('transcripts')
+      .select('*')
+      .eq('episode_slug', episodeData.slug)
+      .eq('lang', langForTranscription)
+      .single();
+
+    if (existingTranscript) {
+      if (existingTranscript.status === 'completed') {
+        toast({
+          title: getLocaleString('success', currentLanguage),
+          description: getLocaleString('transcriptionAlreadyReady', currentLanguage) || 'Текст уже распознан',
+        });
+        refreshAllData();
+        return;
+      }
+
+      if (existingTranscript.provider_id && existingTranscript.status !== 'error') {
+        // Resume polling existing job
+        setIsRecognizingText(true);
+        try {
+          const result = await assemblyAIService.getTranscriptionResult(existingTranscript.provider_id, currentLanguage);
+          
+          if (result.status === 'completed') {
+            // Process transcript data
+            const { processTranscriptData } = await import('@/hooks/transcript/transcriptProcessingUtils');
+            const processedResult = processTranscriptData(result);
+
+            // Update database with processed data and save chunks separately
+            console.log('🔊 [Transcript] Raw result size:', JSON.stringify(result).length, 'bytes');
+            console.log('🔊 [Transcript] Processed result size:', JSON.stringify(processedResult).length, 'bytes');
+            
+            // Save only metadata to transcripts table
+            const transcriptMetadata = {
+              transcript_id: result.transcript_id,
+              status: result.status,
+              utterance_count: result.utterances?.length || 0,
+              provider_id: result.id
+            };
+            
+            console.log('🔊 [Transcript] Metadata size:', JSON.stringify(transcriptMetadata).length, 'bytes');
+            
+            // Save chunks to transcript_chunks table for both original and edited
+            const chunkSize = 50; // utterances per chunk
+            const chunks = [];
+            
+            // Save original transcript chunks
+            for (let i = 0; i < processedResult.utterances.length; i += chunkSize) {
+              const chunk = processedResult.utterances.slice(i, i + chunkSize);
+              chunks.push({
+                episode_slug: episodeData.slug,
+                lang: langForTranscription,
+                chunk_type: 'transcript',
+                chunk_index: Math.floor(i / chunkSize),
+                chunk_data: { utterances: chunk }
+              });
+            }
+            
+            // Save edited transcript chunks (same as original initially)
+            for (let i = 0; i < processedResult.utterances.length; i += chunkSize) {
+              const chunk = processedResult.utterances.slice(i, i + chunkSize);
+              chunks.push({
+                episode_slug: episodeData.slug,
+                lang: langForTranscription,
+                chunk_type: 'edited_transcript',
+                chunk_index: Math.floor(i / chunkSize),
+                chunk_data: { utterances: chunk }
+              });
+            }
+            
+            console.log('🔊 [Transcript] Creating', chunks.length, 'chunks (', chunks.length/2, 'original + ', chunks.length/2, 'edited) of', chunkSize, 'utterances each');
+            
+            // First update metadata
+            const { error: updateError } = await supabase
+              .from('transcripts')
+              .update({
+                status: 'completed',
+                transcript_data: transcriptMetadata,
+                edited_transcript_data: { utterance_count: processedResult.utterances.length }
+              })
+              .eq('id', existingTranscript.id);
+
+            if (updateError) {
+              console.error("Error updating transcript metadata:", updateError);
+              throw updateError;
+            }
+            
+            // Then save chunks in batches
+            const batchSize = 5; // chunks per batch
+            for (let i = 0; i < chunks.length; i += batchSize) {
+              const batch = chunks.slice(i, i + batchSize);
+              console.log(`🔊 [Transcript] Saving batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(chunks.length/batchSize)}`);
+              
+              const { error: chunkError } = await supabase
+                .from('transcript_chunks')
+                .upsert(batch, { onConflict: 'episode_slug,lang,chunk_type,chunk_index' });
+                
+              if (chunkError) {
+                console.error("Error saving transcript chunks:", chunkError);
+                throw chunkError;
+              }
+            }
+            
+            console.log('🔊 [Transcript] All chunks saved successfully!');
+
+            toast({
+              title: getLocaleString('success', currentLanguage),
+              description: getLocaleString('transcriptionCompleted', currentLanguage) || 'Распознавание завершено!',
+            });
+            refreshAllData();
+          } else if (result.status === 'error') {
+            toast({
+              title: getLocaleString('error', currentLanguage),
+              description: getLocaleString('transcriptionError', currentLanguage) || 'Ошибка распознавания. Можно повторить.',
+              variant: 'destructive',
+            });
+          } else {
+            toast({
+              title: getLocaleString('transcriptionInProgressTitle', currentLanguage),
+              description: getLocaleString('transcriptionInProgressDescription', currentLanguage) || 'Распознавание в процессе...',
+            });
+          }
+        } catch (pollError) {
+          console.error('Polling error:', pollError);
+          toast({
+            title: getLocaleString('error', currentLanguage),
+            description: 'Ошибка проверки статуса. Попробуйте позже.',
+            variant: 'destructive',
+          });
+        } finally {
+          setIsRecognizingText(false);
+        }
+        return;
+      }
+
+      // If error status or no provider_id, allow new submission
+    }
+
+    // Submit new job
+    setIsRecognizingText(true);
+    try {
+      const job = await assemblyAIService.submitTranscription(
+        audioUrl,
+        langForTranscription === 'all' ? 'es' : langForTranscription,
+        episodeData.slug,
+        currentLanguage,
+        langForTranscription
+      );
+
+      const transcriptId = job?.id;
+      if (!transcriptId) throw new Error('No transcript ID returned from AssemblyAI');
+
+      // Save to database
+      const transcriptPayload = {
+        episode_slug: episodeData.slug,
+        lang: langForTranscription,
+        provider_id: transcriptId,
+        status: 'processing'
+      };
+
+      await supabase.from('transcripts').upsert(transcriptPayload, { onConflict: 'episode_slug,lang' });
+
+      toast({
+        title: getLocaleString('success', currentLanguage),
+        description: getLocaleString('transcriptionStarted', currentLanguage) || 'Распознавание текста начато',
+      });
+    } catch (error) {
+      console.error('Error starting transcription:', error);
+      toast({
+        title: getLocaleString('error', currentLanguage),
+        description: error.message || getLocaleString('transcriptionError', currentLanguage),
+        variant: 'destructive',
+      });
+    } finally {
+      setIsRecognizingText(false);
+    }
+  }, [episodeData, currentLanguage, toast, refreshAllData]);
+
+  const handleRecognizeQuestions = useCallback(async () => {
+    if (!episodeData?.slug) return;
+
+    setIsRecognizingQuestions(true);
+    try {
+      const langForQuestions = episodeData.lang === 'all' ? currentLanguage : episodeData.lang;
+
+      // Get transcript data first
+      const { data: transcriptData } = await supabase
+        .from('transcripts')
+        .select('edited_transcript_data')
+        .eq('episode_slug', episodeData.slug)
+        .eq('lang', langForQuestions)
+        .single();
+
+      if (!transcriptData || !transcriptData.edited_transcript_data) {
+        throw new Error(getLocaleString('transcriptRequired', currentLanguage));
+      }
+
+      const questions = await generateQuestionsOpenAI(transcriptData.edited_transcript_data, langForQuestions, currentLanguage);
+
+      if (!Array.isArray(questions) || questions.length === 0) {
+        throw new Error(getLocaleString('questionsGenerationFailed', currentLanguage));
+      }
+
+      // Save questions to database
+      await supabase.from('timecodes').delete().eq('episode_slug', episodeData.slug).eq('lang', langForQuestions);
+
+      const questionsToInsert = questions.map((q, index) => ({
+        episode_slug: episodeData.slug,
+        lang: langForQuestions,
+        title: q.title,
+        time: Number(q.time ?? 0)
+      }));
+
+      await supabase.from('timecodes').insert(questionsToInsert);
+
+      toast({
+        title: getLocaleString('success', currentLanguage),
+        description: getPluralizedLocaleString('questionsGeneratedForEpisode', currentLanguage, questions.length, { episodeSlug: episodeData.slug, lang: langForQuestions.toUpperCase() }),
+      });
+    } catch (error) {
+      console.error('Error generating questions:', error);
+      toast({
+        title: getLocaleString('error', currentLanguage),
+        description: error.message || getLocaleString('questionsGenerationError', currentLanguage),
+        variant: 'destructive',
+      });
+    } finally {
+      setIsRecognizingQuestions(false);
+    }
+  }, [episodeData, currentLanguage, toast]);
+
   // Пока не получили базовые данные эпизода — показываем простой лоадер
   if (loading && !episodeData) {
     return (
@@ -580,7 +865,7 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
                 onQuestionUpdate={handleQuestionUpdate}
                 currentLanguage={currentLanguage}
                 onQuestionSelectJump={handleSeekToTime}
-                audioRef={audioRef} 
+                audioRef={audioRef}
                 episodeSlug={playerEpisodeDataMemo.slug}
                 episodeAudioUrl={getAudioUrl(playerEpisodeDataMemo)}
                 episodeLang={playerEpisodeDataMemo.lang}
@@ -595,6 +880,10 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
                 onTranscriptUpdate={handleTranscriptUpdate}
                 fetchTranscriptForEpisode={fetchTranscriptForEpisode}
                 isOfflineMode={isOfflineMode}
+                onRecognizeText={handleRecognizeText}
+                onRecognizeQuestions={handleRecognizeQuestions}
+                isRecognizingText={isRecognizingText}
+                isRecognizingQuestions={isRecognizingQuestions}
             />
           )}
         </div>

@@ -184,8 +184,8 @@ const useTranscriptAssemblyAI = (
       setTranscriptionJobId(job.id);
 
       let dbOp = existingDbTranscriptEntry?.id
-        ? supabase.from('transcripts').update({ assemblyai_transcript_id: job.id, status: job.status, lang: transcriptLangForDb, updated_at: new Date().toISOString() }).eq('id', existingDbTranscriptEntry.id)
-        : supabase.from('transcripts').insert([{ episode_slug: episodeSlug, lang: transcriptLangForDb, assemblyai_transcript_id: job.id, status: job.status }]);
+        ? supabase.from('transcripts').update({ provider_id: job.id, status: job.status, lang: transcriptLangForDb, updated_at: new Date().toISOString() }).eq('id', existingDbTranscriptEntry.id)
+        : supabase.from('transcripts').insert([{ episode_slug: episodeSlug, lang: transcriptLangForDb, provider_id: job.id, status: job.status }]);
       
       // Retry logic for large payloads
       let retryCount = 0;

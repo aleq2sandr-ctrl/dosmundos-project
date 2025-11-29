@@ -55,21 +55,5 @@ Stores marked time points (formerly "questions") for an episode.
 | `title` | `text` | Title or description of the timecode/question. |
 | `created_at` | `timestamptz` | Timestamp of creation. |
 
-## Deprecated Tables (Backup)
-
-These tables contain data from the V1 schema and are kept for backup purposes.
-
-*   `episodes_old`
-*   `questions_old`
-*   `transcripts_old`
-
-## Relationships
-
-*   **One-to-Many**: `episodes` -> `episode_variants`
-*   **One-to-Many**: `episodes` -> `transcripts`
-*   **One-to-Many**: `episodes` -> `timecodes`
-
-## Realtime Subscriptions
-
 The application listens for realtime updates on the following tables:
 *   `timecodes` (for instant updates when adding/editing questions)

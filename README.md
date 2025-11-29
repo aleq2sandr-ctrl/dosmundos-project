@@ -22,9 +22,12 @@ npm run preview    # просмотр сборки
 
 ## Переменные окружения
 
+
 Frontend:
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
+- `DEEPSEEK_API_KEY` — ключ для DeepSeek (переводы)
+- `ASSEMBLYAI_API_KEY` — ключ для AssemblyAI (транскрибация)
 
 ## Деплой на VPS из GitHub Actions
 

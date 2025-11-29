@@ -13,44 +13,29 @@ const initializeAssemblyAI = async () => {
     logger.debug("Using cached AssemblyAI API key");
     return assemblyAIApiKey;
   }
-  
+
   try {
     logger.info("Initializing AssemblyAI API key...");
-    
-    // 1) Try localStorage (user-provided in settings UI)
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        const stored = window.localStorage.getItem('ASSEMBLYAI_API_KEY');
-        if (stored && typeof stored === 'string' && stored.trim()) {
-          assemblyAIApiKey = stored.trim();
-          logger.info("AssemblyAI API key loaded from localStorage");
-          return assemblyAIApiKey;
-        } else {
-          logger.debug("No AssemblyAI API key found in localStorage");
-        }
+
+    // Get API key from environment variable (from .env file)
+    if (import.meta.env?.VITE_ASSEMBLYAI_API_KEY) {
+      assemblyAIApiKey = import.meta.env.VITE_ASSEMBLYAI_API_KEY;
+      logger.info("AssemblyAI API key loaded from environment variable");
+      return assemblyAIApiKey;
+    }
+
+    // If not found in environment, try localStorage as fallback
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const stored = window.localStorage.getItem('ASSEMBLYAI_API_KEY');
+      if (stored && typeof stored === 'string' && stored.trim()) {
+        assemblyAIApiKey = stored.trim();
+        logger.info("AssemblyAI API key loaded from localStorage (fallback)");
+        return assemblyAIApiKey;
       }
-    } catch (err) {
-      logger.warn('Failed to read ASSEMBLYAI_API_KEY from localStorage:', err?.message);
     }
 
-    logger.info("Attempting to fetch AssemblyAI API key via Edge Function...");
-    const { data, error } = await supabase.functions.invoke('get-env-variables', {
-      body: { variable_names: ['ASSEMBLYAI_API_KEY'] },
-    });
-
-    if (error) {
-      logger.error('Error invoking get-env-variables Edge Function for AssemblyAI:', error);
-      throw new Error(`Failed to fetch AssemblyAI API key: ${error.message || 'Edge Function invocation failed'}`);
-    }
-    
-    if (!data || !data.ASSEMBLYAI_API_KEY) {
-      logger.error('AssemblyAI API key not found in Edge Function response:', data);
-      throw new Error('AssemblyAI API key is not available from server.');
-    }
-    
-    assemblyAIApiKey = data.ASSEMBLYAI_API_KEY;
-    logger.info("AssemblyAI API key fetched successfully from Edge Function");
-    return assemblyAIApiKey;
+    logger.error('No AssemblyAI API key found in environment variables or localStorage');
+    throw new Error('AssemblyAI API key is not configured. Please add VITE_ASSEMBLYAI_API_KEY to .env file.');
   } catch (error) {
     logger.error('Error initializing AssemblyAI:', error);
     throw error;

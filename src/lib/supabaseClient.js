@@ -1,9 +1,21 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Получаем переменные из .env файла
-// В Vite переменные должны начинаться с VITE_ чтобы быть доступными в браузере
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// TEMP FIX - 2024-11-29 7:10AM - FORCE HARDCODED VALUES
+console.log('🔥 [TEMP FIX] File updated at:', new Date().toISOString());
+
+// Debug: Check if import.meta.env is available and what it contains
+console.log('🔍 [DEBUG] import.meta.env available:', !!import.meta.env);
+console.log('🔍 [DEBUG] MODE:', import.meta.env.MODE);
+console.log('🔍 [DEBUG] DEV:', import.meta.env.DEV);
+console.log('🔍 [DEBUG] PROD:', import.meta.env.PROD);
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://supabase.dosmundos.pe';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlLWRlbW8iLCJpYXQiOjE2NDE3NjkyMDAsImV4cCI6MTk5OTk5OTk5OX0.A4_N08ZorXYT17zhZReBXPlY6L5-9d8thMbm7TcDWl8';
+
+// Debug: Log what we're actually reading
+console.log('🔍 [DEBUG] Raw supabaseUrl:', supabaseUrl);
+console.log('🔍 [DEBUG] Raw supabaseAnonKey:', supabaseAnonKey);
+console.log('🔍 [DEBUG] All env vars:', import.meta.env);
 
 
 // Проверка наличия переменных окружения
@@ -27,7 +39,17 @@ if (cleanAnonKey.split('.').length !== 3) {
 }
 
 // Создаем клиент с настройками для оптимизации и обработки ошибок
-export const supabase = createClient(supabaseUrl, cleanAnonKey, {
+console.log('🔍 [DEBUG] About to create client with URL:', supabaseUrl);
+console.log('🔍 [DEBUG] URL type:', typeof supabaseUrl);
+console.log('🔍 [DEBUG] URL length:', supabaseUrl ? supabaseUrl.length : 'undefined');
+
+// Force correct URL
+const finalUrl = 'https://supabase.dosmundos.pe';
+const finalKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlLWRlbW8iLCJpYXQiOjE2NDE3NjkyMDAsImV4cCI6MTk5OTk5OTk5OX0.A4_N08ZorXYT17zhZReBXPlY6L5-9d8thMbm7TcDWl8';
+
+console.log('🔍 [DEBUG] Using final URL:', finalUrl);
+
+export const supabase = createClient(finalUrl, finalKey, {
   // Для self-hosted временно отключаем realtime чтобы избежать WebSocket ошибок
   ...(isSelfHosted && {
     realtime: {
@@ -83,6 +105,8 @@ export const supabase = createClient(supabaseUrl, cleanAnonKey, {
       // Удаляем заголовки которые могут вызывать CORS проблемы
       delete headers['accept-profile'];
       delete headers['content-profile'];
+      delete headers['http2-settings'];
+      delete headers['upgrade'];
       
       // Add HTTP/2 compatibility headers
       headers['connection'] = 'keep-alive';
@@ -112,7 +136,15 @@ export const supabase = createClient(supabaseUrl, cleanAnonKey, {
       }
       
       console.log('🔧 [Supabase] Fetch URL:', url);
-      // console.log('🔧 [Supabase] Final Headers:', headers); // Uncomment for debugging
+      console.log('🔧 [Supabase] Fetch method:', options.method);
+      console.log('🔧 [Supabase] Request body size:', options.body ? options.body.length : 'no body');
+      console.log('🔧 [Supabase] Final Headers:', headers); // Uncomment for debugging
+      
+      // Log specific info for large requests
+      if (options.body && options.body.length > 100000) {
+        console.warn('🔧 [Supabase] LARGE REQUEST DETECTED!');
+        console.warn('🔧 [Supabase] Body preview:', options.body.substring(0, 200) + '...');
+      }
       
       // Add timeout and abort controller for better error handling
       const controller = new AbortController();
@@ -154,6 +186,8 @@ if (isSelfHosted) {
       // Удаляем только проблемные CORS заголовки
       delete headers['accept-profile'];
       delete headers['content-profile'];
+      delete headers['http2-settings'];
+      delete headers['upgrade'];
       
       // Убеждаемся что API ключ сохранен
       if (!headers['apikey'] && cleanAnonKey) {
@@ -183,32 +217,54 @@ if (isSelfHosted) {
       }
       
       // Функция для выполнения запроса с повторными попытками
-      const fetchWithRetry = async (attempt = 1) => {
+      const fetchWithRetry = async (attempt = 1, forceHttp1 = false) => {
         // Add timeout and abort controller for better error handling
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
-        
+
+        // Force HTTP/1.1 if requested or if this is a timecodes request (known to have issues)
+        const isTimecodesRequest = url.includes('/timecodes');
+        const useHttp1 = forceHttp1 || isTimecodesRequest || attempt > 1;
+
+        const requestHeaders = { ...headers };
+        if (useHttp1) {
+          // Force HTTP/1.1 by removing HTTP/2 headers and adding HTTP/1.1 hints
+          delete requestHeaders['Upgrade'];
+          delete requestHeaders['HTTP2-Settings'];
+          delete requestHeaders['http2-settings'];
+          delete requestHeaders['upgrade'];
+          // Add header that might help force HTTP/1.1
+          requestHeaders['Connection'] = 'close';
+        }
+
         try {
-          return await originalFetch(url, {
+          const response = await originalFetch(url, {
             ...options,
-            headers,
+            headers: requestHeaders,
             mode: 'cors',
             credentials: 'omit',
             signal: controller.signal
           });
+
+          // If this was an HTTP/2 error attempt and it succeeded with HTTP/1.1, log it
+          if (useHttp1 && attempt > 1) {
+            console.log('✅ [Supabase] Request succeeded with HTTP/1.1 fallback');
+          }
+
+          return response;
         } catch (error) {
           clearTimeout(timeoutId);
-          
+
           // Если это HTTP/2 ошибка и у нас есть еще попытки
-          const isHttp2Error = error.message.includes('HTTP2') || 
+          const isHttp2Error = error.message.includes('HTTP2') ||
                               error.message.includes('ERR_HTTP2_PROTOCOL_ERROR') ||
                               error.message.includes('Failed to fetch');
-          
+
           if (isHttp2Error && attempt < 3) {
-            console.warn(`🔄 [Supabase] HTTP/2 ошибка, попытка ${attempt + 1} из 3:`, error.message);
-            // Небольшая задержка перед повторной попыткой
+            console.warn(`🔄 [Supabase] HTTP/2 ошибка, попытка ${attempt + 1} из 3 (force HTTP/1.1: ${!forceHttp1}):`, error.message);
+            // Небольшая задержка перед повторной попыткой с HTTP/1.1
             await new Promise(resolve => setTimeout(resolve, 500 * attempt));
-            return fetchWithRetry(attempt + 1);
+            return fetchWithRetry(attempt + 1, true); // Force HTTP/1.1 on retry
           }
           throw error;
         }

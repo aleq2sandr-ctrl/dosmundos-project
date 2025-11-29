@@ -6,6 +6,7 @@ import { getLocaleString } from '@/lib/locales';
 import r2Service from '@/lib/r2Service';
 import { getAudioUrl } from '@/lib/audioUrl';
 import { getFullTextFromUtterances } from '@/hooks/transcript/transcriptProcessingUtils';
+import { reconstructTranscriptFromChunks } from '@/lib/transcriptChunkingService';
 
 // Utility function to check if a file exists on Archive.org
 export const checkEpisodeFileExists = async (episode) => {
@@ -135,6 +136,56 @@ const useEpisodeData = (episodeSlug, currentLanguage, toast) => {
         });
       }
 
+      // First try to get transcript from chunks
+      logger.debug('🧩 Trying to reconstruct transcript from chunks');
+      const chunkedTranscript = await reconstructTranscriptFromChunks(epSlug, langForTranscript);
+      
+      logger.debug('🧩 Chunk reconstruction result:', { 
+        hasResult: !!chunkedTranscript,
+        utterancesCount: chunkedTranscript?.utterances?.length || 0,
+        hasEditedVersion: chunkedTranscript?.hasEditedVersion || false
+      });
+      
+      if (chunkedTranscript && chunkedTranscript.utterances && chunkedTranscript.utterances.length > 0) {
+        logger.debug('✅ Successfully reconstructed transcript from chunks', { 
+          utterancesCount: chunkedTranscript.utterances.length 
+        });
+        
+        const freshPayload = {
+          id: chunkedTranscript.id || null,
+          status: 'completed',
+          data: {
+            utterances: chunkedTranscript.utterances,
+            words: chunkedTranscript.words || [],
+            text: chunkedTranscript.text || getFullTextFromUtterances(chunkedTranscript.utterances)
+          }
+        };
+        
+        const freshVersion = computeTranscriptVersionKey(freshPayload);
+        const cachedVersion = cached?.value?.meta?.versionKey || 'none';
+
+        if (freshVersion !== cachedVersion) {
+          logger.debug('✅ Updating transcript state and cache from chunks');
+          setTranscript({ 
+            id: freshPayload.id,
+            utterances: freshPayload.data.utterances,
+            words: freshPayload.data.words,
+            text: freshPayload.data.text,
+            status: freshPayload.status 
+          });
+          writeTranscriptCache(epSlug, langForTranscript, {
+            meta: { id: freshPayload.id, status: freshPayload.status, versionKey: freshVersion },
+            data: freshPayload.data
+          });
+        } else {
+          logger.debug('⏭️ Skipping update - transcript unchanged');
+        }
+        return;
+      }
+
+      // Fallback to old method if no chunks found
+      logger.debug('📦 No chunks found, trying legacy transcript data');
+      
       const { data, error: transcriptError } = await supabase
         .from('transcripts')
         .select('id, edited_transcript_data, status')
@@ -146,7 +197,8 @@ const useEpisodeData = (episodeSlug, currentLanguage, toast) => {
 
       if (transcriptError) throw transcriptError;
       
-      if (data) {
+      // Check if we have actual utterances in edited_transcript_data (not just count)
+      if (data && data.edited_transcript_data && data.edited_transcript_data.utterances && Array.isArray(data.edited_transcript_data.utterances)) {
         const finalTranscriptData = data.edited_transcript_data;
         logger.debug('📝 Raw transcript data received');
         
@@ -174,7 +226,7 @@ const useEpisodeData = (episodeSlug, currentLanguage, toast) => {
         const cachedVersion = cached?.value?.meta?.versionKey || 'none';
 
         if (freshVersion !== cachedVersion) {
-          logger.debug('✅ Updating transcript state and cache');
+          logger.debug('✅ Updating transcript state and cache from legacy data');
           // Update state and cache only if changed
           setTranscript({ 
             id: freshPayload.id,
@@ -191,7 +243,7 @@ const useEpisodeData = (episodeSlug, currentLanguage, toast) => {
           logger.debug('⏭️ Skipping update - transcript unchanged');
         }
       } else {
-        logger.debug('❌ No transcript data found in DB');
+        logger.debug('❌ No transcript data found in DB (only metadata, no utterances)');
         setTranscript(null);
       }
     } catch (err) {
@@ -272,9 +324,12 @@ const useEpisodeData = (episodeSlug, currentLanguage, toast) => {
             lang,
             audio_url
           ),
-          episode_translations (
+          transcripts (
             lang,
-            title
+            title,
+            short_description,
+            status,
+            edited_transcript_data
           )
         `)
         .eq('slug', episodeSlug)
@@ -290,35 +345,41 @@ const useEpisodeData = (episodeSlug, currentLanguage, toast) => {
 
       // Process variants to find the best match for current language
       const audios = episode.episode_audios || [];
-      const translations = episode.episode_translations || [];
+      const transcripts = episode.transcripts || [];
       
-      // Find variant for current language, or fallback to ES, or Mixed, or just the first one
-      let activeAudio = audios.find(v => v.lang === currentLanguage);
+      // According to requirements: default to ru for Russian, es for Spanish, mixed for other languages
+      let activeAudio;
       
-      // If no direct match (e.g. user is on EN, but we only have RU/ES audio),
-      // logic requested: default to ES for translated languages
-      if (!activeAudio) {
+      // First, try to find audio for current language
+      if (currentLanguage === 'ru') {
+        activeAudio = audios.find(v => v.lang === 'ru');
+      } else if (currentLanguage === 'es') {
         activeAudio = audios.find(v => v.lang === 'es');
-      }
-      // If still no ES, try Mixed
-      if (!activeAudio) {
+      } else {
+        // For other languages, default to mixed
         activeAudio = audios.find(v => v.lang === 'mixed');
       }
-      // Fallback to any
+      
+      // If not found, fallback logic
+      if (!activeAudio) {
+        // Try mixed as fallback
+        activeAudio = audios.find(v => v.lang === 'mixed');
+      }
+      // If still no mixed, try any available
       if (!activeAudio && audios.length > 0) {
         activeAudio = audios[0];
       }
 
-      // Find title from translations
-      const activeTranslation = translations.find(t => t.lang === currentLanguage) 
-                             || translations.find(t => t.lang === 'es')
-                             || translations[0];
+      // Find title from transcripts
+      const activeTranscript = transcripts.find(t => t.lang === currentLanguage)
+                             || transcripts.find(t => t.lang === 'es')
+                             || transcripts[0];
 
       // Construct the episode object compatible with the player
       const episodeData = {
         ...episode,
         // Flatten active variant properties for backward compatibility
-        title: activeTranslation?.title || episode.slug,
+        title: activeTranscript?.title || episode.slug,
         lang: activeAudio?.lang || 'mixed',
         audio_url: activeAudio?.audio_url,
         duration: 0, // Duration removed from V3 for now

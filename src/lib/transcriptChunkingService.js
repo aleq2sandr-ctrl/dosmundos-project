@@ -296,6 +296,8 @@ export const saveTranscriptInChunks = async (episodeSlug, lang, transcriptData, 
  */
 export const reconstructTranscriptFromChunks = async (episodeSlug, lang) => {
   try {
+    logger.debug('[transcriptChunkingService] Starting reconstruction', { episodeSlug, lang });
+    
     // Получаем все чанки для эпизода
     const { data: chunks, error: chunksError } = await supabase
       .from('transcript_chunks')
@@ -309,7 +311,15 @@ export const reconstructTranscriptFromChunks = async (episodeSlug, lang) => {
       throw new Error(`Failed to fetch chunks: ${chunksError.message}`);
     }
 
+    logger.debug('[transcriptChunkingService] Chunks fetched:', { 
+      count: chunks?.length || 0, 
+      types: chunks?.map(c => c.chunk_type) || [],
+      episodeSlug, 
+      lang 
+    });
+
     if (!chunks || chunks.length === 0) {
+      logger.info('[transcriptChunkingService] No chunks found');
       return null;
     }
     logger.info('[transcriptChunkingService] Reconstruct: chunks fetched', { episodeSlug, lang, count: chunks.length });
@@ -326,25 +336,46 @@ export const reconstructTranscriptFromChunks = async (episodeSlug, lang) => {
       }
     }
 
-    // Восстанавливаем utterances
-    const utteranceChunks = chunks
-      .filter(c => c.chunk_type === 'utterances')
+    // Восстанавливаем utterances из transcript chunks (оригинальные)
+    const transcriptChunks = chunks
+      .filter(c => c.chunk_type === 'transcript')
       .sort((a, b) => a.chunk_index - b.chunk_index);
 
-    const allUtterances = [];
-    for (const chunk of utteranceChunks) {
-      allUtterances.push(...chunk.chunk_data.utterances);
+    const transcriptUtterances = [];
+    for (const chunk of transcriptChunks) {
+      transcriptUtterances.push(...chunk.chunk_data.utterances);
     }
 
+    // Восстанавливаем utterances из edited_transcript chunks (отредактированные)
+    const editedTranscriptChunks = chunks
+      .filter(c => c.chunk_type === 'edited_transcript')
+      .sort((a, b) => a.chunk_index - b.chunk_index);
+
+    const editedTranscriptUtterances = [];
+    for (const chunk of editedTranscriptChunks) {
+      editedTranscriptUtterances.push(...chunk.chunk_data.utterances);
+    }
+
+    // Приоритет отредактированным utterances, если они есть
+    const finalUtterances = editedTranscriptUtterances.length > 0 ? editedTranscriptUtterances : transcriptUtterances;
+    
     // Сортируем utterances по времени
-    allUtterances.sort((a, b) => a.start - b.start);
-    logger.debug('[transcriptChunkingService] Reconstruct: utterances assembled', { utterances: allUtterances.length, hasTextChunks: textChunks.length > 0 });
+    finalUtterances.sort((a, b) => a.start - b.start);
+    
+    logger.debug('[transcriptChunkingService] Reconstruct: utterances assembled', { 
+      transcriptUtterances: transcriptUtterances.length,
+      editedTranscriptUtterances: editedTranscriptUtterances.length,
+      finalUtterances: finalUtterances.length,
+      hasTextChunks: textChunks.length > 0 
+    });
 
     return {
-      text: fullText || allUtterances.map(u => u.text).join(' '),
-      utterances: allUtterances,
+      text: fullText || finalUtterances.map(u => u.text).join(' '),
+      utterances: finalUtterances,
+      words: [], // Можно восстановить если нужно
       reconstructed: true,
-      chunkCount: chunks.length
+      chunkCount: chunks.length,
+      hasEditedVersion: editedTranscriptUtterances.length > 0
     };
 
   } catch (error) {

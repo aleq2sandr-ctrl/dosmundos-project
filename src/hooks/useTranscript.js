@@ -65,7 +65,7 @@ const useTranscript = (episodeSlug, episodeAudioUrl, episodeLang, currentLanguag
       
       const { data, error: fetchError } = await supabase
         .from('transcripts')
-        .select('id, episode_slug, lang, assemblyai_transcript_id, status, edited_transcript_data')
+        .select('id, episode_slug, lang, provider_id, status, edited_transcript_data')
         .eq('episode_slug', episodeSlug)
         .eq('lang', transcriptLangForQuery)
         .order('created_at', { ascending: false })
@@ -77,7 +77,7 @@ const useTranscript = (episodeSlug, episodeAudioUrl, episodeLang, currentLanguag
       if (data) {
         logger.debug('[useTranscript] Transcript row found', { id: data.id, status: data.status, hasEdited: !!data.edited_transcript_data });
         setTranscriptDbId(data.id);
-        setTranscriptionJobId(data.assemblyai_transcript_id);
+        setTranscriptionJobId(data.provider_id);
         
         // Используем только edited_transcript_data
         const displayData = data.edited_transcript_data;
@@ -114,7 +114,7 @@ const useTranscript = (episodeSlug, episodeAudioUrl, episodeLang, currentLanguag
           toast({ title: getLocaleString('transcriptionInProgressTitle', currentLanguage), description: getLocaleString('transcriptionInProgressDescription', currentLanguage) });
           const assemblyLangForPolling = data.lang === 'ru' ? 'ru' : (data.lang === 'es' ? 'es' : determineAssemblyLangForEpisode());
           if (pollingTimeoutRef.current) clearTimeout(pollingTimeoutRef.current);
-          pollTranscriptStatus(data.assemblyai_transcript_id, data.id, assemblyLangForPolling);
+          pollTranscriptStatus(data.provider_id, data.id, assemblyLangForPolling);
         } else if (data.status === 'error') {
             const errorMessage = getLocaleString('unknownError', currentLanguage);
             setTranscriptError(getLocaleString('transcriptionError', currentLanguage) + `: ${errorMessage}`);

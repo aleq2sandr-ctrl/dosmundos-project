@@ -47,14 +47,18 @@ const PodcastPlayer = ({
   currentPlaybackRateValue, 
   onSetPlaybackRate, 
   onOpenAddQuestionDialog, 
-  transcriptUtterances, 
-  transcriptId, 
-  transcriptWords, 
-  segmentToHighlight, 
-  user, 
-  isOfflineMode, 
-  onTranscriptUpdate, 
-  fetchTranscriptForEpisode 
+  transcriptUtterances,
+  transcriptId,
+  transcriptWords,
+  segmentToHighlight,
+  user,
+  isOfflineMode,
+  onTranscriptUpdate,
+  fetchTranscriptForEpisode,
+  onRecognizeText,
+  onRecognizeQuestions,
+  isRecognizingText,
+  isRecognizingQuestions
 }) => {
   
   const { toast } = useToast();
@@ -88,19 +92,88 @@ const PodcastPlayer = ({
     }
   }, [autoplayBlocked]);
 
-  // Audio Track State
-  const [selectedAudioLang, setSelectedAudioLang] = useState(episodeLang || 'mixed');
-
-  const handleAudioTrackChange = useCallback((lang) => {
-    console.log('🎵 [PodcastPlayer] Audio track changed to:', lang);
-    setSelectedAudioLang(lang);
-    // If we need to actually switch the audio source, we might need to trigger a reload
-    // or notify the parent. For now, we just update the UI state.
-    // In a full implementation, this would likely trigger a URL change or audio source update.
-  }, []);
-
   // Use context audio ref as the primary source
   const primaryAudioRef = contextAudioRef || audioRef;
+
+  // Audio Track State
+  const [selectedAudioLang, setSelectedAudioLang] = useState(episodeLang || 'mixed');
+  
+  // Keep selected audio selection in sync with incoming episode data
+  useEffect(() => {
+    if (episodeData?.lang) {
+      setSelectedAudioLang(String(episodeData.lang).toLowerCase());
+    }
+  }, [episodeData?.lang, episodeData?.slug]);
+
+  const handleAudioTrackChange = useCallback((inputLang) => {
+    const lang = String(inputLang || '').toLowerCase();
+    console.log('🎵 [PodcastPlayer] Audio track changed to:', lang);
+    setSelectedAudioLang(lang);
+
+    // Collect variants from either audio_variants or available_variants
+    const rawVariants = episodeData?.audio_variants || episodeData?.available_variants || [];
+    const normalizeVariant = (v) => {
+      if (!v) return null;
+      if (typeof v === 'string') return { lang: String(v).toLowerCase(), audio_url: null };
+      return { lang: String(v.lang || '').toLowerCase(), audio_url: v.audio_url || v.audioUrl || null };
+    };
+    const variants = rawVariants.map(normalizeVariant).filter(Boolean);
+    const selectedVariant = variants.find(v => v.lang === lang);
+
+    const selectedUrl = selectedVariant?.audio_url || null;
+    if (!selectedUrl) {
+      console.warn('🎵 [PodcastPlayer] Selected variant missing audio_url, cannot switch', { lang, variants });
+      return;
+    }
+
+    console.log('🎵 [PodcastPlayer] Switching audio source to:', selectedUrl);
+
+    // Get localized track name for notification
+    let trackName;
+    if (lang === 'ru') {
+      trackName = getLocaleString('audioTrackRussian', currentLanguage) || 'Русский';
+    } else if (lang === 'es') {
+      trackName = getLocaleString('audioTrackSpanish', currentLanguage) || 'Español';
+    } else if (lang === 'mixed') {
+      trackName = getLocaleString('audioTrackMixed', currentLanguage) || 'Mixed';
+    } else {
+      trackName = lang.toUpperCase();
+    }
+
+    // Get current playback state - use PlayerContext directly
+    const wasPlaying = isPlaying;
+    const currentPlaybackTime = currentTime;
+
+    // Stop current playback
+    if (primaryAudioRef.current) {
+      primaryAudioRef.current.pause();
+    }
+
+    // Update PlayerContext with new episode data
+    if (episodeData) {
+      const updatedEpisodeData = {
+        ...episodeData,
+        lang,
+        audio_url: selectedUrl,
+        audioUrl: selectedUrl
+      };
+
+      playEpisode(updatedEpisodeData, currentPlaybackTime);
+
+      // Show notification
+      toast({
+        title: getLocaleString('audioTrackSwitched', currentLanguage) || 'Audio track switched',
+        description: getLocaleString('audioTrackSwitchedDesc', currentLanguage, { track: trackName }) || `Audio track changed to ${trackName}`,
+      });
+
+      // Resume playback if it was playing
+      if (wasPlaying) {
+        setTimeout(() => {
+          togglePlay();
+        }, 100);
+      }
+    }
+  }, [episodeData, isPlaying, currentTime, primaryAudioRef, playEpisode, togglePlay, currentLanguage, toast]);
   
   const lastJumpIdRef = useRef(null);
 
@@ -407,6 +480,10 @@ const PodcastPlayer = ({
     setIsAddQuestionPlayerDialogOpen(true);
   }, [currentTimeState, setAddQuestionDialogInitialTime, setIsAddQuestionPlayerDialogOpen, isAuthenticated, openAuthModal]);
 
+  // Determine if transcript and questions exist
+  const hasTranscript = episodeData?.transcript?.status === 'completed' && episodeData?.transcript?.utterances?.length > 0;
+  const hasQuestions = internalQuestions.length > 0;
+
   if (!episodeData) return <div className="p-4 text-center">{getLocaleString('selectAnEpisode', currentLanguage)}</div>;
 
   return (
@@ -445,7 +522,7 @@ const PodcastPlayer = ({
           </div>
         )}
         
-        <PlayerUIControls 
+        <PlayerUIControls
           activeQuestionTitle={activeQuestionTitleState}
           isPlaying={isPlayingState}
           currentLanguage={currentLanguage}
@@ -474,6 +551,13 @@ const PodcastPlayer = ({
           availableAudioVariants={episodeData?.available_variants || []}
           selectedAudioLang={selectedAudioLang}
           onAudioTrackChange={handleAudioTrackChange}
+          // Recognition Props
+          hasTranscript={hasTranscript}
+          hasQuestions={hasQuestions}
+          onRecognizeText={onRecognizeText}
+          onRecognizeQuestions={onRecognizeQuestions}
+          isRecognizingText={isRecognizingText}
+          isRecognizingQuestions={isRecognizingQuestions}
         />
       </div>
     </div>

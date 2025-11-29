@@ -1,4 +1,3 @@
-
 import React from 'react';
 import {
   DropdownMenu,
@@ -12,7 +11,7 @@ import {
   DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu";
 import { Button } from '@/components/ui/button';
-import { Settings, ScrollText, Download, PlusCircle, Gauge, FileText, Volume2 } from 'lucide-react';
+import { Settings, ScrollText, Download, Gauge, FileText, Volume2, Mic, HelpCircle } from 'lucide-react';
 import { getLocaleString } from '@/lib/locales';
 
 const PlayerSettingsMenu = ({
@@ -28,12 +27,41 @@ const PlayerSettingsMenu = ({
   isOfflineMode = false,
   availableAudioVariants = [],
   selectedAudioLang,
-  onAudioTrackChange
+  onAudioTrackChange,
+  hasTranscript = false,
+  hasQuestions = false,
+  onRecognizeText,
+  onRecognizeQuestions,
+  isRecognizingText = false,
+  isRecognizingQuestions = false
 }) => {
-  // Filter variants to show only relevant audio tracks (e.g. exclude mixed if we have specific ones, or just show all)
-  // Actually, we just want to show RU and ES if they exist.
-  // If we have 'mixed', it usually means it's the only one.
-  const showAudioTracks = availableAudioVariants.length > 1 && !availableAudioVariants.some(v => (typeof v === 'string' ? v : v.lang) === 'mixed');
+  // Normalize and dedupe audio variants (accept strings or objects), sort ru, es, mixed, then others
+  const normalizeLang = (v) => {
+    const raw = (typeof v === 'string' ? v : v?.lang) || '';
+    const l = String(raw).toLowerCase();
+    // Map common synonyms to canonical codes
+    if (['spanish', 'es-es', 'spa'].includes(l)) return 'es';
+    if (['russian', 'ru-ru', 'rus'].includes(l)) return 'ru';
+    if (['mix', 'mx'].includes(l)) return 'mixed';
+    return l;
+  };
+  const variantMap = new Map();
+  (availableAudioVariants || []).forEach(v => {
+    const l = normalizeLang(v);
+    if (!l) return;
+    if (!variantMap.has(l)) variantMap.set(l, { lang: l });
+  });
+  const order = { ru: 0, es: 1, mixed: 2 };
+  const normalizedVariants = Array.from(variantMap.values()).sort((a, b) => {
+    const ao = order[a.lang] ?? 100;
+    const bo = order[b.lang] ?? 100;
+    return ao - bo || a.lang.localeCompare(b.lang);
+  });
+
+  const hasMultipleVariants = normalizedVariants.length > 1;
+  const hasMixed = normalizedVariants.some(v => v.lang === 'mixed');
+  const hasSpecificLanguages = normalizedVariants.some(v => v.lang === 'ru' || v.lang === 'es');
+  const showAudioTracks = hasMultipleVariants || (hasMixed && hasSpecificLanguages);
 
   return (
     <DropdownMenu>
@@ -68,19 +96,26 @@ const PlayerSettingsMenu = ({
                 <Volume2 className="mr-2 h-4 w-4" />
                 {getLocaleString('audioTrack', currentLanguage) || 'Audio Track'}
             </DropdownMenuLabel>
-            <DropdownMenuRadioGroup value={selectedAudioLang} onValueChange={onAudioTrackChange}>
-                {availableAudioVariants.map(variant => {
-                    // Ensure variant is an object or string
-                    const lang = (variant && typeof variant === 'object') ? variant.lang : variant;
+            <DropdownMenuRadioGroup value={(selectedAudioLang || '').toLowerCase()} onValueChange={(val) => onAudioTrackChange(String(val).toLowerCase())}>
+                {normalizedVariants.map(({ lang }) => {
                     if (!lang) return null;
-                    
+                    let trackName;
+                    if (lang === 'ru') {
+                        trackName = getLocaleString('audioTrackRussian', currentLanguage) || 'Русский';
+                    } else if (lang === 'es') {
+                        trackName = getLocaleString('audioTrackSpanish', currentLanguage) || 'Español';
+                    } else if (lang === 'mixed') {
+                        trackName = getLocaleString('audioTrackMixed', currentLanguage) || 'Mixed';
+                    } else {
+                        trackName = lang.toUpperCase();
+                    }
                     return (
                         <DropdownMenuRadioItem 
                             key={lang} 
                             value={lang}
                             className="focus:bg-slate-700 data-[state=checked]:bg-purple-600/30"
                         >
-                            {lang === 'ru' ? 'Русский' : (lang === 'es' ? 'Español' : lang.toUpperCase())}
+                            {trackName}
                         </DropdownMenuRadioItem>
                     );
                 })}
@@ -106,6 +141,24 @@ const PlayerSettingsMenu = ({
         </DropdownMenuRadioGroup>
 
         <DropdownMenuSeparator className="bg-slate-700" />
+
+        {!hasTranscript && (
+          <DropdownMenuItem onClick={onRecognizeText} disabled={isRecognizingText} className="focus:bg-slate-700">
+            <Mic className="mr-2 h-4 w-4 text-green-300" />
+            <span>{isRecognizingText ? getLocaleString('transcribing', currentLanguage) || 'Распознавание текста...' : getLocaleString('recognizeText', currentLanguage) || 'Распознать текст'}</span>
+          </DropdownMenuItem>
+        )}
+
+        {!hasQuestions && (
+          <DropdownMenuItem onClick={onRecognizeQuestions} disabled={isRecognizingQuestions} className="focus:bg-slate-700">
+            <HelpCircle className="mr-2 h-4 w-4 text-blue-300" />
+            <span>{isRecognizingQuestions ? getLocaleString('recognizing', currentLanguage) || 'Распознавание вопросов...' : getLocaleString('recognizeQuestions', currentLanguage) || 'Распознать вопросы'}</span>
+          </DropdownMenuItem>
+        )}
+
+        {(hasTranscript || hasQuestions) && (
+          <DropdownMenuSeparator className="bg-slate-700" />
+        )}
 
         <DropdownMenuItem onClick={onDownloadText} className="focus:bg-slate-700">
           <FileText className="mr-2 h-4 w-4 text-purple-300" />

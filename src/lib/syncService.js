@@ -332,7 +332,7 @@ class SyncService {
               slug,
               date,
               created_at,
-              episode_translations (
+              transcripts (
                 title,
                 lang
               ),
@@ -356,7 +356,7 @@ class SyncService {
           }
 
           // Transform V2 data to flat structure
-          const translations = rawEpisode.episode_translations || [];
+          const translations = rawEpisode.transcripts || [];
           const audios = rawEpisode.episode_audios || [];
           
           // Use provided lang or fallback to 'es' or first available
@@ -475,7 +475,7 @@ class SyncService {
             .from('episodes')
             .select(`
               *,
-              episode_translations (
+              transcripts (
                 lang,
                 title
               ),
@@ -493,9 +493,9 @@ class SyncService {
           if (Array.isArray(episodesData)) {
             return episodesData.map(ep => ({
               ...ep,
-              translations: ep.episode_translations || [],
+              translations: ep.transcripts || [],
               audios: ep.episode_audios || []
-            })).filter(ep => 
+            })).filter(ep =>
               ep && typeof ep === 'object' && ep.slug
             );
           }

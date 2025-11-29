@@ -837,5 +837,10 @@
   "confirmDeleteEpisodeMessage": "Вы уверены, что хотите удалить этот эпизод?",
   "actionIrreversible": "Это действие необратимо.",
   "deleting": "Удаление...",
-  "deleteConfirm": "Удалить"
+  "deleteConfirm": "Удалить",
+  "audioTrackRussian": "Русский",
+  "audioTrackSpanish": "Испанский",
+  "audioTrackMixed": "Смешанный",
+  "recognizeText": "Распознать текст",
+  "recognizeQuestions": "Распознать вопросы"
 }

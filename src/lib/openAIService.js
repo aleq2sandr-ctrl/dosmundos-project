@@ -6,63 +6,55 @@ let openai;
 
 const initializeOpenAI = async () => {
   if (openai) {
-    logger.debug("🔄 Using existing DeepSeek client");
+    logger.debug("🔄 Using existing OpenAI client");
     return openai;
   }
-  
-  try {
-    logger.debug("🔑 Fetching DeepSeek API key from server...");
-    
-    // Add timeout to the Edge Function call
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-    
-    const { data, error } = await supabase.functions.invoke('get-env-variables', {
-      body: { variable_names: ['DEEPSEEK_API_KEY'] },
-      signal: controller.signal
-    });
-    
-    clearTimeout(timeoutId);
 
-    if (error) {
-      logger.error('❌ Error invoking get-env-variables Edge Function for DeepSeek:', error);
-      
-      // More specific error messages
-      if (error.message?.includes('aborted')) {
-        throw new Error('Таймаут при получении API ключа от сервера. Проверьте подключение.');
-      } else if (error.message?.includes('network') || error.message?.includes('fetch')) {
-        throw new Error('Сетевая ошибка при обращении к серверу. Проверьте интернет-соединение.');
-      } else {
-        throw new Error(`Ошибка получения API ключа: ${error.message || 'Edge Function invocation failed'}`);
-      }
+  try {
+    logger.debug("🔑 Initializing OpenAI API key...");
+
+    // Get API key from environment variable (from .env file)
+    let apiKey = null;
+    let baseURL = 'https://api.openai.com/v1';
+
+    // Try OpenAI API key first
+    if (import.meta.env?.VITE_OPENAI_API_KEY) {
+      apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+      baseURL = 'https://api.openai.com/v1';
+      logger.debug("✅ OpenAI API key loaded from environment variable");
     }
-    
-    const envKey = data?.DEEPSEEK_API_KEY;
-    const fallbackKey = undefined; // optionally set a fallback key if needed
-    if (!envKey && !fallbackKey) {
-      logger.error('❌ DeepSeek API key not found in Edge Function response:', data);
-      throw new Error('DeepSeek API ключ недоступен на сервере. Обратитесь к администратору.');
+
+    // If not found, try DeepSeek as fallback
+    if (!apiKey && import.meta.env?.VITE_DEEPSEEK_API_KEY) {
+      apiKey = import.meta.env.VITE_DEEPSEEK_API_KEY;
+      baseURL = 'https://api.deepseek.com';
+      logger.debug("✅ DeepSeek API key loaded from environment variable (fallback)");
     }
-    
-    logger.debug("✅ DeepSeek API key received, initializing client...");
+
+    if (!apiKey) {
+      logger.error('❌ No OpenAI or DeepSeek API key found in environment variables');
+      throw new Error('OpenAI API key is not configured. Please add VITE_OPENAI_API_KEY or VITE_DEEPSEEK_API_KEY to .env file.');
+    }
+
+    logger.debug("🔧 Initializing OpenAI client...");
     const OpenAI = (await import('openai')).default;
-    
-    openai = new OpenAI({ 
-      apiKey: envKey || fallbackKey, 
-      baseURL: 'https://api.deepseek.com',
+
+    openai = new OpenAI({
+      apiKey: apiKey,
+      baseURL: baseURL,
       dangerouslyAllowBrowser: true,
       maxRetries: 0   // We handle retries manually
     });
-    
-    logger.debug("✅ DeepSeek client created successfully");
+
+    logger.debug("✅ OpenAI client created successfully");
 
     return openai;
   } catch (error) {
-    logger.error('❌ Error initializing DeepSeek:', error);
-    
+    logger.error('❌ Error initializing OpenAI:', error);
+
     // Reset openai client on error so next attempt will try again
     openai = null;
-    
+
     throw error;
   }
 };
@@ -370,99 +362,65 @@ export const generateQuestionsOpenAI = async (transcriptData, episodeLang, curre
 
     // Подготавливаем текст транскрипта с временными метками
     const utterances = transcriptData.utterances || [];
-    if (!utterances.length) {
-      throw new Error('Сегменты транскрипта отсутствуют');
-    }
 
-    // Создаем текстовое представление с временными метками для ИИ
-    const transcriptWithTiming = utterances.map((utterance, index) => {
-      const timeInSeconds = Math.floor(utterance.start / 1000);
-      const speakerInfo = utterance.speaker ? `[${utterance.speaker}]` : '';
-      const text = utterance.text || '';
-      return `[${timeInSeconds}s]${speakerInfo} ${text}`;
-    }).join('\n');
+    // Для длинных транскриптов сокращаем текст для анализа
+    let textToAnalyze = '';
+    if (utterances.length > 200) {
+      // Для очень длинных транскриптов берем только ключевые сегменты
+      const totalDuration = utterances[utterances.length - 1]?.end || 0;
 
-    // Для очень длинных текстов разбиваем на части по времени с умной стратегией
-    const MAX_TEXT_LENGTH = 12000; // Увеличиваем лимит для лучшего покрытия
-    let textToAnalyze = transcriptWithTiming;
+      // Берем сегменты из разных интервалов времени
+      const intervals = [];
+      const intervalDuration = Math.floor(totalDuration / 10); // Разбиваем на 10 интервалов
 
-    if (transcriptWithTiming.length > MAX_TEXT_LENGTH) {
-      logger.debug(`📝 Transcript too long (${transcriptWithTiming.length} chars), using smart segmentation strategy`);
+      for (let i = 0; i < 10; i++) {
+        intervals.push({
+          start: i * intervalDuration,
+          end: (i + 1) * intervalDuration
+        });
+      }
 
-      // Стратегия: комбинируем ключевые сегменты + всегда включаем конец подкаста
-      const keySegments = utterances.filter((utterance, index) => {
-        const text = utterance.text || '';
-        const hasQuestion = text.includes('?') || text.match(/\b(как|что|почему|зачем|когда|где|кто|сколько)\b/i);
-        const hasQuestionMarker = text.match(/\b(вопрос от|следующий вопрос|очередной слушатель|question from|next question)\b/i);
-        const hasMeditation = text.match(/\b(медитация|медитировать|медитативная|медитативное|медитативный|медитативная практика|закройте глаза|закрываем глаза|давайте закроем|глубокое дыхание|глубокие вдохи|релаксация|расслабление|визуализация|дыхательные упражнения|дыхательное упражнение|осознанное дыхание|осознание дыхания|погружение|внутренняя тишина|духовная практика|душевная практика|let's meditate|close your eyes|close our eyes|deep breathing|deep breaths|relaxation|guided meditation|mindfulness|breathing exercise|inner peace|spiritual practice)\b/i);
-        const isNewSpeaker = index === 0 || utterance.speaker !== utterances[index - 1].speaker;
-        const isLongSegment = text.length > 20;
-
-        return hasQuestion || hasQuestionMarker || hasMeditation || (isNewSpeaker && isLongSegment);
+      // Всегда включаем последние 30 минут
+      const last30Minutes = utterances.filter(u => {
+        const time = Math.floor(u.start / 1000);
+        return time >= (totalDuration - 1800); // Последние 30 минут всегда включаем
       });
 
-      // Всегда включаем последние 20 сегментов (конец подкаста, где часто медитации)
-      const lastSegments = utterances.slice(-20);
-      const uniqueSegments = [...keySegments, ...lastSegments].filter((segment, index, self) =>
+      let intervalSegments = [];
+      intervals.forEach(interval => {
+        const intervalUtterances = utterances.filter(u => {
+          const time = Math.floor(u.start / 1000);
+          return time >= interval.start && time < interval.end;
+        }).slice(0, 10); // Уменьшаем до 10 сегментов на интервал
+
+        intervalSegments.push(...intervalUtterances);
+      });
+
+      // Объединяем и убираем дубликаты, но всегда включаем последние 30 минут
+      const allSegments = [...intervalSegments, ...last30Minutes];
+      const uniqueFinalSegments = allSegments.filter((segment, index, self) =>
         index === self.findIndex(s => s.start === segment.start)
-      ).slice(0, 120); // Увеличиваем до 120 сегментов
+      ).slice(0, 150); // Увеличиваем лимит
 
-      logger.debug(`📝 Selected ${uniqueSegments.length} key segments + end segments`);
-
-      textToAnalyze = uniqueSegments.map((utterance, index) => {
+      textToAnalyze = uniqueFinalSegments.map((utterance, index) => {
         const timeInSeconds = Math.floor(utterance.start / 1000);
         const speakerInfo = utterance.speaker ? `[${utterance.speaker}]` : '';
         const text = utterance.text || '';
         return `[${timeInSeconds}s]${speakerInfo} ${text}`;
       }).join('\n');
 
-      // Стратегия 2: Если все еще слишком длинно, разбиваем на временные интервалы
-      if (textToAnalyze.length > MAX_TEXT_LENGTH) {
-        logger.debug(`📝 Still too long (${textToAnalyze.length} chars), splitting by time intervals`);
-
-        const totalDuration = Math.floor(utterances[utterances.length - 1]?.end / 1000) || 0;
-        const intervals = [];
-        const intervalLength = Math.max(300, Math.floor(totalDuration / 8)); // Минимум 5-минутные интервалы, больше интервалов
-
-        for (let start = 0; start < totalDuration; start += intervalLength) {
-          const end = Math.min(start + intervalLength, totalDuration);
-          intervals.push({ start, end });
-        }
-
-        // Выбираем ключевые сегменты из каждого интервала + обязательно включаем конец
-        const intervalSegments = [];
-        const last30Minutes = utterances.filter(u => {
-          const time = Math.floor(u.start / 1000);
-          return time >= (totalDuration - 1800); // Последние 30 минут всегда включаем
-        });
-
-        intervals.forEach(interval => {
-          const intervalUtterances = utterances.filter(u => {
-            const time = Math.floor(u.start / 1000);
-            return time >= interval.start && time < interval.end;
-          }).slice(0, 10); // Уменьшаем до 10 сегментов на интервал
-
-          intervalSegments.push(...intervalUtterances);
-        });
-
-        // Объединяем и убираем дубликаты, но всегда включаем последние 30 минут
-        const allSegments = [...intervalSegments, ...last30Minutes];
-        const uniqueFinalSegments = allSegments.filter((segment, index, self) =>
-          index === self.findIndex(s => s.start === segment.start)
-        ).slice(0, 150); // Увеличиваем лимит
-
-        textToAnalyze = uniqueFinalSegments.map((utterance, index) => {
-          const timeInSeconds = Math.floor(utterance.start / 1000);
-          const speakerInfo = utterance.speaker ? `[${utterance.speaker}]` : '';
-          const text = utterance.text || '';
-          return `[${timeInSeconds}s]${speakerInfo} ${text}`;
-        }).join('\n');
-
-        logger.debug(`📝 Reduced to ${uniqueFinalSegments.length} interval segments (${textToAnalyze.length} chars)`);
-      }
-
-      logger.debug(`📝 Final text length: ${textToAnalyze.length} chars`);
+      logger.debug(`📝 Reduced to ${uniqueFinalSegments.length} interval segments (${textToAnalyze.length} chars)`);
+    } else {
+      // Для коротких транскриптов берем весь текст
+      textToAnalyze = utterances.map((utterance, index) => {
+        const timeInSeconds = Math.floor(utterance.start / 1000);
+        const speakerInfo = utterance.speaker ? `[${utterance.speaker}]` : '';
+        const text = utterance.text || '';
+        return `[${timeInSeconds}s]${speakerInfo} ${text}`;
+      }).join('\n');
     }
+
+    logger.debug(`📝 Final text length: ${textToAnalyze.length} chars`);
 
     // Определяем язык для промпта и ответа
     const langMap = {
@@ -738,37 +696,19 @@ ${textToAnalyze}
 export const testOpenAIConnection = async () => {
   try {
     logger.info("🧪 Testing DeepSeek API connection...");
-    logger.debug("🧪 Step 1: Testing Edge Function connectivity...");
-
-    // Test the Edge Function first
-    const { data, error } = await supabase.functions.invoke('get-env-variables', {
-      body: { variable_names: ['DEEPSEEK_API_KEY'] }
-    });
-
-    if (error) {
-      logger.error("❌ Edge Function test failed:", error);
+    // Проверяем наличие ключа в переменных окружения
+    if (!import.meta.env?.VITE_DEEPSEEK_API_KEY) {
+      logger.error("❌ DeepSeek API ключ не найден в переменных окружения");
       return {
         success: false,
-        error: `Edge Function недоступна: ${error.message}`,
-        step: "edge_function"
-      };
-    }
-
-    if (!data || !data.DEEPSEEK_API_KEY) {
-      logger.error("❌ API key not found in response:", data);
-      return {
-        success: false,
-        error: "DeepSeek API ключ не настроен на сервере",
+        error: "DeepSeek API ключ не настроен в .env (VITE_DEEPSEEK_API_KEY)",
         step: "api_key_missing"
       };
     }
-
-    logger.debug("✅ Edge Function working, API key found");
+    logger.debug("✅ DeepSeek API key found in environment");
     logger.debug("🧪 Step 2: Testing DeepSeek API call...");
-
     const testResult = await translateTextOpenAI("Hola mundo", "en", "en");
     logger.info("✅ DeepSeek API test successful:", testResult);
-
     return {
       success: true,
       result: testResult,
@@ -776,22 +716,10 @@ export const testOpenAIConnection = async () => {
     };
   } catch (error) {
     logger.error("❌ DeepSeek API test failed:", error);
-
-    let errorStep = "unknown";
-    if (error.message?.includes('Edge Function')) {
-      errorStep = "edge_function";
-    } else if (error.message?.includes('API key') || error.message?.includes('API ключ')) {
-      errorStep = "api_key";
-    } else if (error.message?.includes('connection') || error.message?.includes('подключение')) {
-      errorStep = "connection";
-    } else if (error.message?.toLowerCase().includes('timeout') || error.message?.toLowerCase().includes('таймаут')) {
-      errorStep = "timeout";
-    }
-
     return {
       success: false,
       error: error.message,
-      step: errorStep
+      step: "error"
     };
   }
 };

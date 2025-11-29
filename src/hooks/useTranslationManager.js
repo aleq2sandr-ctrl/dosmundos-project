@@ -333,7 +333,7 @@ const useTranslationManager = (currentLanguage, toast, episodes, setEpisodes) =>
 
         const { data: transcript } = await supabase
           .from('transcripts')
-          .select('id, episode_slug, lang, status, assemblyai_transcript_id, updated_at')
+        .select('id, episode_slug, lang, status, provider_id, updated_at')
           .eq('episode_slug', targetSlug)
           .eq('lang', targetLang)
           .single();
@@ -475,5 +475,3 @@ const useTranslationManager = (currentLanguage, toast, episodes, setEpisodes) =>
 };
 
 export default useTranslationManager;
-
-

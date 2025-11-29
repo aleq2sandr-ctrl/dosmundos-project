@@ -10,7 +10,7 @@ export const episodeService = {
    * @returns {Promise<{data: any[], error: any}>}
    */
   async getAllEpisodes() {
-    // Fetch episodes with their audios and translations
+    // Fetch episodes with their audios and transcripts (which contain titles)
     const { data, error } = await supabase
       .from('episodes')
       .select(`
@@ -22,9 +22,10 @@ export const episodeService = {
           audio_url,
           duration
         ),
-        episode_translations (
+        transcripts (
           lang,
-          title
+          title,
+          short_description
         )
       `)
       .order('date', { ascending: false });
@@ -36,8 +37,8 @@ export const episodeService = {
 
   /**
    * Fetches a single episode by slug and language.
-   * @param {string} slug 
-   * @param {string} lang 
+   * @param {string} slug
+   * @param {string} lang
    * @returns {Promise<{data: any, error: any}>}
    */
   async getEpisode(slug, lang) {
@@ -52,15 +53,18 @@ export const episodeService = {
           audio_url,
           duration
         ),
-        episode_translations (
+        transcripts (
           lang,
-          title
+          title,
+          short_description,
+          status,
+          edited_transcript_data
         )
       `)
       .eq('slug', slug);
-    
+
     const { data, error } = await query.maybeSingle();
-    
+
     if (error) return { data: null, error };
     if (!data) return { data: null, error: null };
 
@@ -68,15 +72,15 @@ export const episodeService = {
     // (Supabase doesn't support filtering nested relations easily in the select string without complex syntax)
     if (lang) {
       data.episode_audios = data.episode_audios.filter(v => v.lang === lang || v.lang === 'mixed');
-      data.episode_translations = data.episode_translations.filter(v => v.lang === lang);
+      data.transcripts = data.transcripts.filter(v => v.lang === lang);
     }
-    
+
     return { data, error };
   },
 
   /**
    * Creates or updates an episode.
-   * @param {Object} episodeData 
+   * @param {Object} episodeData
    * @returns {Promise<{data: any, error: any}>}
    */
   async upsertEpisode(episodeData) {
@@ -91,18 +95,19 @@ export const episodeService = {
 
     if (epError) return { data: null, error: epError };
 
-    // 2. Upsert the translation (title, lang)
+    // 2. Upsert the transcript record (which contains title and translations)
     if (episodeData.title) {
       const { error: transError } = await supabase
-        .from('episode_translations')
+        .from('transcripts')
         .upsert({
           episode_slug: episodeData.slug,
           lang: episodeData.lang,
           title: episodeData.title,
+          status: episodeData.status || 'completed',
           updated_at: new Date().toISOString()
         }, { onConflict: 'episode_slug,lang' });
-        
-      if (transError) console.error('Error upserting translation:', transError);
+
+      if (transError) console.error('Error upserting transcript:', transError);
     }
 
     // 3. Upsert the audio (audio_url, lang)
@@ -112,7 +117,8 @@ export const episodeService = {
         .upsert({
           episode_slug: episodeData.slug,
           lang: episodeData.lang, // Note: Caller should handle 'mixed' logic if needed
-          audio_url: episodeData.audio_url
+          audio_url: episodeData.audio_url,
+          duration: episodeData.duration
         }, { onConflict: 'episode_slug,lang' });
 
       if (audioError) console.error('Error upserting audio:', audioError);
