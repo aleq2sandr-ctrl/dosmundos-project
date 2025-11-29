@@ -22,7 +22,7 @@ import { saveEditToHistory } from '@/services/editHistoryService';
 import useAudioPrefetch from '@/hooks/player/useAudioPrefetch';
 import { getAudioUrl } from '@/lib/audioUrl';
 import { usePlayer } from '@/contexts/PlayerContext';
-import assemblyAIService from '@/lib/assemblyAIService';
+import deepgramService from '@/lib/deepgramService';
 import { generateQuestionsOpenAI } from '@/lib/openAIService';
 import { saveFullTranscriptToStorage } from '@/lib/transcriptStorageService';
 
@@ -576,149 +576,110 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
 
     const langForTranscription = episodeData.lang === 'all' ? currentLanguage : episodeData.lang;
 
+    // Helper to process and save transcript result
+    const processAndSaveTranscript = async (result, transcriptDbId) => {
+      // 1. Save RAW to VPS
+      let storageUrl = null;
+      
+      try {
+        const vpsResponse = await fetch('/api/save-transcript', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            episodeSlug: episodeData.slug,
+            lang: langForTranscription,
+            transcriptData: result, // RAW data
+            provider: 'deepgram'
+          })
+        });
+        
+        if (vpsResponse.ok) {
+          const vpsResult = await vpsResponse.json();
+          if (vpsResult.success) {
+             storageUrl = vpsResult.url;
+             console.log('[PlayerPage] VPS save successful:', storageUrl);
+          } else {
+             console.error('[PlayerPage] VPS save returned error:', vpsResult.error);
+             // Don't block flow, but log error
+          }
+        } else {
+          console.warn('[PlayerPage] VPS API failed:', vpsResponse.status);
+        }
+      } catch (e) {
+        console.error('[PlayerPage] VPS save failed:', e);
+      }
+
+      // 2. Process data
+      const { processTranscriptData, buildEditedTranscriptData } = await import('@/hooks/transcript/transcriptProcessingUtils');
+      const processed = processTranscriptData(result);
+      const editedData = buildEditedTranscriptData(processed);
+
+      // 3. Update DB
+      const updatePayload = {
+        status: 'completed',
+        provider: 'deepgram',
+        provider_id: result.id,
+        edited_transcript_data: editedData,
+        updated_at: new Date().toISOString()
+      };
+      if (storageUrl) {
+        updatePayload.storage_url = storageUrl;
+      }
+
+      const { error } = await supabase
+        .from('transcripts')
+        .update(updatePayload)
+        .eq('id', transcriptDbId);
+
+      if (error) throw error;
+      
+      toast({
+        title: getLocaleString('success', currentLanguage),
+        description: getLocaleString('transcriptionCompleted', currentLanguage) || 'Распознавание завершено!',
+      });
+      refreshAllData();
+    };
+
     // Check for existing transcript record
     const { data: existingTranscript } = await supabase
       .from('transcripts')
       .select('*')
       .eq('episode_slug', episodeData.slug)
       .eq('lang', langForTranscription)
-      .single();
+      .maybeSingle();
 
-    if (existingTranscript) {
-      if (existingTranscript.status === 'completed') {
-        toast({
-          title: getLocaleString('success', currentLanguage),
-          description: getLocaleString('transcriptionAlreadyReady', currentLanguage) || 'Текст уже распознан',
-        });
-        refreshAllData();
-        return;
-      }
-
-      if (existingTranscript.provider_id && existingTranscript.status !== 'error') {
-        // Resume polling existing job
-        setIsRecognizingText(true);
-        try {
-          const result = await assemblyAIService.getTranscriptionResult(existingTranscript.provider_id, currentLanguage);
-          
-          if (result.status === 'completed') {
-            // Process transcript data
-            const { processTranscriptData } = await import('@/hooks/transcript/transcriptProcessingUtils');
-            const processedResult = processTranscriptData(result);
-
-            // Update database with processed data and save chunks separately
-            console.log('🔊 [Transcript] Raw result size:', JSON.stringify(result).length, 'bytes');
-            console.log('🔊 [Transcript] Processed result size:', JSON.stringify(processedResult).length, 'bytes');
-            
-            // Save only metadata to transcripts table
-            const transcriptMetadata = {
-              transcript_id: result.transcript_id,
-              status: result.status,
-              utterance_count: result.utterances?.length || 0,
-              provider_id: result.id
-            };
-            
-            console.log('🔊 [Transcript] Metadata size:', JSON.stringify(transcriptMetadata).length, 'bytes');
-            
-            // Save chunks to transcript_chunks table for both original and edited
-            const chunkSize = 50; // utterances per chunk
-            const chunks = [];
-            
-            // Save original transcript chunks
-            for (let i = 0; i < processedResult.utterances.length; i += chunkSize) {
-              const chunk = processedResult.utterances.slice(i, i + chunkSize);
-              chunks.push({
-                episode_slug: episodeData.slug,
-                lang: langForTranscription,
-                chunk_type: 'transcript',
-                chunk_index: Math.floor(i / chunkSize),
-                chunk_data: { utterances: chunk }
-              });
-            }
-            
-            // Save edited transcript chunks (same as original initially)
-            for (let i = 0; i < processedResult.utterances.length; i += chunkSize) {
-              const chunk = processedResult.utterances.slice(i, i + chunkSize);
-              chunks.push({
-                episode_slug: episodeData.slug,
-                lang: langForTranscription,
-                chunk_type: 'edited_transcript',
-                chunk_index: Math.floor(i / chunkSize),
-                chunk_data: { utterances: chunk }
-              });
-            }
-            
-            console.log('🔊 [Transcript] Creating', chunks.length, 'chunks (', chunks.length/2, 'original + ', chunks.length/2, 'edited) of', chunkSize, 'utterances each');
-            
-            // First update metadata
-            const { error: updateError } = await supabase
-              .from('transcripts')
-              .update({
-                status: 'completed',
-                transcript_data: transcriptMetadata,
-                edited_transcript_data: { utterance_count: processedResult.utterances.length }
-              })
-              .eq('id', existingTranscript.id);
-
-            if (updateError) {
-              console.error("Error updating transcript metadata:", updateError);
-              throw updateError;
-            }
-            
-            // Then save chunks in batches
-            const batchSize = 5; // chunks per batch
-            for (let i = 0; i < chunks.length; i += batchSize) {
-              const batch = chunks.slice(i, i + batchSize);
-              console.log(`🔊 [Transcript] Saving batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(chunks.length/batchSize)}`);
-              
-              const { error: chunkError } = await supabase
-                .from('transcript_chunks')
-                .upsert(batch, { onConflict: 'episode_slug,lang,chunk_type,chunk_index' });
-                
-              if (chunkError) {
-                console.error("Error saving transcript chunks:", chunkError);
-                throw chunkError;
-              }
-            }
-            
-            console.log('🔊 [Transcript] All chunks saved successfully!');
-
-            toast({
-              title: getLocaleString('success', currentLanguage),
-              description: getLocaleString('transcriptionCompleted', currentLanguage) || 'Распознавание завершено!',
-            });
-            refreshAllData();
-          } else if (result.status === 'error') {
-            toast({
-              title: getLocaleString('error', currentLanguage),
-              description: getLocaleString('transcriptionError', currentLanguage) || 'Ошибка распознавания. Можно повторить.',
-              variant: 'destructive',
-            });
-          } else {
-            toast({
-              title: getLocaleString('transcriptionInProgressTitle', currentLanguage),
-              description: getLocaleString('transcriptionInProgressDescription', currentLanguage) || 'Распознавание в процессе...',
-            });
-          }
-        } catch (pollError) {
-          console.error('Polling error:', pollError);
-          toast({
-            title: getLocaleString('error', currentLanguage),
-            description: 'Ошибка проверки статуса. Попробуйте позже.',
-            variant: 'destructive',
-          });
-        } finally {
-          setIsRecognizingText(false);
-        }
-        return;
-      }
-
-      // If error status or no provider_id, allow new submission
-    }
-
-    // Submit new job
+    // Submit new job (Deepgram is synchronous-like for this implementation)
     setIsRecognizingText(true);
     try {
-      const job = await assemblyAIService.submitTranscription(
+      // Create initial record if not exists
+      let transcriptDbId = existingTranscript?.id;
+      
+      if (!transcriptDbId) {
+         const { data: newTranscript, error: upsertError } = await supabase
+          .from('transcripts')
+          .upsert({
+            episode_slug: episodeData.slug,
+            lang: langForTranscription,
+            status: 'processing',
+            provider: 'deepgram'
+          }, { onConflict: 'episode_slug,lang' })
+          .select()
+          .single();
+          
+         if (upsertError) throw upsertError;
+         transcriptDbId = newTranscript.id;
+      } else {
+         // Update status to processing
+         await supabase.from('transcripts').update({ status: 'processing', provider: 'deepgram' }).eq('id', transcriptDbId);
+      }
+
+      toast({
+        title: getLocaleString('success', currentLanguage),
+        description: getLocaleString('transcriptionStarted', currentLanguage) || 'Распознавание начато',
+      });
+
+      // Submit to Deepgram
+      const result = await deepgramService.submitTranscription(
         audioUrl,
         langForTranscription === 'all' ? 'es' : langForTranscription,
         episodeData.slug,
@@ -726,25 +687,12 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
         langForTranscription
       );
 
-      const transcriptId = job?.id;
-      if (!transcriptId) throw new Error('No transcript ID returned from AssemblyAI');
+      // Process and save immediately
+      await processAndSaveTranscript(result, transcriptDbId);
 
-      // Save to database
-      const transcriptPayload = {
-        episode_slug: episodeData.slug,
-        lang: langForTranscription,
-        provider_id: transcriptId,
-        status: 'processing'
-      };
-
-      await supabase.from('transcripts').upsert(transcriptPayload, { onConflict: 'episode_slug,lang' });
-
-      toast({
-        title: getLocaleString('success', currentLanguage),
-        description: getLocaleString('transcriptionStarted', currentLanguage) || 'Распознавание текста начато',
-      });
     } catch (error) {
       console.error('Error starting transcription:', error);
+      setIsRecognizingText(false);
       toast({
         title: getLocaleString('error', currentLanguage),
         description: error.message || getLocaleString('transcriptionError', currentLanguage),
@@ -753,6 +701,8 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
     } finally {
       setIsRecognizingText(false);
     }
+
+
   }, [episodeData, currentLanguage, toast, refreshAllData]);
 
   const handleRecognizeQuestions = useCallback(async () => {

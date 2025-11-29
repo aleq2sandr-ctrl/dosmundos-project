@@ -56,7 +56,7 @@ const PlayerSettingsMenu = ({
     const ao = order[a.lang] ?? 100;
     const bo = order[b.lang] ?? 100;
     return ao - bo || a.lang.localeCompare(b.lang);
-  });
+  }).filter(v => v.lang !== 'en');
 
   const hasMultipleVariants = normalizedVariants.length > 1;
   const hasMixed = normalizedVariants.some(v => v.lang === 'mixed');
@@ -75,16 +75,16 @@ const PlayerSettingsMenu = ({
           <Settings className={isCompact ? "h-4 w-4" : "h-4 w-4 sm:h-5 sm:w-5 md:h-5 md:w-5"} />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-60 bg-slate-800 border-slate-700 text-slate-100 shadow-xl" side="top" align="start">
-        <DropdownMenuLabel className="text-purple-300">{getLocaleString('settings', currentLanguage)}</DropdownMenuLabel>
-        <DropdownMenuSeparator className="bg-slate-700" />
+        <DropdownMenuContent className="w-60 bg-slate-800 border-slate-600 text-slate-200 shadow-xl" side="top" align="start">
+        <DropdownMenuLabel className="text-white font-medium">{getLocaleString('settings', currentLanguage)}</DropdownMenuLabel>
+        <DropdownMenuSeparator className="bg-slate-600" />
         
         <DropdownMenuCheckboxItem
           checked={showTranscript}
           onCheckedChange={onToggleShowTranscript}
-          className="focus:bg-slate-700 data-[state=checked]:bg-purple-600/30"
+          className="focus:bg-slate-600 data-[state=checked]:bg-slate-600 data-[state=checked]:text-white text-slate-200 focus:text-slate-100 data-[state=checked]:text-white"
         >
-          <ScrollText className="mr-2 h-4 w-4 text-purple-300" />
+          <ScrollText className="mr-2 h-4 w-4 text-slate-200" />
           <span>{getLocaleString('showTranscript', currentLanguage)}</span>
         </DropdownMenuCheckboxItem>
         
@@ -92,8 +92,8 @@ const PlayerSettingsMenu = ({
 
         {showAudioTracks && (
           <>
-            <DropdownMenuLabel className="text-purple-300 flex items-center">
-                <Volume2 className="mr-2 h-4 w-4" />
+            <DropdownMenuLabel className="text-white font-medium flex items-center">
+                <Volume2 className="mr-2 h-4 w-4 text-slate-200" />
                 {getLocaleString('audioTrack', currentLanguage) || 'Audio Track'}
             </DropdownMenuLabel>
             <DropdownMenuRadioGroup value={(selectedAudioLang || '').toLowerCase()} onValueChange={(val) => onAudioTrackChange(String(val).toLowerCase())}>
@@ -101,11 +101,11 @@ const PlayerSettingsMenu = ({
                     if (!lang) return null;
                     let trackName;
                     if (lang === 'ru') {
-                        trackName = getLocaleString('audioTrackRussian', currentLanguage) || 'Русский';
+                        trackName = getLocaleString('audioTrackRussian', currentLanguage) || 'Мария';
                     } else if (lang === 'es') {
-                        trackName = getLocaleString('audioTrackSpanish', currentLanguage) || 'Español';
+                        trackName = getLocaleString('audioTrackSpanish', currentLanguage) || 'Пепе';
                     } else if (lang === 'mixed') {
-                        trackName = getLocaleString('audioTrackMixed', currentLanguage) || 'Mixed';
+                        trackName = getLocaleString('audioTrackMixed', currentLanguage) || 'Вместе';
                     } else {
                         trackName = lang.toUpperCase();
                     }
@@ -113,7 +113,7 @@ const PlayerSettingsMenu = ({
                         <DropdownMenuRadioItem 
                             key={lang} 
                             value={lang}
-                            className="focus:bg-slate-700 data-[state=checked]:bg-purple-600/30"
+                            className="focus:bg-slate-600 data-[state=checked]:bg-slate-600 data-[state=checked]:text-white text-slate-200 focus:text-slate-100 data-[state=checked]:text-white"
                         >
                             {trackName}
                         </DropdownMenuRadioItem>
@@ -124,8 +124,8 @@ const PlayerSettingsMenu = ({
           </>
         )}
 
-        <DropdownMenuLabel className="text-purple-300 flex items-center">
-            <Gauge className="mr-2 h-4 w-4" />
+        <DropdownMenuLabel className="text-white font-medium flex items-center">
+            <Gauge className="mr-2 h-4 w-4 text-slate-200" />
             {getLocaleString('playbackSpeed', currentLanguage)}
         </DropdownMenuLabel>
         <DropdownMenuRadioGroup value={String(currentPlaybackRateValue)} onValueChange={(value) => onSetPlaybackRate(parseFloat(value))}>
@@ -133,25 +133,25 @@ const PlayerSettingsMenu = ({
                 <DropdownMenuRadioItem 
                     key={option.value} 
                     value={String(option.value)}
-                    className="focus:bg-slate-700 data-[state=checked]:bg-purple-600/30"
+                    className="focus:bg-slate-600 data-[state=checked]:bg-slate-600 data-[state=checked]:text-white text-slate-200 focus:text-slate-100 data-[state=checked]:text-white"
                 >
                     {option.label}
                 </DropdownMenuRadioItem>
             ))}
         </DropdownMenuRadioGroup>
 
-        <DropdownMenuSeparator className="bg-slate-700" />
+        <DropdownMenuSeparator className="bg-slate-600" />
 
         {!hasTranscript && (
-          <DropdownMenuItem onClick={onRecognizeText} disabled={isRecognizingText} className="focus:bg-slate-700">
-            <Mic className="mr-2 h-4 w-4 text-green-300" />
+          <DropdownMenuItem onClick={onRecognizeText} disabled={isRecognizingText} className="focus:bg-slate-600 text-slate-200">
+            <Mic className="mr-2 h-4 w-4 text-emerald-400" />
             <span>{isRecognizingText ? getLocaleString('transcribing', currentLanguage) || 'Распознавание текста...' : getLocaleString('recognizeText', currentLanguage) || 'Распознать текст'}</span>
           </DropdownMenuItem>
         )}
 
         {!hasQuestions && (
-          <DropdownMenuItem onClick={onRecognizeQuestions} disabled={isRecognizingQuestions} className="focus:bg-slate-700">
-            <HelpCircle className="mr-2 h-4 w-4 text-blue-300" />
+          <DropdownMenuItem onClick={onRecognizeQuestions} disabled={isRecognizingQuestions} className="focus:bg-slate-600 text-slate-200">
+            <HelpCircle className="mr-2 h-4 w-4 text-sky-400" />
             <span>{isRecognizingQuestions ? getLocaleString('recognizing', currentLanguage) || 'Распознавание вопросов...' : getLocaleString('recognizeQuestions', currentLanguage) || 'Распознать вопросы'}</span>
           </DropdownMenuItem>
         )}
@@ -160,13 +160,13 @@ const PlayerSettingsMenu = ({
           <DropdownMenuSeparator className="bg-slate-700" />
         )}
 
-        <DropdownMenuItem onClick={onDownloadText} className="focus:bg-slate-700">
-          <FileText className="mr-2 h-4 w-4 text-purple-300" />
+        <DropdownMenuItem onClick={onDownloadText} className="focus:bg-slate-600 text-slate-200">
+          <FileText className="mr-2 h-4 w-4 text-slate-200" />
           <span>{getLocaleString('downloadText', currentLanguage)}</span>
         </DropdownMenuItem>
 
-        <DropdownMenuItem onClick={onDownloadAudio} className="focus:bg-slate-700 relative">
-          <Download className="mr-2 h-4 w-4 text-purple-300" />
+        <DropdownMenuItem onClick={onDownloadAudio} className="focus:bg-slate-600 text-slate-200 relative">
+          <Download className="mr-2 h-4 w-4 text-slate-200" />
           <span>{getLocaleString('downloadAudio', currentLanguage)}</span>
           {isOfflineMode && (
             <div className="absolute right-2 top-1/2 -translate-y-1/2 w-2 h-2 bg-orange-500 rounded-full border border-white/20"></div>

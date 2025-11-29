@@ -16,6 +16,12 @@ const initializeDeepgram = async () => {
     return DEEPGRAM_API_KEY;
   }
 
+  // Try client-side env var first (for local dev)
+  if (import.meta.env.VITE_DEEPGRAM_API_KEY) {
+    DEEPGRAM_API_KEY = import.meta.env.VITE_DEEPGRAM_API_KEY;
+    return DEEPGRAM_API_KEY;
+  }
+
   try {
     console.debug("🔑 Fetching Deepgram API key from server...");
 
@@ -44,6 +50,49 @@ const initializeDeepgram = async () => {
 };
 
 /**
+ * Normalize Deepgram response to match AssemblyAI format (milliseconds, text field)
+ */
+export const normalizeDeepgramResponse = (deepgramData) => {
+  if (!deepgramData || !deepgramData.results) return { utterances: [], words: [] };
+
+  const results = deepgramData.results;
+  const utterances = results.utterances || [];
+  const channel = results.channels?.[0]?.alternatives?.[0];
+  const words = channel?.words || [];
+
+  // Convert Deepgram utterances (seconds) to AssemblyAI format (milliseconds)
+  const normalizedUtterances = utterances.map(u => ({
+    start: Math.round(u.start * 1000),
+    end: Math.round(u.end * 1000),
+    text: u.transcript,
+    speaker: u.speaker,
+    words: (u.words || []).map(w => ({
+      start: Math.round(w.start * 1000),
+      end: Math.round(w.end * 1000),
+      text: w.word || w.punctuated_word,
+      confidence: w.confidence
+    }))
+  }));
+
+  // Convert all words
+  const normalizedWords = words.map(w => ({
+    start: Math.round(w.start * 1000),
+    end: Math.round(w.end * 1000),
+    text: w.word || w.punctuated_word,
+    confidence: w.confidence
+  }));
+
+  return {
+    utterances: normalizedUtterances,
+    words: normalizedWords,
+    confidence: channel?.confidence,
+    text: channel?.transcript,
+    id: deepgramData.metadata?.request_id,
+    status: 'completed'
+  };
+};
+
+/**
  * Submit audio file for transcription using Deepgram
  */
 export const submitTranscription = async (audioUrl, language, episodeSlug, currentLanguage, lang) => {
@@ -51,19 +100,27 @@ export const submitTranscription = async (audioUrl, language, episodeSlug, curre
     // Initialize API key first
     await initializeDeepgram();
 
-    const response = await fetch(`${DEEPGRAM_BASE_URL}/listen`, {
+    // Determine language (strictly 'ru' or 'es')
+    const targetLanguage = language === 'ru' ? 'ru' : 'es';
+
+    // Construct URL with query parameters as per Deepgram documentation
+    const params = new URLSearchParams({
+      model: 'nova-3',
+      language: targetLanguage,
+      punctuate: 'true',
+      smart_format: 'true',
+      utterances: 'true',
+      diarize: 'true'
+    });
+
+    const response = await fetch(`${DEEPGRAM_BASE_URL}/listen?${params.toString()}`, {
       method: 'POST',
       headers: {
         'Authorization': `Token ${DEEPGRAM_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        url: audioUrl,
-        language: language === 'ru' ? 'ru' : language === 'es' ? 'es' : 'en',
-        punctuate: true,
-        smart_format: true,
-        utterances: true,
-        diarize: true, // Speaker identification
+        url: audioUrl
       }),
     });
 
@@ -73,6 +130,9 @@ export const submitTranscription = async (audioUrl, language, episodeSlug, curre
     }
 
     const data = await response.json();
+    
+    // Normalize immediately
+    const normalizedData = normalizeDeepgramResponse(data);
 
     // Store transcription metadata in database
     await supabase
@@ -80,17 +140,13 @@ export const submitTranscription = async (audioUrl, language, episodeSlug, curre
       .upsert({
         episode_slug: episodeSlug,
         lang: lang,
-        status: 'processing',
+        status: 'processing', // Will be updated to completed immediately after
         provider: 'deepgram',
         provider_id: data.metadata?.request_id,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'episode_slug,lang' });
 
-    return {
-      id: data.metadata?.request_id,
-      status: 'processing',
-      provider: 'deepgram'
-    };
+    return normalizedData;
 
   } catch (error) {
     console.error('Deepgram transcription submission error:', error);

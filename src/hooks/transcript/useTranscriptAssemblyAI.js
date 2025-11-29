@@ -3,7 +3,6 @@ import { supabase } from '@/lib/supabaseClient';
 import assemblyAIService from '@/lib/assemblyAIService.js';
 import { getLocaleString } from '@/lib/locales';
 import { processTranscriptData, buildEditedTranscriptData, getFullTextFromUtterances } from '@/hooks/transcript/transcriptProcessingUtils';
-import { saveFullTranscriptToStorage } from '@/lib/transcriptStorageService';
 import logger from '@/lib/logger';
 
 
@@ -36,21 +35,28 @@ const useTranscriptAssemblyAI = (
     try {
       logger.debug('[useTranscriptAssemblyAI] Poll start', { assemblyId, dbTranscriptId, assemblyLang });
       const result = await assemblyAIService.getTranscriptionResult(assemblyId, currentLanguage);
-      if (result.status === 'completed') {
-        logger.info('[useTranscriptAssemblyAI] AssemblyAI status completed', { assemblyId, dbTranscriptId });
-        setTranscriptState(result);
-        toast({ title: getLocaleString('transcriptionCompletedTitle', currentLanguage), description: getLocaleString('transcriptionCompletedDescription', currentLanguage) });
+        if (result.status === 'completed') {
+          logger.info('[useTranscriptAssemblyAI] AssemblyAI status completed', { assemblyId, dbTranscriptId });
+          
+          // Process data for frontend consistency
+          const processedResult = processTranscriptData(result);
+          setTranscriptState(processedResult);
+          toast({ title: getLocaleString('transcriptionCompletedTitle', currentLanguage), description: getLocaleString('transcriptionCompletedDescription', currentLanguage) });
 
-        // 1) Mark status completed immediately with a tiny payload so UI does not look stuck
+        // 1) Mark status completed immediately with updated provider_id and status
         try {
           const nowIso = new Date().toISOString();
-          logger.debug('[useTranscriptAssemblyAI] Updating DB status to completed', { dbTranscriptId, updated_at: nowIso });
+          logger.debug('[useTranscriptAssemblyAI] Updating DB status to completed with new provider_id', { dbTranscriptId, assemblyId, updated_at: nowIso });
           const { error: statusUpdateError } = await supabase
             .from('transcripts')
-            .update({ status: 'completed', updated_at: nowIso })
+            .update({ 
+              status: 'completed', 
+              provider_id: assemblyId,
+              updated_at: nowIso 
+            })
             .eq('id', dbTranscriptId);
           if (statusUpdateError) throw statusUpdateError;
-          logger.info('[useTranscriptAssemblyAI] DB status updated to completed', { dbTranscriptId });
+          logger.info('[useTranscriptAssemblyAI] DB status and provider_id updated to completed', { dbTranscriptId, newProviderId: assemblyId });
 
           // Доп. страховка: обновим по (episode_slug, lang), если строка не нашлась по id
           try {
@@ -103,14 +109,41 @@ const useTranscriptAssemblyAI = (
                   contentType: 'application/json',
                   upsert: true
                 });
+              
+              let vpsStorageUrl = null;
+              // Save full transcript to VPS via server API (replaces direct call)
+              try {
+                const vpsResponse = await fetch('/api/save-transcript', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    episodeSlug: transcriptInfo.episode_slug,
+                    lang: transcriptInfo.lang,
+                    transcriptData: result // Save RAW data to VPS
+                  })
+                });
+                if (vpsResponse.ok) {
+                  const vpsResult = await vpsResponse.json();
+                  if (vpsResult.success) {
+                    logger.info('[useTranscriptAssemblyAI] VPS save successful:', vpsResult.url);
+                    vpsStorageUrl = vpsResult.url;
+                  }
+                } else {
+                  logger.warn('[useTranscriptAssemblyAI] VPS API failed:', vpsResponse.status);
+                }
+              } catch (vpsError) {
+                logger.warn('[useTranscriptAssemblyAI] VPS save failed (non-fatal):', vpsError.message);
+              }
 
               let storageUrl = null;
-              if (!uploadError) {
+              if (vpsStorageUrl) {
+                storageUrl = vpsStorageUrl;
+              } else if (!uploadError) {
                 const { data: { publicUrl } } = supabase.storage
                   .from('transcript')
                   .getPublicUrl(fileName);
                 storageUrl = publicUrl;
-                logger.info('[useTranscriptAssemblyAI] Raw uploaded:', storageUrl);
+                logger.info('[useTranscriptAssemblyAI] Raw uploaded to Supabase:', storageUrl);
               } else {
                 logger.warn(`Raw upload failed:`, uploadError.message);
               }
@@ -129,6 +162,30 @@ const useTranscriptAssemblyAI = (
                 console.warn('Warning: Could not update edited_transcript_data/storage_url:', editUpdateError);
               } else {
                 logger.info('[useTranscriptAssemblyAI] edited_transcript_data and storage_url saved', { dbTranscriptId });
+                
+                // Invalidate transcript cache after successful save
+                try {
+                  const { data: transcriptInfo } = await supabase
+                    .from('transcripts')
+                    .select('episode_slug, lang')
+                    .eq('id', dbTranscriptId)
+                    .single();
+                  
+                  if (transcriptInfo) {
+                    import('@/lib/cacheIntegration').then(cacheIntegration => {
+                      cacheIntegration.default.smartCache(
+                        'transcript', 
+                        `${transcriptInfo.episode_slug}:${transcriptInfo.lang}`, 
+                        null, 
+                        'high', 
+                        true
+                      );
+                    });
+                    logger.debug('[useTranscriptAssemblyAI] Transcript cache invalidated', { episodeSlug: transcriptInfo.episode_slug, lang: transcriptInfo.lang });
+                  }
+                } catch (cacheError) {
+                  logger.warn('Cache invalidation failed (non-fatal):', cacheError.message);
+                }
               }
             }
           } catch (e) {
@@ -136,32 +193,7 @@ const useTranscriptAssemblyAI = (
           }
         })();
 
-        // 3) Save full transcript to storage (replaces chunking)
-        ;(async () => {
-          try {
-            // Получаем episode_slug и lang 
-            const { data: transcriptInfo, error: infoError } = await supabase
-              .from('transcripts')
-              .select('episode_slug, lang')
-              .eq('id', dbTranscriptId)
-              .single();
-            
-            if (infoError || !transcriptInfo) {
-              logger.warn('[useTranscriptAssemblyAI] Could not get transcript info for storage save:', infoError?.message);
-              return;
-            }
-            
-            await saveFullTranscriptToStorage(
-              transcriptInfo.episode_slug, 
-              transcriptInfo.lang, 
-              result
-            );
-            
-            logger.info('[useTranscriptAssemblyAI] Full transcript saved to storage successfully', { dbTranscriptId });
-          } catch (e) {
-            logger.warn('[useTranscriptAssemblyAI] Non-fatal error saving full transcript to storage:', e?.message || e);
-          }
-        })();
+        // VPS saving now handled above in compactEdited block via API
       } else if (result.status === 'error') {
         const errorMessage = result.error || getLocaleString('unknownAssemblyError', currentLanguage);
         logger.error('[useTranscriptAssemblyAI] AssemblyAI returned error', { assemblyId, errorMessage });
@@ -186,25 +218,40 @@ const useTranscriptAssemblyAI = (
       return;
     }
     
-    if (transcriptionJobId && (existingDbTranscriptEntry?.status === 'processing' || existingDbTranscriptEntry?.status === 'queued')) {
-        console.log("Transcription request already sent and in progress. Skipping new request.");
-        return;
-    }
 
     const finalAudioUrl = audioUrlForTranscription || episodeAudioUrl;
     setIsLoadingTranscriptState(true);
     setTranscriptErrorState(null);
     
     const assemblyLangToUse = langCodeForAssembly || determineAssemblyLangForEpisode();
+    if (assemblyLangToUse === 'mixed') {
+      assemblyLangToUse = currentLanguage === 'ru' ? 'ru' : 'es';
+    }
     const transcriptLangForDb = episodeLang === 'all' ? currentLanguage : episodeLang;
 
     try {
       const job = await assemblyAIService.submitTranscription(finalAudioUrl, assemblyLangToUse, episodeSlug, currentLanguage, transcriptLangForDb);
       setTranscriptionJobId(job.id);
 
-      let dbOp = existingDbTranscriptEntry?.id
-        ? supabase.from('transcripts').update({ provider_id: job.id, status: job.status, lang: transcriptLangForDb, updated_at: new Date().toISOString() }).eq('id', existingDbTranscriptEntry.id)
-        : supabase.from('transcripts').insert([{ episode_slug: episodeSlug, lang: transcriptLangForDb, provider_id: job.id, status: job.status }]);
+      let dbOp;
+      if (existingDbTranscriptEntry?.id) {
+        // Update existing by ID
+        dbOp = supabase.from('transcripts').update({ 
+          provider_id: job.id, 
+          status: job.status, 
+          lang: transcriptLangForDb, 
+          updated_at: new Date().toISOString() 
+        }).eq('id', existingDbTranscriptEntry.id);
+      } else {
+        // Upsert by episode_slug + lang to overwrite existing
+        dbOp = supabase.from('transcripts').upsert({ 
+          episode_slug: episodeSlug, 
+          lang: transcriptLangForDb, 
+          provider_id: job.id, 
+          status: job.status,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'episode_slug,lang' });
+      }
       
       // Retry logic for large payloads
       let retryCount = 0;

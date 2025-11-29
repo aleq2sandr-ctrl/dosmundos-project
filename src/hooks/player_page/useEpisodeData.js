@@ -3,7 +3,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import logger from '@/lib/logger';
 import { getLocaleString } from '@/lib/locales';
-import r2Service from '@/lib/r2Service';
 import { getAudioUrl } from '@/lib/audioUrl';
 import { getFullTextFromUtterances } from '@/hooks/transcript/transcriptProcessingUtils';
 import { reconstructTranscriptFromChunks } from '@/lib/transcriptChunkingService';
@@ -384,7 +383,7 @@ const useEpisodeData = (episodeSlug, currentLanguage, toast) => {
         audio_url: activeAudio?.audio_url,
         duration: 0, // Duration removed from V3 for now
         // Store all variants for the player to allow switching
-        available_variants: audios
+        available_variants: audios.filter(v => String(v.lang || '').toLowerCase() !== 'en')
       };
       
       // Сразу устанавливаем данные эпизода и снимаем основной лоадер

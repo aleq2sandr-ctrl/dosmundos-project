@@ -131,11 +131,11 @@ const PodcastPlayer = ({
     // Get localized track name for notification
     let trackName;
     if (lang === 'ru') {
-      trackName = getLocaleString('audioTrackRussian', currentLanguage) || 'Русский';
+      trackName = getLocaleString('audioTrackRussian', currentLanguage) || 'Мария';
     } else if (lang === 'es') {
-      trackName = getLocaleString('audioTrackSpanish', currentLanguage) || 'Español';
+      trackName = getLocaleString('audioTrackSpanish', currentLanguage) || 'Пепе';
     } else if (lang === 'mixed') {
-      trackName = getLocaleString('audioTrackMixed', currentLanguage) || 'Mixed';
+      trackName = getLocaleString('audioTrackMixed', currentLanguage) || 'Вместе';
     } else {
       trackName = lang.toUpperCase();
     }
@@ -166,12 +166,6 @@ const PodcastPlayer = ({
         description: getLocaleString('audioTrackSwitchedDesc', currentLanguage, { track: trackName }) || `Audio track changed to ${trackName}`,
       });
 
-      // Resume playback if it was playing
-      if (wasPlaying) {
-        setTimeout(() => {
-          togglePlay();
-        }, 100);
-      }
     }
   }, [episodeData, isPlaying, currentTime, primaryAudioRef, playEpisode, togglePlay, currentLanguage, toast]);
   

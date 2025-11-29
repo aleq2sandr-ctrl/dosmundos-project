@@ -29,6 +29,7 @@ import { EditorAuthModal } from '@/components/EditorAuthModal';
 import EditHistoryAdminPage from '@/pages/EditHistoryAdminPage';
 import LivePage from '@/pages/LivePage';
 import { initGA4, trackPageView } from '@/lib/analyticsService';
+import { scheduleTempCleanup } from '@/lib/transcriptStorageService';
 
 // Поддерживаемые языки
 const SUPPORTED_LANGUAGES = ['ru', 'es', 'en', 'de', 'fr', 'pl'];
@@ -271,17 +272,20 @@ function App() {
     initGA4();
   }, []);
 
-  // Инициализация оптимизированной системы кэша
+  // Инициализация оптимизированной системы кэша и регулярной очистки temp файлов
   useEffect(() => {
     const initOptimizedCache = async () => {
       try {
         console.log('[App] Initializing optimized cache system...');
-        
+
         // Инициализируем оптимизированную систему кэша
         await cacheIntegration.init();
-        
+
+        // Запускаем регулярную очистку temp файлов
+        scheduleTempCleanup(1); // Очистка каждый час
+
         setOfflineServicesReady(true);
-        console.log('[App] Optimized cache system initialized successfully');
+        console.log('[App] Optimized cache system and temp cleanup initialized successfully');
       } catch (error) {
         console.error('[App] Failed to initialize optimized cache:', error);
         setOfflineServicesReady(true);

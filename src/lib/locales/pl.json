@@ -860,5 +860,11 @@
   "analyticsAudience": "Audience",
   "analyticsContent": "Content",
   "analyticsBehavior": "Behavior",
-  "analyticsFooterNote": "Data updates every 5 minutes. Use the refresh button for the latest information."
+  "analyticsFooterNote": "Data updates every 5 minutes. Use the refresh button for the latest information.",
+  "audioTrackMixed": "Razem",
+  "audioTrackRussian": "Maria",
+  "audioTrackSpanish": "Pepe",
+  "recognizeText": "Rozpoznaj tekst",
+  "recognizeQuestions": "Rozpoznaj pytania",
+  "transcribing": "Transkrybuję..."
 }

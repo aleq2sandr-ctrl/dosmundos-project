@@ -869,5 +869,11 @@
   "syncQueueDescription": "Gestionar tareas de sincronización pendientes",
   "syncQueueEmpty": "Cola de sincronización vacía",
   "manualSync": "Sincronización manual",
-  "refreshStats": "Actualizar estadísticas"
+  "refreshStats": "Actualizar estadísticas",
+  "audioTrackMixed": "Juntos",
+  "audioTrackRussian": "María",
+  "audioTrackSpanish": "Pepe",
+  "recognizeText": "Reconocer texto",
+  "recognizeQuestions": "Reconocer preguntas",
+  "transcribing": "Transcribiendo..."
 }

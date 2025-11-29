@@ -1,22 +1,22 @@
 import { createClient } from '@supabase/supabase-js';
 
-// TEMP FIX - 2024-11-29 7:10AM - FORCE HARDCODED VALUES
-console.log('🔥 [TEMP FIX] File updated at:', new Date().toISOString());
+// Helper to safely get env vars in both Vite and Node environments
+const getEnv = (key) => {
+  try {
+    if (typeof import.meta !== 'undefined' && import.meta.env) {
+      return import.meta.env[key];
+    }
+  } catch (e) {
+    // Ignore error if import.meta is not available
+  }
+  if (typeof process !== 'undefined' && process.env) {
+    return process.env[key];
+  }
+  return undefined;
+};
 
-// Debug: Check if import.meta.env is available and what it contains
-console.log('🔍 [DEBUG] import.meta.env available:', !!import.meta.env);
-console.log('🔍 [DEBUG] MODE:', import.meta.env.MODE);
-console.log('🔍 [DEBUG] DEV:', import.meta.env.DEV);
-console.log('🔍 [DEBUG] PROD:', import.meta.env.PROD);
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://supabase.dosmundos.pe';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlLWRlbW8iLCJpYXQiOjE2NDE3NjkyMDAsImV4cCI6MTk5OTk5OTk5OX0.A4_N08ZorXYT17zhZReBXPlY6L5-9d8thMbm7TcDWl8';
-
-// Debug: Log what we're actually reading
-console.log('🔍 [DEBUG] Raw supabaseUrl:', supabaseUrl);
-console.log('🔍 [DEBUG] Raw supabaseAnonKey:', supabaseAnonKey);
-console.log('🔍 [DEBUG] All env vars:', import.meta.env);
-
+const supabaseUrl = getEnv('VITE_SUPABASE_URL') || 'https://supabase.dosmundos.pe';
+const supabaseAnonKey = getEnv('VITE_SUPABASE_ANON_KEY') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlLWRlbW8iLCJpYXQiOjE2NDE3NjkyMDAsImV4cCI6MTk5OTk5OTk5OX0.A4_N08ZorXYT17zhZReBXPlY6L5-9d8thMbm7TcDWl8';
 
 // Проверка наличия переменных окружения
 if (!supabaseUrl || !supabaseAnonKey) {

@@ -80,9 +80,10 @@ const assemblyAIService = {
 
       // Request body with enhanced features for Russian and Spanish
       // Use automatic language detection if language is uncertain or not specified
-      const shouldUseAutoDetection = !languageCodeForAssembly ||
-                                     languageCodeForAssembly === 'auto' ||
-                                     languageCodeForAssembly === 'all';
+  const shouldUseAutoDetection = !languageCodeForAssembly ||
+                                   languageCodeForAssembly === 'auto' ||
+                                   languageCodeForAssembly === 'all' ||
+                                   languageCodeForAssembly === 'mixed';
 
       requestBody = {
         audio_url: audioUrl,
