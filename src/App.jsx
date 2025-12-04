@@ -29,7 +29,6 @@ import { EditorAuthModal } from '@/components/EditorAuthModal';
 import EditHistoryAdminPage from '@/pages/EditHistoryAdminPage';
 import LivePage from '@/pages/LivePage';
 import { initGA4, trackPageView } from '@/lib/analyticsService';
-import { scheduleTempCleanup } from '@/lib/transcriptStorageService';
 
 // Поддерживаемые языки
 const SUPPORTED_LANGUAGES = ['ru', 'es', 'en', 'de', 'fr', 'pl'];
@@ -206,9 +205,7 @@ const AppLayout = ({ user }) => {
             </LanguageRouteWrapper>
           } />
           <Route path="/:lang/analytics" element={
-            <LanguageRouteWrapper>
-              <AnalyticsPage />
-            </LanguageRouteWrapper>
+            <AnalyticsPage />
           } />
           <Route path="/:lang/offline-settings" element={
             <LanguageRouteWrapper>
@@ -281,11 +278,8 @@ function App() {
         // Инициализируем оптимизированную систему кэша
         await cacheIntegration.init();
 
-        // Запускаем регулярную очистку temp файлов
-        scheduleTempCleanup(1); // Очистка каждый час
-
         setOfflineServicesReady(true);
-        console.log('[App] Optimized cache system and temp cleanup initialized successfully');
+        console.log('[App] Optimized cache system initialized successfully');
       } catch (error) {
         console.error('[App] Failed to initialize optimized cache:', error);
         setOfflineServicesReady(true);

@@ -3,12 +3,12 @@ import react from '@vitejs/plugin-react';
 import { createLogger, defineConfig } from 'vite';
 
 const isDev = process.env.NODE_ENV !== 'production';
-let inlineEditPlugin, editModeDevPlugin;
+// let inlineEditPlugin, editModeDevPlugin;
 
-if (isDev) {
-	inlineEditPlugin = (await import('./plugins/visual-editor/vite-plugin-react-inline-editor.js')).default;
-	editModeDevPlugin = (await import('./plugins/visual-editor/vite-plugin-edit-mode.js')).default;
-}
+// if (isDev) {
+// 	inlineEditPlugin = (await import('./plugins/visual-editor/vite-plugin-react-inline-editor.js')).default;
+// 	editModeDevPlugin = (await import('./plugins/visual-editor/vite-plugin-edit-mode.js')).default;
+// }
 
 const configHorizonsViteErrorHandler = `
 const observer = new MutationObserver((mutations) => {
@@ -204,7 +204,7 @@ const enableDebugOverlays = isDev || process.env.VITE_DEBUG_OVERLAYS === 'true';
 export default defineConfig({
 	customLogger: logger,
 	plugins: [
-		...(isDev ? [inlineEditPlugin(), editModeDevPlugin()] : []),
+		// ...(isDev ? [inlineEditPlugin(), editModeDevPlugin()] : []),
 		react(),
         ...(enableDebugOverlays ? [addTransformIndexHtml] : [])
 	],
@@ -230,12 +230,13 @@ export default defineConfig({
 			'/supabase-rest': {
 				target: 'https://supabase.dosmundos.pe',
 				changeOrigin: true,
-				secure: true,
+				secure: false,
+				ws: true,
+				rewrite: (path) => path.replace(/^\/supabase-rest/, ''),
 				configure: (proxy, options) => {
 					proxy.on('proxyReq', (proxyReq, req, res) => {
-						req.headers.forEach((value, key) => {
-							proxyReq.setHeader(key, value);
-						});
+						// Override Origin header to avoid CORS issues on the target server
+						proxyReq.setHeader('Origin', 'https://supabase.dosmundos.pe');
 					});
 					proxy.on('error', (err, req, res) => {
 						console.error('Supabase proxy error:', err);

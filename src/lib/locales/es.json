@@ -875,5 +875,11 @@
   "audioTrackSpanish": "Pepe",
   "recognizeText": "Reconocer texto",
   "recognizeQuestions": "Reconocer preguntas",
-  "transcribing": "Transcribiendo..."
+  "recognizingText": "Reconociendo texto...",
+  "recognizingQuestions": "Reconociendo preguntas...",
+  "smartSegmentation": "Segmentación inteligente",
+  "segmenting": "Segmentando...",
+  "transcribing": "Transcribiendo...",
+  "autoRecognizeQuestions": "Reconocimiento automático de preguntas con IA",
+  "autoRecognizeQuestionsDesc": "Generar automáticamente preguntas al cargar un episodio"
 }

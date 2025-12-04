@@ -37,8 +37,10 @@ const PlayerUIControls = React.memo(({
   hasQuestions = false,
   onRecognizeText,
   onRecognizeQuestions,
+  onSmartSegmentation,
   isRecognizingText = false,
-  isRecognizingQuestions = false
+  isRecognizingQuestions = false,
+  isSmartSegmenting = false
 }) => {
   
   return (
@@ -79,8 +81,10 @@ const PlayerUIControls = React.memo(({
             hasQuestions={hasQuestions}
             onRecognizeText={onRecognizeText}
             onRecognizeQuestions={onRecognizeQuestions}
+            onSmartSegmentation={onSmartSegmentation}
             isRecognizingText={isRecognizingText}
             isRecognizingQuestions={isRecognizingQuestions}
+            isSmartSegmenting={isSmartSegmenting}
           />
           <Button variant="ghost" size="icon" onClick={() => onNavigateQuestion(-1)} className="text-white/80 hover:text-white hover:bg-white/15 h-9 w-9 sm:h-10 sm:w-10 md:h-11 md:w-11" aria-label={getLocaleString('previousQuestion', currentLanguage)}>
             <ChevronLeft className="h-5 w-5 sm:h-5 sm:w-5 md:h-6 md:w-6" />

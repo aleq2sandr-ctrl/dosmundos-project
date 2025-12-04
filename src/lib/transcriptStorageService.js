@@ -1,28 +1,37 @@
 import { createClient } from '@supabase/supabase-js';
 import logger from './logger.js';
 
+let supabaseClient = null;
+
 const getSupabaseServerClient = () => {
+  if (supabaseClient) return supabaseClient;
+
   // Server-side only - check Node.js environment
   if (typeof window !== 'undefined') {
     logger.warn('supabaseServerClient called in browser - using fallback');
-    return createClient(
+    supabaseClient = createClient(
       'https://supabase.dosmundos.pe',
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlLWRlbW8iLCJpYXQiOjE2NDE3NjkyMDAsImV4cCI6MTk5OTk5OTk5OX0.A4_N08ZorXYT17zhZReBXPlY6L5-9d8thMbm7TcDWl8'
     );
+    return supabaseClient;
   }
 
   const supabaseUrl = process.env.SUPABASE_URL || 'https://supabase.dosmundos.pe';
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SERVICE_ROLE_KEY;
 
-  return createClient(supabaseUrl, supabaseServiceKey, {
+  if (!supabaseServiceKey) {
+    throw new Error('Supabase service key not found. Please set SUPABASE_SERVICE_ROLE_KEY or SERVICE_ROLE_KEY in .env');
+  }
+
+  supabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false
     }
   });
-};
 
-const supabase = getSupabaseServerClient();
+  return supabaseClient;
+};
 
 export const saveFullTranscriptToStorage = async (episodeSlug, lang, transcriptData, provider = 'unknown') => {
   const fileName = `${episodeSlug}_${lang.toUpperCase()}_${provider}.json`;
@@ -31,6 +40,7 @@ export const saveFullTranscriptToStorage = async (episodeSlug, lang, transcriptD
   logger.info(`Uploading transcript to Supabase Storage: ${fileName}`);
 
   try {
+    const supabase = getSupabaseServerClient();
     // Upload to Supabase Storage 'transcript' bucket (Node.js Buffer for server-side)
     const fileBuffer = Buffer.from(content, 'utf8');
     const { data: uploadData, error: uploadError } = await supabase.storage

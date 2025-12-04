@@ -23,8 +23,8 @@ import useAudioPrefetch from '@/hooks/player/useAudioPrefetch';
 import { getAudioUrl } from '@/lib/audioUrl';
 import { usePlayer } from '@/contexts/PlayerContext';
 import deepgramService from '@/lib/deepgramService';
+import smartSegmentationService from '@/lib/smartSegmentationService';
 import { generateQuestionsOpenAI } from '@/lib/openAIService';
-import { saveFullTranscriptToStorage } from '@/lib/transcriptStorageService';
 
 
 const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
@@ -61,14 +61,16 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
     }
   }, [urlLanguage, appCurrentLanguage, location.pathname, location.search, location.hash, navigate]);
 
-  const [showFloatingControls, setShowFloatingControls] = useState(false);
-  const playerControlsContainerRef = useRef(null);
-  const [editingQuestion, setEditingQuestion] = useState(null);
-  const [allEpisodesForPrefetch, setAllEpisodesForPrefetch] = useState([]);
   const [isRecognizingText, setIsRecognizingText] = useState(false);
   const [isRecognizingQuestions, setIsRecognizingQuestions] = useState(false);
+  const [isSmartSegmenting, setIsSmartSegmenting] = useState(false);
   const { playEpisode, audioRef, currentEpisode, currentTime, duration, isPlaying } = usePlayer();
+  const playerControlsContainerRef = useRef(null);
+  const [allEpisodesForPrefetch, setAllEpisodesForPrefetch] = useState([]);
+  const [editingQuestion, setEditingQuestion] = useState(null);
   
+  // Removed automatic recognition flags — recognition must now be triggered manually
+
   // Загрузка списка эпизодов для prefetch
   useEffect(() => {
     const fetchEpisodesForPrefetch = async () => {
@@ -161,38 +163,6 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
     isOfflineMode // Передаем офлайн статус
   );
 
-  // Listen for rollback events to update UI in realtime
-  useEffect(() => {
-    const handleTranscriptUpdate = (event) => {
-      if (event.detail?.episodeSlug === episodeSlug) {
-        fetchTranscriptForEpisode(episodeSlug, currentLanguage);
-      }
-    };
-
-    const handleQuestionUpdate = (event) => {
-      if (event.detail?.episodeSlug === episodeSlug) {
-        fetchQuestionsForEpisode(episodeSlug, currentLanguage);
-      }
-    };
-
-    const handleSpeakerUpdate = (event) => {
-      if (event.detail?.episodeSlug === episodeSlug) {
-        fetchTranscriptForEpisode(episodeSlug, currentLanguage);
-      }
-    };
-
-    window.addEventListener('transcriptUpdated', handleTranscriptUpdate);
-    window.addEventListener('questionUpdated', handleQuestionUpdate);
-    window.addEventListener('speakerUpdated', handleSpeakerUpdate);
-
-    return () => {
-      window.removeEventListener('transcriptUpdated', handleTranscriptUpdate);
-      window.removeEventListener('questionUpdated', handleQuestionUpdate);
-      window.removeEventListener('speakerUpdated', handleSpeakerUpdate);
-    };
-  }, [episodeSlug, currentLanguage, fetchTranscriptForEpisode, fetchQuestionsForEpisode]);
-
-
   const {
     isAddQuestionFromSegmentDialogOpen,
     segmentForQuestion,
@@ -223,12 +193,12 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
       if (ref) {
         const rect = ref.getBoundingClientRect();
         if (rect.bottom < 0) {
-          setShowFloatingControls(true);
+          setPlayerShowFloatingControls(true);
         } else {
-          setShowFloatingControls(false);
+          setPlayerShowFloatingControls(false);
         }
       } else {
-        setShowFloatingControls(false);
+        setPlayerShowFloatingControls(false);
       }
     };
     window.addEventListener('scroll', handleScroll);
@@ -242,7 +212,7 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
     // Special handling for virtual blocks
     if (questionData.id === 'intro-virtual') {
       // Create or update a real intro question (time locked to 0)
-      const langForQuestions = episodeData.lang === 'all' ? currentLanguage : episodeData.lang;
+      const langForQuestions = (episodeData.lang === 'all' || episodeData.lang === 'mixed') ? currentLanguage : episodeData.lang;
       const { data: existingIntro, error: fetchErr } = await supabase
         .from('timecodes')
         .select('*')
@@ -289,7 +259,7 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
     }
     
     let dbError;
-    const langForQuestions = episodeData.lang === 'all' ? currentLanguage : episodeData.lang;
+    const langForQuestions = (episodeData.lang === 'all' || episodeData.lang === 'mixed') ? currentLanguage : episodeData.lang;
 
     if (action === 'add') {
       const questionPayload = { 
@@ -392,7 +362,7 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
 
   const handleTranscriptUpdate = useCallback(async (newTranscriptData) => {
     if (!episodeData || !episodeData.slug) return;
-    const langForContent = episodeData.lang === 'all' ? currentLanguage : episodeData.lang;
+    const langForContent = (episodeData.lang === 'all' || episodeData.lang === 'mixed') ? currentLanguage : episodeData.lang;
 
     console.log('🔊 [Transcript] Updating transcript with', newTranscriptData.utterances?.length || 0, 'utterances');
     
@@ -482,7 +452,7 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
   const playerEpisodeDataMemo = useMemo(() => {
     if (!episodeData) return null;
     
-    const langForDisplay = episodeData.lang === 'all' ? currentLanguage : episodeData.lang;
+    const langForDisplay = (episodeData.lang === 'all' || episodeData.lang === 'mixed') ? currentLanguage : episodeData.lang;
     
     // Determine display title
     let displayTitle = episodeData.title;
@@ -574,7 +544,7 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
       return;
     }
 
-    const langForTranscription = episodeData.lang === 'all' ? currentLanguage : episodeData.lang;
+    const langForTranscription = (episodeData.lang === 'all' || episodeData.lang === 'mixed') ? currentLanguage : episodeData.lang;
 
     // Helper to process and save transcript result
     const processAndSaveTranscript = async (result, transcriptDbId) => {
@@ -681,7 +651,7 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
       // Submit to Deepgram
       const result = await deepgramService.submitTranscription(
         audioUrl,
-        langForTranscription === 'all' ? 'es' : langForTranscription,
+        langForTranscription,
         episodeData.slug,
         currentLanguage,
         langForTranscription
@@ -710,7 +680,7 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
 
     setIsRecognizingQuestions(true);
     try {
-      const langForQuestions = episodeData.lang === 'all' ? currentLanguage : episodeData.lang;
+      const langForQuestions = (episodeData.lang === 'all' || episodeData.lang === 'mixed') ? currentLanguage : episodeData.lang;
 
       // Get transcript data first
       const { data: transcriptData } = await supabase
@@ -758,6 +728,66 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
     }
   }, [episodeData, currentLanguage, toast]);
 
+  const handleSmartSegmentation = useCallback(async () => {
+    if (!episodeData?.slug || !transcript) return;
+
+    setIsSmartSegmenting(true);
+    try {
+      // 1. Gather all words
+      let originalWords = [];
+      if (transcript.words && transcript.words.length > 0) {
+          originalWords = transcript.words;
+      } else if (transcript.utterances) {
+          // Flatten utterances to words
+          transcript.utterances.forEach(u => {
+              if (u.words) {
+                  originalWords = [...originalWords, ...u.words];
+              }
+          });
+      }
+
+      if (originalWords.length === 0) {
+          throw new Error("No words found in transcript to segment.");
+      }
+
+      // 2. Construct full text (for logging/debugging if needed, but service handles it)
+      // const fullText = originalWords.map(w => w.word).join(' ');
+
+      toast({
+        title: getLocaleString('processing', currentLanguage),
+        description: getLocaleString('segmenting', currentLanguage), 
+      });
+
+      // 3. Call service
+      // Wrap words in a single utterance structure as expected by the service
+      const inputUtterances = [{ words: originalWords }];
+      const newUtterances = await smartSegmentationService.processTranscript(inputUtterances);
+
+      // 4. Save result
+      await handleTranscriptUpdate({ 
+          ...transcript,
+          utterances: newUtterances 
+      });
+
+      toast({
+        title: getLocaleString('success', currentLanguage),
+        description: "Smart segmentation completed!",
+      });
+
+    } catch (error) {
+      console.error('Error during smart segmentation:', error);
+      toast({
+        title: getLocaleString('error', currentLanguage),
+        description: error.message || "Smart segmentation failed",
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSmartSegmenting(false);
+    }
+  }, [episodeData, transcript, currentLanguage, toast, handleTranscriptUpdate]);
+
+  // Automatic recognition removed — recognition is now manual (triggered from UI)
+
   // Пока не получили базовые данные эпизода — показываем простой лоадер
   if (loading && !episodeData) {
     return (
@@ -795,7 +825,7 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
 
   return (
     <div className="w-full flex flex-col items-center">
-      {showFloatingControls && (
+      {playerShowFloatingControls && (
         <FloatingPlayerControls
           episodeTitle={playerEpisodeDataMemo?.displayTitle || ''}
           isPlaying={isPlaying}
@@ -833,8 +863,10 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
                 isOfflineMode={isOfflineMode}
                 onRecognizeText={handleRecognizeText}
                 onRecognizeQuestions={handleRecognizeQuestions}
+                onSmartSegmentation={handleSmartSegmentation}
                 isRecognizingText={isRecognizingText}
                 isRecognizingQuestions={isRecognizingQuestions}
+                isSmartSegmenting={isSmartSegmenting}
             />
           )}
         </div>

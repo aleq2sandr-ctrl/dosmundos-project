@@ -843,5 +843,11 @@
   "audioTrackMixed": "Вместе",
   "recognizeText": "Распознать текст",
   "recognizeQuestions": "Распознать вопросы",
-  "transcribing": "Транскрибирую..."
+  "recognizingText": "Распознавание текста...",
+  "recognizingQuestions": "Распознавание вопросов...",
+  "smartSegmentation": "Умная сегментация",
+  "segmenting": "Сегментация...",
+  "transcribing": "Транскрибирую...",
+  "autoRecognizeQuestions": "Автоматическое распознавание вопросов через ИИ",
+  "autoRecognizeQuestionsDesc": "Автоматически генерировать вопросы при загрузке эпизода"
 }

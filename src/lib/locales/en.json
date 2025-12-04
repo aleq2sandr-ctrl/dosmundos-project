@@ -911,5 +911,11 @@
   "audioTrackSpanish": "Pepe",
   "recognizeText": "Recognize text",
   "recognizeQuestions": "Recognize questions",
-  "transcribing": "Transcribing..."
+  "recognizingText": "Recognizing text...",
+  "recognizingQuestions": "Recognizing questions...",
+  "smartSegmentation": "Smart Segmentation",
+  "segmenting": "Segmenting...",
+  "transcribing": "Transcribing...",
+  "autoRecognizeQuestions": "Automatic AI question recognition",
+  "autoRecognizeQuestionsDesc": "Automatically generate questions when loading an episode"
 }

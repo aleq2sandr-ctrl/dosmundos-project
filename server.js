@@ -1,6 +1,11 @@
 import express from 'express';
 import cors from 'cors';
+import dotenv from 'dotenv';
 import saveTranscript from './api/save-transcript.js';
+
+dotenv.config();
+
+console.log('SERVICE_ROLE_KEY:', process.env.SERVICE_ROLE_KEY ? 'set' : 'not set');
 
 const app = express();
 const PORT = process.env.PORT || 3000;

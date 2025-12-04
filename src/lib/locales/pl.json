@@ -866,5 +866,9 @@
   "audioTrackSpanish": "Pepe",
   "recognizeText": "Rozpoznaj tekst",
   "recognizeQuestions": "Rozpoznaj pytania",
-  "transcribing": "Transkrybuję..."
+  "recognizingText": "Rozpoznawanie tekstu...",
+  "recognizingQuestions": "Rozpoznawanie pytań...",
+  "transcribing": "Transkrybuję...",
+  "autoRecognizeQuestions": "Automatyczne rozpoznawanie pytań przez SI",
+  "autoRecognizeQuestionsDesc": "Automatycznie generuj pytania podczas ładowania odcinka"
 }

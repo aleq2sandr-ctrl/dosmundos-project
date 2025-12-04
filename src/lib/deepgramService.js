@@ -4,6 +4,7 @@
  */
 
 import { supabase } from './supabaseClient';
+import smartSegmentationService from './smartSegmentationService';
 
 let DEEPGRAM_API_KEY = null;
 const DEEPGRAM_BASE_URL = 'https://api.deepgram.com/v1';
@@ -17,8 +18,14 @@ const initializeDeepgram = async () => {
   }
 
   // Try client-side env var first (for local dev)
-  if (import.meta.env.VITE_DEEPGRAM_API_KEY) {
+  if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_DEEPGRAM_API_KEY) {
     DEEPGRAM_API_KEY = import.meta.env.VITE_DEEPGRAM_API_KEY;
+    return DEEPGRAM_API_KEY;
+  }
+
+  // Try server-side env var
+  if (typeof process !== 'undefined' && process.env?.DEEPGRAM_API_KEY) {
+    DEEPGRAM_API_KEY = process.env.DEEPGRAM_API_KEY;
     return DEEPGRAM_API_KEY;
   }
 
@@ -146,6 +153,19 @@ export const submitTranscription = async (audioUrl, language, episodeSlug, curre
         updated_at: new Date().toISOString(),
       }, { onConflict: 'episode_slug,lang' });
 
+    // Smart Segmentation
+    try {
+      console.log('Starting smart segmentation...');
+      const segmentedUtterances = await smartSegmentationService.processTranscript(normalizedData.utterances);
+      normalizedData.utterances = segmentedUtterances;
+      console.log('Smart segmentation completed');
+    } catch (segError) {
+      console.error('Smart segmentation failed, using original:', segError);
+    }
+
+    // Save result
+    await saveTranscriptionResult(episodeSlug, lang, normalizedData);
+
     return normalizedData;
 
   } catch (error) {
@@ -197,12 +217,12 @@ export const saveTranscriptionResult = async (episodeSlug, lang, transcriptionDa
       episode_slug: episodeSlug,
       lang: lang,
       edited_transcript_data: {
-        text: transcriptionData.transcript || '',
+        text: transcriptionData.transcript || transcriptionData.text || '',
         utterances: utterances.map(u => ({
-          id: u.id || u.start.toString(),
+          id: u.id || (u.start ? u.start.toString() : `u-${Math.random()}`),
           start: u.start,
           end: u.end,
-          text: u.transcript,
+          text: u.transcript || u.text,
           speaker: u.speaker,
           words: u.words || []
         })),
@@ -219,23 +239,53 @@ export const saveTranscriptionResult = async (episodeSlug, lang, transcriptionDa
       updated_at: new Date().toISOString()
     };
 
-    // Upload raw transcription data to storage
-    const fileName = `${episodeSlug}-${lang}-deepgram-raw.json`;
-    const rawJson = JSON.stringify(transcriptionData);
-    const { error: uploadError } = await supabase.storage
-      .from('transcript')
-      .upload(fileName, rawJson, {
-        contentType: 'application/json',
-        upsert: true
-      });
+    // Check environment
+    const isBrowser = typeof window !== 'undefined';
 
-    if (!uploadError) {
-      const { data: { publicUrl } } = supabase.storage
+    if (isBrowser) {
+      // Upload raw data directly to storage from client
+      const fileName = `${episodeSlug}_${lang.toUpperCase()}_DEEPGRAM_${provider}.json`;
+      const rawJson = JSON.stringify(transcriptionData);
+      const { error: uploadError } = await supabase.storage
         .from('transcript')
-        .getPublicUrl(fileName);
-      transcriptPayload.storage_url = publicUrl;
+        .upload(fileName, rawJson, {
+          contentType: 'application/json',
+          upsert: true
+        });
+
+      let storageUrl = null;
+      if (!uploadError) {
+        const { data: { publicUrl } } = supabase.storage
+          .from('transcript')
+          .getPublicUrl(fileName);
+        storageUrl = publicUrl;
+      } else {
+        console.warn(`Raw data upload failed for ${episodeSlug}-${lang}:`, uploadError.message);
+      }
+
+      // Now update DB with processed data and storage URL
+      const updatePayload = {
+        ...transcriptPayload,
+        storage_url: storageUrl
+      };
+
+      const { error } = await supabase
+        .from('transcripts')
+        .upsert(updatePayload, { onConflict: 'episode_slug,lang' });
+
+      if (error) {
+        console.error('Error saving Deepgram transcription:', error);
+        throw error;
+      }
+
+      return { success: true };
     } else {
-      console.warn(`Raw data upload failed for ${episodeSlug}-${lang}:`, uploadError.message);
+      // Server-side: use storage service directly
+      const { saveFullTranscriptToStorage } = await import('./transcriptStorageService.js');
+      const result = await saveFullTranscriptToStorage(episodeSlug, lang, transcriptionData, 'deepgram');
+      if (result.success && result.url) {
+         transcriptPayload.storage_url = result.url;
+      }
     }
 
     const { error } = await supabase

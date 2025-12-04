@@ -57,8 +57,10 @@ const PodcastPlayer = ({
   fetchTranscriptForEpisode,
   onRecognizeText,
   onRecognizeQuestions,
+  onSmartSegmentation,
   isRecognizingText,
-  isRecognizingQuestions
+  isRecognizingQuestions,
+  isSmartSegmenting
 }) => {
   
   const { toast } = useToast();
@@ -550,8 +552,10 @@ const PodcastPlayer = ({
           hasQuestions={hasQuestions}
           onRecognizeText={onRecognizeText}
           onRecognizeQuestions={onRecognizeQuestions}
+          onSmartSegmentation={onSmartSegmentation}
           isRecognizingText={isRecognizingText}
           isRecognizingQuestions={isRecognizingQuestions}
+          isSmartSegmenting={isSmartSegmenting}
         />
       </div>
     </div>

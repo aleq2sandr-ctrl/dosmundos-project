@@ -44,6 +44,7 @@ console.log('🔍 [DEBUG] URL type:', typeof supabaseUrl);
 console.log('🔍 [DEBUG] URL length:', supabaseUrl ? supabaseUrl.length : 'undefined');
 
 // Force correct URL
+const isDev = import.meta.env.DEV;
 const finalUrl = 'https://supabase.dosmundos.pe';
 const finalKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlLWRlbW8iLCJpYXQiOjE2NDE3NjkyMDAsImV4cCI6MTk5OTk5OTk5OX0.A4_N08ZorXYT17zhZReBXPlY6L5-9d8thMbm7TcDWl8';
 
@@ -52,6 +53,11 @@ console.log('🔍 [DEBUG] Using final URL:', finalUrl);
 export const supabase = createClient(finalUrl, finalKey, {
   // Для self-hosted временно отключаем realtime чтобы избежать WebSocket ошибок
   ...(isSelfHosted && {
+    realtime: {
+      enabled: false
+    }
+  }),
+  ...(isDev && {
     realtime: {
       enabled: false
     }
@@ -75,7 +81,15 @@ export const supabase = createClient(finalUrl, finalKey, {
         'Connection': 'keep-alive',
         'User-Agent': 'DosMundos-Podcast-App/1.0'
       })
-    }
+    },
+    ...(isDev && {
+      fetch: (url, options = {}) => {
+        // In development, rewrite Supabase URLs to use the proxy
+        const proxyUrl = url.replace('https://supabase.dosmundos.pe', '/supabase-rest');
+        console.log('🔄 [Supabase] Proxying request to:', proxyUrl);
+        return fetch(proxyUrl, options);
+      }
+    })
   },
   auth: {
     autoRefreshToken: true,
@@ -165,11 +179,11 @@ export const supabase = createClient(finalUrl, finalKey, {
 
 
 // Если это self-hosted, добавляем глобальный перехватчик fetch для CORS
-if (isSelfHosted) {
+if (isSelfHosted || isDev) {
   const originalFetch = window.fetch;
   window.fetch = async function(url, options = {}) {
     // Если это запрос к нашему Supabase, очищаем заголовки и добавляем обработку ошибок
-    if (url && url.includes('supabase.dosmundos.pe')) {
+    if (url && (url.includes('supabase.dosmundos.pe') || url.startsWith('/supabase-rest'))) {
       // Handle headers whether they are a plain object or Headers object
       // We normalize keys to lowercase to avoid duplication
       let headers = {};
@@ -215,6 +229,14 @@ if (isSelfHosted) {
           headers['content-type'] = 'application/json';
         }
       }
+
+      // Force proxy URL if in dev mode
+      let fetchUrl = url;
+      // DISABLED: Proxy rewrite causing 502 errors - direct HTTPS works fine
+      // if (isDev && url.includes('supabase.dosmundos.pe')) {
+      //   fetchUrl = url.replace('https://supabase.dosmundos.pe', '/supabase-rest');
+      //   console.log('🔄 [Supabase] Rewriting URL to proxy:', fetchUrl);
+      // }
       
       // Функция для выполнения запроса с повторными попытками
       const fetchWithRetry = async (attempt = 1, forceHttp1 = false) => {
@@ -223,7 +245,7 @@ if (isSelfHosted) {
         const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
 
         // Force HTTP/1.1 if requested or if this is a timecodes request (known to have issues)
-        const isTimecodesRequest = url.includes('/timecodes');
+        const isTimecodesRequest = fetchUrl.includes('/timecodes');
         const useHttp1 = forceHttp1 || isTimecodesRequest || attempt > 1;
 
         const requestHeaders = { ...headers };
@@ -238,7 +260,7 @@ if (isSelfHosted) {
         }
 
         try {
-          const response = await originalFetch(url, {
+          const response = await originalFetch(fetchUrl, {
             ...options,
             headers: requestHeaders,
             mode: 'cors',
