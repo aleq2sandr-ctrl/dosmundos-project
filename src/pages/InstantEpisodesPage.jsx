@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import { supabase } from '@/lib/supabaseClient.js';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { getLocaleString } from '@/lib/locales';

@@ -19,7 +19,7 @@ import FestivalPage from '@/pages/FestivalPage';
 import EventsPage from '@/pages/EventsPage';
 import NewYearPage from '@/pages/NewYearPage';
 import VolunteersPage from '@/pages/VolunteersPage';
-import { supabase } from '@/lib/supabaseClient';
+import { supabase } from '@/lib/supabaseClient.js';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import cacheIntegration from '@/lib/cacheIntegration';
 import { useToast } from '@/components/ui/use-toast';

@@ -83,12 +83,7 @@ export const supabase = createClient(finalUrl, finalKey, {
       })
     },
     ...(isDev && {
-      fetch: (url, options = {}) => {
-        // In development, rewrite Supabase URLs to use the proxy
-        const proxyUrl = url.replace('https://supabase.dosmundos.pe', '/supabase-rest');
-        console.log('🔄 [Supabase] Proxying request to:', proxyUrl);
-        return fetch(proxyUrl, options);
-      }
+      // Dev mode specific settings if needed
     })
   },
   auth: {
@@ -121,6 +116,8 @@ export const supabase = createClient(finalUrl, finalKey, {
       delete headers['content-profile'];
       delete headers['http2-settings'];
       delete headers['upgrade'];
+      delete headers['cache-control'];
+      delete headers['pragma'];
       
       // Add HTTP/2 compatibility headers
       headers['connection'] = 'keep-alive';
@@ -202,6 +199,8 @@ if (isSelfHosted || isDev) {
       delete headers['content-profile'];
       delete headers['http2-settings'];
       delete headers['upgrade'];
+      delete headers['cache-control'];
+      delete headers['pragma'];
       
       // Убеждаемся что API ключ сохранен
       if (!headers['apikey'] && cleanAnonKey) {

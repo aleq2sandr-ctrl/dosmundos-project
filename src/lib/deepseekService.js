@@ -1,7 +1,10 @@
 import axios from 'axios';
 import logger from './logger';
 
-const DEEPSEEK_API_URL = "https://api.deepseek.com/chat/completions";
+// Use proxy in development to avoid CORS issues
+const DEEPSEEK_API_URL = import.meta.env.DEV 
+  ? "/deepseek-api/chat/completions" 
+  : "https://api.deepseek.com/chat/completions";
 
 let deepseekApiKey = null;
 
@@ -71,7 +74,7 @@ const deepseekService = {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${apiKey}`
           },
-          timeout: 120000 // 2 minutes timeout for long texts
+          timeout: 300000 // 5 minutes timeout for long texts
         }
       );
 

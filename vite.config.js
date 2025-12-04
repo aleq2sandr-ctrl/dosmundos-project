@@ -227,22 +227,28 @@ export default defineConfig({
 				changeOrigin: true,
 				secure: false
 			},
-			'/supabase-rest': {
-				target: 'https://supabase.dosmundos.pe',
+			'/deepseek-api': {
+				target: 'https://api.deepseek.com',
 				changeOrigin: true,
-				secure: false,
-				ws: true,
-				rewrite: (path) => path.replace(/^\/supabase-rest/, ''),
-				configure: (proxy, options) => {
-					proxy.on('proxyReq', (proxyReq, req, res) => {
-						// Override Origin header to avoid CORS issues on the target server
-						proxyReq.setHeader('Origin', 'https://supabase.dosmundos.pe');
-					});
-					proxy.on('error', (err, req, res) => {
-						console.error('Supabase proxy error:', err);
-					});
-				}
-			}
+				rewrite: (path) => path.replace(/^\/deepseek-api/, ''),
+				secure: false
+			},
+			// '/supabase-rest': {
+			// 	target: 'https://supabase.dosmundos.pe',
+			// 	changeOrigin: true,
+			// 	secure: false,
+			// 	ws: true,
+			// 	rewrite: (path) => path.replace(/^\/supabase-rest/, ''),
+			// 	configure: (proxy, options) => {
+			// 		proxy.on('proxyReq', (proxyReq, req, res) => {
+			// 			// Override Origin header to avoid CORS issues on the target server
+			// 			proxyReq.setHeader('Origin', 'https://supabase.dosmundos.pe');
+			// 		});
+			// 		proxy.on('error', (err, req, res) => {
+			// 			console.error('Supabase proxy error:', err);
+			// 		});
+			// 	}
+			// }
 		}
 	},
 	resolve: {

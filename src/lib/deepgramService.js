@@ -244,7 +244,7 @@ export const saveTranscriptionResult = async (episodeSlug, lang, transcriptionDa
 
     if (isBrowser) {
       // Upload raw data directly to storage from client
-      const fileName = `${episodeSlug}_${lang.toUpperCase()}_DEEPGRAM_${provider}.json`;
+      const fileName = `${episodeSlug}_${lang.toUpperCase()}_DEEPGRAM.json`;
       const rawJson = JSON.stringify(transcriptionData);
       const { error: uploadError } = await supabase.storage
         .from('transcript')
