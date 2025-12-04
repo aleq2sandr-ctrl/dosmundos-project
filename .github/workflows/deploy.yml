@@ -99,10 +99,10 @@ jobs:
             echo "Current directory contents:"
             ls -lah "$DEPLOY_PATH" | head -10 || echo "Directory is empty or doesn't exist"
             
-            # Remove old files (except backup directories)
-            echo "Removing old files (keeping backups)..."
+            # Remove old files (except backup directories and hidden files)
+            echo "Removing old files (keeping backups and hidden files)..."
             cd "$DEPLOY_PATH"
-            find . -mindepth 1 -maxdepth 1 ! -name 'backup-*' -exec rm -rf {} \; || true
+            find . -mindepth 1 -maxdepth 1 ! -name 'backup-*' ! -name '.*' -exec rm -rf {} \; 2>/dev/null || true
             
             # Verify archive exists
             if [ ! -f "/tmp/deploy.tar.gz" ]; then
