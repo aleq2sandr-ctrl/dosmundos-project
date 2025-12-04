@@ -82,7 +82,7 @@ jobs:
           source: "deploy.tar.gz"
           target: "/tmp/"
 
-      - name: Cleanup old files and extract new deployment
+      - name: Deploy to VPS
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -95,14 +95,13 @@ jobs:
             DEPLOY_PATH="${{ secrets.VPS_PATH }}"
             mkdir -p "$DEPLOY_PATH"
             
-            # Show current state
-            echo "Current directory contents:"
-            ls -lah "$DEPLOY_PATH" | head -10 || echo "Directory is empty or doesn't exist"
-            
-            # Remove old files (except backup directories and hidden files)
-            echo "Removing old files (keeping backups and hidden files)..."
-            cd "$DEPLOY_PATH"
-            find . -mindepth 1 -maxdepth 1 ! -name 'backup-*' ! -name '.*' -exec rm -rf {} \; 2>/dev/null || true
+            # Backup current deployment
+            if [ -d "$DEPLOY_PATH" ] && [ "$(ls -A $DEPLOY_PATH)" ]; then
+              BACKUP_DIR="/tmp/dosmundos-backup-$(date +%Y%m%d-%H%M%S)"
+              mkdir -p "$BACKUP_DIR"
+              cp -r "$DEPLOY_PATH"/* "$BACKUP_DIR/" 2>/dev/null || true
+              echo "Backup created at $BACKUP_DIR"
+            fi
             
             # Verify archive exists
             if [ ! -f "/tmp/deploy.tar.gz" ]; then
@@ -110,8 +109,9 @@ jobs:
               exit 1
             fi
             
-            # Extract new files
-            echo "Extracting new files..."
+            # Extract new files directly to deployment path
+            echo "Extracting new files to $DEPLOY_PATH..."
+            cd "$DEPLOY_PATH"
             tar -xzf /tmp/deploy.tar.gz
             
             # Clean up archive
