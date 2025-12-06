@@ -1,7 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { getLocaleString } from '@/lib/locales';
-import logService from '@/lib/logService';
 import { useEditorAuth } from '@/contexts/EditorAuthContext';
 import { saveEditToHistory } from '@/services/editHistoryService';
 
