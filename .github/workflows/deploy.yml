@@ -67,9 +67,12 @@ jobs:
 
       - name: Create deployment archive
         run: |
-          cd dist
-          tar -czf ../deploy.tar.gz .
-          ls -lh ../deploy.tar.gz
+          # Create archive of both built files and source code
+          tar -czf deploy.tar.gz --exclude='node_modules' --exclude='.git' --exclude='dist' --exclude='.DS_Store' .
+          # Add the built dist files
+          tar -rf deploy.tar.gz dist/
+          gzip deploy.tar.gz
+          ls -lh deploy.tar.gz
           echo "Archive created successfully"
 
       - name: Upload archive to VPS
