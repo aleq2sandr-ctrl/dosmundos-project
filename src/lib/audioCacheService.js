@@ -181,7 +181,17 @@ class AudioCacheService {
 
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
-        const response = await fetch(url);
+        // Handle CORS for audio files from dosmundos.pe
+        const fetchOptions = {};
+        if (url.includes('dosmundos.pe')) {
+          fetchOptions.mode = 'cors';
+          fetchOptions.credentials = 'omit';
+          fetchOptions.headers = {
+            'Connection': 'keep-alive',
+            'User-Agent': 'DosMundos-Podcast-App/1.0'
+          };
+        }
+        const response = await fetch(url, fetchOptions);
 
         if (!response.ok) {
           // Если это не последний attempt, пробуем еще раз

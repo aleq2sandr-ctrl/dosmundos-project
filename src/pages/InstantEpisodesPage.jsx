@@ -39,7 +39,7 @@ const InstantEpisodesPage = ({ currentLanguage }) => {
   const [selectedMonth, setSelectedMonth] = useState(null);
 
   const observerTarget = useRef(null);
-  const initialLoadDone = useRef(false);
+  const lastLoadedLanguage = useRef(null);
 
   const monthLabels = [
     "january", "february", "march", "april", "may", "june", 
@@ -73,9 +73,7 @@ const InstantEpisodesPage = ({ currentLanguage }) => {
       const translations = ep.transcripts || [];
       const audios = ep.episode_audios || [];
       
-      const titleObj = translations.find(t => t.lang === currentLanguage) 
-                    || translations.find(t => t.lang === 'es') 
-                    || translations[0];
+      const titleObj = translations.find(t => t.lang === currentLanguage);
       
       const audioObj = audios.find(a => a.lang === currentLanguage)
                     || audios.find(a => a.lang === 'es')
@@ -86,7 +84,7 @@ const InstantEpisodesPage = ({ currentLanguage }) => {
         slug: ep.slug,
         date: ep.date,
         created_at: ep.created_at,
-        title: titleObj?.title || ep.slug,
+        title: titleObj?.title, // Don't fallback to other languages for title, let UI generate localized default
         translations: translations,
         lang: 'all',
         audio_url: audioObj?.audio_url,
@@ -264,8 +262,8 @@ const InstantEpisodesPage = ({ currentLanguage }) => {
 
   // Initial load (Instant + Fresh)
   useEffect(() => {
-    if (initialLoadDone.current) return;
-    initialLoadDone.current = true;
+    if (lastLoadedLanguage.current === currentLanguage) return;
+    lastLoadedLanguage.current = currentLanguage;
 
     const loadInitial = async () => {
       // 1. Try to load from cache instantly
@@ -301,7 +299,7 @@ const InstantEpisodesPage = ({ currentLanguage }) => {
 
   // Reset and reload when filters change
   useEffect(() => {
-    if (!initialLoadDone.current) return; // Skip on initial mount as it's handled above
+    if (!lastLoadedLanguage.current) return; // Skip on initial mount as it's handled above
     
     setPage(0);
     setHasMore(true);

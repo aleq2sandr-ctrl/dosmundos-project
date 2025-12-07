@@ -56,9 +56,7 @@ const additionalOptions = isSelfHosted ? {
   // Оптимизируем заголовки для self-hosted
   global: {
     headers: {
-      'x-client-info': 'dosmundos-podcast-app',
-      'x-self-hosted': 'true',
-      'x-optimized': 'true'
+        'x-client-info': 'dosmundos-podcast-app'
     }
   }
 } : {
@@ -145,6 +143,8 @@ if (isSelfHosted) {
       delete headers['sec-ch-ua'];
       delete headers['sec-ch-ua-mobile'];
       delete headers['sec-ch-ua-platform'];
+      delete headers['x-optimized'];
+      delete headers['x-self-hosted'];
       
       // ВАЖНО: НЕ ДОБАВЛЯЕМ CORS ЗАГОЛОВКИ - они должны быть только на сервере
       // delete headers['access-control-allow-origin']; // Уже удален выше

@@ -132,13 +132,19 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
   // Sync with Global Player Context
   useEffect(() => {
     if (episodeData && episodeData.slug) {
-      // Only play if it's not already the current episode or if we want to ensure it's active
-      // But we don't want to restart if it's already playing
-      if (currentEpisode?.slug !== episodeData.slug) {
-         playEpisode(episodeData);
+      const currentAudioUrl = currentEpisode?.audioUrl || currentEpisode?.audio_url;
+      const newAudioUrl = episodeData.audioUrl || episodeData.audio_url;
+      
+      // Play if:
+      // 1. It's a different episode slug
+      // 2. OR it's the same slug but different audio URL (language switch)
+      if (currentEpisode?.slug !== episodeData.slug || (newAudioUrl && newAudioUrl !== currentAudioUrl)) {
+         // If switching language for same episode, try to preserve current time
+         const startTime = (currentEpisode?.slug === episodeData.slug) ? currentTime : 0;
+         playEpisode(episodeData, startTime);
       }
     }
-  }, [episodeData, playEpisode, currentEpisode]);
+  }, [episodeData, playEpisode, currentEpisode, currentTime]);
 
   const {
     jumpDetails,
@@ -455,13 +461,24 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
     const langForDisplay = (episodeData.lang === 'all' || episodeData.lang === 'mixed') ? currentLanguage : episodeData.lang;
     
     // Determine display title
-    let displayTitle = episodeData.title;
+    let displayTitle = null;
 
     // Try to find translation for current language if available
     if (episodeData.translations && Array.isArray(episodeData.translations)) {
         const translation = episodeData.translations.find(t => t.lang === currentLanguage);
         if (translation && translation.title) {
             displayTitle = translation.title;
+        }
+    }
+
+    // If no translation found, check if we should use the fallback title from episodeData
+    if (!displayTitle && episodeData.title) {
+        // Only use fallback if it's NOT a generic title in another language
+        // This is a heuristic to avoid showing "Meditación ..." in Russian interface
+        // Matches "Meditación DD.MM.YYYY" or "Meditation DD.MM.YYYY"
+        const isGeneric = episodeData.title.match(/^(Meditación|Meditation|Медитация)\s+\d{2}\.\d{2}\.\d{4}/i);
+        if (!isGeneric) {
+            displayTitle = episodeData.title;
         }
     }
 

@@ -63,8 +63,14 @@ export const PlayerProvider = ({ children }) => {
               console.error("[PlayerContext] Play error:", e);
               setIsPlaying(false);
               if (e.name === 'NotAllowedError') {
+                console.log('🎵 [PlayerContext] Autoplay blocked by browser policy, waiting for user interaction');
                 setAutoplayBlocked(true);
+                // Don't retry autoplay if blocked by browser policy
+                return;
               }
+              // Only retry for other types of errors
+              console.log('🎵 [PlayerContext] Retrying play after error');
+              setTimeout(attemptPlay, 100);
             });
           } else {
             // Retry after a short delay
@@ -94,20 +100,27 @@ export const PlayerProvider = ({ children }) => {
 
         if (audioRef.current) {
           audioRef.current.src = newAudioUrl;
-          audioRef.current.currentTime = startTime;
           audioRef.current.playbackRate = playbackRate;
           audioRef.current.load();
 
-          audioRef.current.play().then(() => {
-            console.log('🎵 [PlayerContext] Track switch play successful');
-            setAutoplayBlocked(false);
-          }).catch(e => {
-            console.error('[PlayerContext] Play error after track switch:', e);
-            setIsPlaying(false);
-            if (e.name === 'NotAllowedError') {
-              setAutoplayBlocked(true);
+          const handleTrackSwitch = () => {
+            if (audioRef.current) {
+              audioRef.current.currentTime = startTime;
+              audioRef.current.play().then(() => {
+                console.log('🎵 [PlayerContext] Track switch play successful');
+                setAutoplayBlocked(false);
+              }).catch(e => {
+                console.error('[PlayerContext] Play error after track switch:', e);
+                setIsPlaying(false);
+                if (e.name === 'NotAllowedError') {
+                  setAutoplayBlocked(true);
+                }
+              });
             }
-          });
+          };
+
+          // Use one-time event listener to ensure currentTime is set after metadata loads
+          audioRef.current.addEventListener('loadedmetadata', handleTrackSwitch, { once: true });
         }
       } else {
         console.log('🎵 [PlayerContext] Same episode, ensuring playback');
