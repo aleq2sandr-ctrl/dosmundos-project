@@ -40,10 +40,32 @@ generate_categories_json() {
 # Function to create slug from filename
 create_slug() {
     local filename="$1"
-    # Remove .docx extension and create slug
+    # Remove .docx extension
     local slug=$(basename "$filename" .docx)
-    # Convert to lowercase, replace spaces and special chars with hyphens
-    slug=$(echo "$slug" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-zа-я0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//;s/-$//')
+    
+    # Transliterate to Latin using python
+    slug=$(python3 -c "
+import sys
+text = sys.argv[1].lower()
+mapping = {
+    'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'yo', 'ж': 'zh',
+    'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm', 'н': 'n', 'о': 'o',
+    'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u', 'ф': 'f', 'х': 'kh', 'ц': 'ts',
+    'ч': 'ch', 'ш': 'sh', 'щ': 'shch', 'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu',
+    'я': 'ya'
+}
+res = ''
+for char in text:
+    if char in mapping:
+        res += mapping[char]
+    elif char.isalnum():
+        res += char
+    else:
+        res += '-'
+# Remove duplicate hyphens and leading/trailing hyphens
+print('-'.join(filter(None, res.split('-'))))
+" "$slug")
+
     echo "$slug"
 }
 
@@ -71,7 +93,24 @@ get_youtube_url() {
 generate_summary() {
     local title="$1"
     local categories="$2"
+    local summaries_file="/Users/macbookairm4-15n/Documents/GitHub/dosmundos-project/article_summaries.json"
     
+    # Check if summary exists in JSON file
+    if [ -f "$summaries_file" ]; then
+        # Use python to extract summary safely from JSON
+        # We use python because parsing JSON with grep/sed is fragile
+        local json_summary=$(python3 -c "import sys, json; 
+try:
+    data = json.load(open(sys.argv[1])); 
+    print(data.get(sys.argv[2], ''))
+except: print('')" "$summaries_file" "$title")
+        
+        if [ -n "$json_summary" ]; then
+            echo "$json_summary"
+            return
+        fi
+    fi
+
     # Specific descriptions for exact article titles
     case "$title" in
         "От чего зависят видения в церемониях с Аяваской")
@@ -186,6 +225,7 @@ generate_summary() {
             echo "Влияние затмений на человека и как избежать манипуляций через астрологические моды" ;;
         "Восприятие умом и харой. Почему блокируется хара")
             echo "Различия восприятия через ум и центр Хара, и причины блокировки интуиции" ;;
+    esac
 }
 
 # Start building JSON
@@ -225,12 +265,16 @@ find "$BOOK_DIR" -name "*.docx" -not -path "*/.venv/*" | while read -r file; do
     # Generate summary
     summary=$(generate_summary "$filename" "$cats_json")
 
+    # Escape quotes for JSON
+    safe_title=$(echo "$filename" | sed 's/"/\\"/g')
+    safe_summary=$(echo "$summary" | sed 's/"/\\"/g')
+
     # Create JSON entry
     cat >> "$INDEX_FILE" << EOF
   {
     "id": "$slug",
-    "title": "$filename",
-    "summary": "$summary",
+    "title": "$safe_title",
+    "summary": "$safe_summary",
     "categories": $cats_json,
     "author": "Dos Mundos",
     "contentUrl": "/articles/$slug.html",

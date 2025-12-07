@@ -67,11 +67,8 @@ jobs:
 
       - name: Create deployment archive
         run: |
-          # Create archive of both built files and source code
-          tar -czf deploy.tar.gz --exclude='node_modules' --exclude='.git' --exclude='dist' --exclude='.DS_Store' .
-          # Add the built dist files
-          tar -rf deploy.tar.gz dist/
-          gzip deploy.tar.gz
+          # Create archive containing source code and built dist files
+          tar -czf deploy.tar.gz --exclude='node_modules' --exclude='.git' --exclude='.DS_Store' .
           ls -lh deploy.tar.gz
           echo "Archive created successfully"
 
@@ -116,6 +113,13 @@ jobs:
             echo "Extracting new files to $DEPLOY_PATH..."
             cd "$DEPLOY_PATH"
             tar -xzf /tmp/deploy.tar.gz
+
+            # Move frontend files from dist/ to root directory
+            if [ -d "dist" ]; then
+              echo "Moving frontend files from dist/ to root..."
+              cp -r dist/* ./
+              rm -rf dist/
+            fi
 
             # Clean up archive
             rm -f /tmp/deploy.tar.gz

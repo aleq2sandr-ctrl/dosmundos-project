@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { getLocaleString } from '@/lib/locales';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { User, ArrowRight, Youtube, BookOpen } from 'lucide-react';
+import { User, ArrowRight, Youtube, BookOpen, Search } from 'lucide-react';
 
 // Color palette for categories
 const categoryColors = {
@@ -26,6 +26,7 @@ const ArticlesPage = () => {
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     const fetchArticles = async () => {
@@ -60,12 +61,27 @@ const ArticlesPage = () => {
   }, [articles]);
 
   const filteredArticles = useMemo(() => {
-    if (selectedCategory === 'All') return articles;
-    return articles.filter(a => {
-      const articleCats = Array.isArray(a.categories) ? a.categories : (a.category ? [a.category] : []);
-      return articleCats.includes(selectedCategory);
-    });
-  }, [articles, selectedCategory]);
+    let filtered = articles;
+
+    // Filter by category
+    if (selectedCategory !== 'All') {
+      filtered = filtered.filter(a => {
+        const articleCats = Array.isArray(a.categories) ? a.categories : (a.category ? [a.category] : []);
+        return articleCats.includes(selectedCategory);
+      });
+    }
+
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(a => 
+        a.title.toLowerCase().includes(query) || 
+        (a.summary && a.summary.toLowerCase().includes(query))
+      );
+    }
+
+    return filtered;
+  }, [articles, selectedCategory, searchQuery]);
 
   return (
     <div className="min-h-screen bg-[#fdfbf7] text-slate-900 font-serif">
@@ -79,6 +95,20 @@ const ArticlesPage = () => {
               ? 'Исследуйте глубины внутреннего мира через наши статьи и размышления.' 
               : 'Explore the depths of the inner world through our articles and reflections.'}
           </p>
+        </div>
+
+        {/* Search Bar */}
+        <div className="max-w-md mx-auto mb-8 relative">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
+            <input
+              type="text"
+              placeholder={lang === 'ru' ? 'Поиск статей...' : 'Search articles...'}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 rounded-full border border-slate-200 focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition-all font-sans"
+            />
+          </div>
         </div>
 
         {/* Category Navigation */}
