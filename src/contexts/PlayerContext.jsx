@@ -99,13 +99,13 @@ export const PlayerProvider = ({ children }) => {
         setAutoplayBlocked(false);
 
         if (audioRef.current) {
-          audioRef.current.src = newAudioUrl;
-          audioRef.current.playbackRate = playbackRate;
-          audioRef.current.load();
-
           const handleTrackSwitch = () => {
             if (audioRef.current) {
-              audioRef.current.currentTime = startTime;
+              console.log(`🎵 [PlayerContext] Audio loaded. Restoring time to: ${startTime}s`);
+              if (Number.isFinite(startTime) && startTime > 0) {
+                audioRef.current.currentTime = startTime;
+              }
+              
               audioRef.current.play().then(() => {
                 console.log('🎵 [PlayerContext] Track switch play successful');
                 setAutoplayBlocked(false);
@@ -120,7 +120,12 @@ export const PlayerProvider = ({ children }) => {
           };
 
           // Use one-time event listener to ensure currentTime is set after metadata loads
+          // Add listener BEFORE changing src to ensure we don't miss the event
           audioRef.current.addEventListener('loadedmetadata', handleTrackSwitch, { once: true });
+
+          audioRef.current.src = newAudioUrl;
+          audioRef.current.playbackRate = playbackRate;
+          audioRef.current.load();
         }
       } else {
         console.log('🎵 [PlayerContext] Same episode, ensuring playback');

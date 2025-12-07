@@ -140,7 +140,12 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
       // 2. OR it's the same slug but different audio URL (language switch)
       if (currentEpisode?.slug !== episodeData.slug || (newAudioUrl && newAudioUrl !== currentAudioUrl)) {
          // If switching language for same episode, try to preserve current time
-         const startTime = (currentEpisode?.slug === episodeData.slug) ? currentTime : 0;
+         // Use audioRef.current.currentTime for more precision if available and valid (duration > 0 means metadata loaded)
+         const isAudioValid = audioRef && audioRef.current && audioRef.current.duration > 0 && !audioRef.current.ended;
+         const preciseTime = isAudioValid ? audioRef.current.currentTime : currentTime;
+         const startTime = (currentEpisode?.slug === episodeData.slug) ? preciseTime : 0;
+         
+         console.log(`🎵 [PlayerPage] Switching audio source. Slug: ${episodeData.slug}. Preserving time: ${startTime}s (Source: ${isAudioValid ? 'AudioElement' : 'State'})`);
          playEpisode(episodeData, startTime);
       }
     }

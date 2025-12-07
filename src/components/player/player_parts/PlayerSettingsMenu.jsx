@@ -11,7 +11,7 @@ import {
   DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu";
 import { Button } from '@/components/ui/button';
-import { Settings, ScrollText, Download, Gauge, FileText, Volume2, Mic, HelpCircle, Brain, Loader2, Sparkles } from 'lucide-react';
+import { Settings, ScrollText, Download, Gauge, FileText, Volume2, HelpCircle } from 'lucide-react';
 import { getLocaleString } from '@/lib/locales';
 
 const PlayerSettingsMenu = ({
@@ -144,59 +144,7 @@ const PlayerSettingsMenu = ({
 
         <DropdownMenuSeparator className="bg-slate-600" />
 
-        <DropdownMenuItem 
-          onClick={onRecognizeQuestions} 
-          disabled={isRecognizingQuestions}
-          className="focus:bg-slate-600 text-slate-200 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isRecognizingQuestions ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin text-purple-400" />
-          ) : (
-            <Brain className="mr-2 h-4 w-4 text-purple-400" />
-          )}
-          <span>
-            {isRecognizingQuestions 
-              ? getLocaleString('recognizingQuestions', currentLanguage) || 'Распознавание вопросов...'
-              : getLocaleString('recognizeQuestions', currentLanguage) || 'Распознать вопросы'
-            }
-          </span>
-        </DropdownMenuItem>
 
-        <DropdownMenuItem 
-          onClick={onSmartSegmentation} 
-          disabled={isSmartSegmenting}
-          className="focus:bg-slate-600 text-slate-200 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isSmartSegmenting ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin text-amber-400" />
-          ) : (
-            <Sparkles className="mr-2 h-4 w-4 text-amber-400" />
-          )}
-          <span>
-            {isSmartSegmenting 
-              ? "Segmenting..." // TODO: Localize
-              : "Smart Segmentation" // TODO: Localize
-            }
-          </span>
-        </DropdownMenuItem>
-
-        <DropdownMenuItem 
-          onClick={onRecognizeText} 
-          disabled={isRecognizingText}
-          className="focus:bg-slate-600 text-slate-200 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isRecognizingText ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin text-blue-400" />
-          ) : (
-            <Mic className="mr-2 h-4 w-4 text-blue-400" />
-          )}
-          <span>
-            {isRecognizingText 
-              ? getLocaleString('recognizingText', currentLanguage) || 'Распознавание текста...'
-              : getLocaleString('recognizeText', currentLanguage) || 'Распознать текст'
-            }
-          </span>
-        </DropdownMenuItem>
 
         <DropdownMenuItem onClick={onDownloadText} className="focus:bg-slate-600 text-slate-200">
           <FileText className="mr-2 h-4 w-4 text-slate-200" />
