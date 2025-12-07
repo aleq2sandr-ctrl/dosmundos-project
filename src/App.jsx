@@ -28,6 +28,8 @@ import { PlayerProvider } from '@/contexts/PlayerContext';
 import { EditorAuthModal } from '@/components/EditorAuthModal';
 import EditHistoryAdminPage from '@/pages/EditHistoryAdminPage';
 import LivePage from '@/pages/LivePage';
+import ArticlesPage from '@/pages/ArticlesPage';
+import ArticleDetailPage from '@/pages/ArticleDetailPage';
 import { initGA4, trackPageView } from '@/lib/analyticsService';
 
 // Поддерживаемые языки
@@ -210,6 +212,17 @@ const AppLayout = ({ user }) => {
           <Route path="/:lang/offline-settings" element={
             <LanguageRouteWrapper>
               <OfflineSettingsPage onBack={() => window.history.back()} />
+            </LanguageRouteWrapper>
+          } />
+
+          <Route path="/:lang/articles" element={
+            <LanguageRouteWrapper>
+              <ArticlesPage />
+            </LanguageRouteWrapper>
+          } />
+          <Route path="/:lang/articles/:articleId" element={
+            <LanguageRouteWrapper>
+              <ArticleDetailPage />
             </LanguageRouteWrapper>
           } />
           
