@@ -60,7 +60,8 @@ const PodcastPlayer = ({
   onSmartSegmentation,
   isRecognizingText,
   isRecognizingQuestions,
-  isSmartSegmenting
+  isSmartSegmenting,
+  shouldPreserveState = false
 }) => {
   
   const { toast } = useToast();

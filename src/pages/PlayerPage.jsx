@@ -139,6 +139,13 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
       // 1. It's a different episode slug
       // 2. OR it's the same slug but different audio URL (language switch)
       if (currentEpisode?.slug !== episodeData.slug || (newAudioUrl && newAudioUrl !== currentAudioUrl)) {
+         
+         // Extra check: if the audio element is already playing this URL, don't restart
+         if (audioRef.current && audioRef.current.src === newAudioUrl) {
+            console.log(`🎵 [PlayerPage] Audio already playing correct URL: ${newAudioUrl}. Skipping playEpisode.`);
+            return;
+         }
+
          // If switching language for same episode, try to preserve current time
          // Use audioRef.current.currentTime for more precision if available and valid (duration > 0 means metadata loaded)
          const isAudioValid = audioRef && audioRef.current && audioRef.current.duration > 0 && !audioRef.current.ended;
@@ -863,7 +870,7 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
         <div ref={playerControlsContainerRef} className="mb-4">
           {playerEpisodeDataMemo && (
             <PodcastPlayer
-                key={playerEpisodeDataMemo.slug + '-' + playerEpisodeDataMemo.lang}
+                key={playerEpisodeDataMemo.slug}
                 episodeData={playerEpisodeDataMemo}
                 onQuestionUpdate={handleQuestionUpdate}
                 currentLanguage={currentLanguage}
