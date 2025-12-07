@@ -123,7 +123,7 @@ const AppLayout = ({ user }) => {
   const podcastData = {
     title: 'Dos Mundos',
     author: 'EL CENTRO DESARROLLO INTEGRAL',
-    image: 'https://dosmundos.pe/wp-content/uploads/2025/02/logo-5-120x120.png'
+    image: '/img/logo-5-120x120.png'
   };
 
   return (
