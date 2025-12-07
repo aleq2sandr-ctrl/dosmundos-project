@@ -5,6 +5,22 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { User, ArrowRight, Youtube, BookOpen } from 'lucide-react';
 
+// Color palette for categories
+const categoryColors = {
+  'Растения Учителя и Процесс Диеты': 'bg-green-100 text-green-800 border-green-200',
+  'Целительство и Энергетические практики': 'bg-purple-100 text-purple-800 border-purple-200',
+  'Взаимоотношения и семья': 'bg-pink-100 text-pink-800 border-pink-200',
+  'Внутренние развитие': 'bg-indigo-100 text-indigo-800 border-indigo-200',
+  'Здоровье и Питание': 'bg-red-100 text-red-800 border-red-200',
+  'Энергетическая защита и очищение': 'bg-orange-100 text-orange-800 border-orange-200',
+  'Медитации': 'bg-blue-100 text-blue-800 border-blue-200',
+  'default': 'bg-slate-100 text-slate-600 border-slate-200'
+};
+
+const getCategoryColor = (category) => {
+  return categoryColors[category] || categoryColors.default;
+};
+
 const ArticlesPage = () => {
   const { lang } = useParams();
   const [articles, setArticles] = useState([]);
@@ -32,13 +48,23 @@ const ArticlesPage = () => {
   }, []);
 
   const categories = useMemo(() => {
-    const cats = ['All', ...new Set(articles.map(a => a.category))];
-    return cats;
+    const allCats = new Set();
+    articles.forEach(article => {
+      if (Array.isArray(article.categories)) {
+        article.categories.forEach(cat => allCats.add(cat));
+      } else if (article.category) {
+        allCats.add(article.category);
+      }
+    });
+    return ['All', ...Array.from(allCats).sort()];
   }, [articles]);
 
   const filteredArticles = useMemo(() => {
     if (selectedCategory === 'All') return articles;
-    return articles.filter(a => a.category === selectedCategory);
+    return articles.filter(a => {
+      const articleCats = Array.isArray(a.categories) ? a.categories : (a.category ? [a.category] : []);
+      return articleCats.includes(selectedCategory);
+    });
   }, [articles, selectedCategory]);
 
   return (
@@ -89,9 +115,16 @@ const ArticlesPage = () => {
                 <Card className="h-full bg-white border-slate-200 text-slate-900 overflow-hidden transition-all duration-500 hover:shadow-xl hover:shadow-slate-200/50 hover:-translate-y-1 group-hover:border-slate-300">
                   <CardHeader className="pb-4">
                     <div className="flex justify-between items-start mb-3">
-                      <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-xs font-medium tracking-wide uppercase border border-slate-200 font-sans">
-                        {article.category}
-                      </span>
+                      <div className="flex flex-wrap gap-1">
+                        {(Array.isArray(article.categories) ? article.categories : (article.category ? [article.category] : [])).map((cat, index) => (
+                          <span
+                            key={index}
+                            className={`px-2 py-1 rounded-full text-xs font-medium tracking-wide uppercase border font-sans ${getCategoryColor(cat)}`}
+                          >
+                            {cat}
+                          </span>
+                        ))}
+                      </div>
                       {article.youtubeUrl && (
                         <Youtube className="w-5 h-5 text-red-600 opacity-80" />
                       )}

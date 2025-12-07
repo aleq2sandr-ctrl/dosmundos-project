@@ -4,6 +4,22 @@ import { getLocaleString } from '@/lib/locales';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, User, Youtube, Share2 } from 'lucide-react';
 
+// Color palette for categories (same as ArticlesPage)
+const categoryColors = {
+  'Растения Учителя и Процесс Диеты': 'bg-green-100 text-green-800 border-green-200',
+  'Целительство и Энергетические практики': 'bg-purple-100 text-purple-800 border-purple-200',
+  'Взаимоотношения и семья': 'bg-pink-100 text-pink-800 border-pink-200',
+  'Внутренние развитие': 'bg-indigo-100 text-indigo-800 border-indigo-200',
+  'Здоровье и Питание': 'bg-red-100 text-red-800 border-red-200',
+  'Энергетическая защита и очищение': 'bg-orange-100 text-orange-800 border-orange-200',
+  'Медитации': 'bg-blue-100 text-blue-800 border-blue-200',
+  'default': 'bg-slate-100 text-slate-600 border-slate-200'
+};
+
+const getCategoryColor = (category) => {
+  return categoryColors[category] || categoryColors.default;
+};
+
 const ArticleDetailPage = () => {
   const { lang, articleId } = useParams();
   const navigate = useNavigate();
@@ -107,10 +123,15 @@ const ArticleDetailPage = () => {
 
         <article className="animate-in fade-in slide-in-from-bottom-4 duration-700">
           <header className="mb-10 text-center">
-            <div className="flex justify-center mb-6">
-              <span className="bg-slate-100 text-slate-600 px-4 py-1.5 rounded-full text-sm font-sans font-medium tracking-wide uppercase border border-slate-200">
-                {article.category}
-              </span>
+            <div className="flex justify-center flex-wrap gap-2 mb-6">
+              {(Array.isArray(article.categories) ? article.categories : (article.category ? [article.category] : [])).map((cat, index) => (
+                <span
+                  key={index}
+                  className={`px-3 py-1.5 rounded-full text-sm font-sans font-medium tracking-wide uppercase border ${getCategoryColor(cat)}`}
+                >
+                  {cat}
+                </span>
+              ))}
             </div>
             
             <h1 className="text-3xl md:text-5xl font-bold text-slate-900 mb-8 leading-tight">
@@ -128,16 +149,16 @@ const ArticleDetailPage = () => {
           <div 
             className="prose prose-xl max-w-none text-justify
               prose-headings:font-serif prose-headings:text-slate-900 prose-headings:font-bold
-              prose-p:text-slate-800 prose-p:leading-loose prose-p:font-serif prose-p:indent-12 prose-p:mb-6
+              prose-p:text-slate-800 prose-p:leading-loose prose-p:font-serif prose-p:indent-8 prose-p:mb-4
               prose-a:text-purple-700 prose-a:no-underline hover:prose-a:text-purple-900 hover:prose-a:underline
               prose-strong:text-slate-900 prose-strong:font-semibold
               prose-ul:text-slate-800 prose-ol:text-slate-800
               prose-blockquote:border-l-slate-900 prose-blockquote:bg-slate-50 prose-blockquote:py-2 prose-blockquote:px-6 prose-blockquote:rounded-r-lg prose-blockquote:not-italic prose-blockquote:text-slate-700"
             dangerouslySetInnerHTML={{ __html: content }}
           />
-
+          
           {article.youtubeUrl && (
-            <div className="mt-16 pt-8 border-t border-slate-200 flex justify-center">
+            <div className="mt-16 flex justify-center">
               <a 
                 href={article.youtubeUrl} 
                 target="_blank" 

@@ -1,47 +1,711 @@
 [
   {
-    "id": "amulets",
-    "title": "Амулеты, очистка от негативных энергий",
-    "summary": "Как влияют амулеты на энергетическом уровне и как их правильно использовать для очистки от негативных энергий?",
-    "category": "Внутренние развитие",
+    "id": "от-чего-зависят-видения-в-церемониях-с-аяваской",
+    "title": "От чего зависят видения в церемониях с Аяваской",
+    "summary": "Факторы, влияющие на видения и переживания во время церемоний с Аяваской",
+    "categories": ["Растения Учителя и Процесс Диеты"],
     "author": "Dos Mundos",
-    "contentUrl": "/articles/amulets.html",
-    "youtubeUrl": "https://www.youtube.com/watch?v=mS10aDXykTk"
-  },
+    "contentUrl": "/articles/от-чего-зависят-видения-в-церемониях-с-аяваской.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=HxpuLlYWTCE"
+  }
+,
   {
-    "id": "wealth",
-    "title": "Богатство в Сакральном Пути",
-    "summary": "Каким образом человек, обладающий состоянием, может жить из сакрального начала и проявлять служение в мире, где присутствует разделение на богатых и бедных?",
-    "category": "Внутренние развитие",
+    "id": "диета-с-дурманом-легенда-об-дикуте",
+    "title": "Диета с Дурманом. Легенда об Дикуте",
+    "summary": "Традиционная диета с дурманом и древняя легенда о шамане Дикуте",
+    "categories": ["Растения Учителя и Процесс Диеты"],
     "author": "Dos Mundos",
-    "contentUrl": "/articles/wealth.html",
-    "youtubeUrl": "https://www.youtube.com/watch?v=wyydDv5lhH0"
-  },
+    "contentUrl": "/articles/диета-с-дурманом-легенда-об-дикуте.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=fcOMFkBm9lE"
+  }
+,
   {
-    "id": "eclipses",
-    "title": "Влияние затмений",
-    "summary": "Основной вопрос текста: Влияют ли затмения и астрологические события на человечество, или это просто мода и бизнес?",
-    "category": "Внутренние развитие",
+    "id": "откуда-люди-узнали-про-аяуаску",
+    "title": "Откуда люди узнали про Аяуаску",
+    "summary": "История открытия и распространения знаний об Аяваске среди людей",
+    "categories": ["Растения Учителя и Процесс Диеты"],
     "author": "Dos Mundos",
-    "contentUrl": "/articles/eclipses.html",
-    "youtubeUrl": "https://www.youtube.com/watch?v=VtwXlOsohpk"
-  },
+    "contentUrl": "/articles/откуда-люди-узнали-про-аяуаску.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=eCP2s4T9xRo"
+  }
+,
   {
-    "id": "emotions",
+    "id": "про-марихуану",
+    "title": "Про марихуану",
+    "summary": "Свойства и применение марихуаны в духовных практиках",
+    "categories": ["Растения Учителя и Процесс Диеты"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/про-марихуану.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=jO8exYDpTRg"
+  }
+,
+  {
+    "id": "работа-растений-какие-качества-они-дают",
+    "title": "Работа растений. Какие качества они дают",
+    "summary": "Как энтеогенные растения влияют на сознание и какие качества раскрывают",
+    "categories": ["Растения Учителя и Процесс Диеты"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/работа-растений-какие-качества-они-дают.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=EIxS75n2uVw"
+  }
+,
+  {
+    "id": "использование-аяваски-ибоги-камбо-рапэ-в-лечении",
+    "title": "Использование Аяваски, Ибоги, Камбо, Рапэ в лечении",
+    "summary": "Применение священных растений в терапии и исцелении",
+    "categories": ["Растения Учителя и Процесс Диеты"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/использование-аяваски-ибоги-камбо-рапэ-в-лечении.html",
+    "youtubeUrl": null
+  }
+,
+  {
+    "id": "традиционный-чай-из-аяваски",
+    "title": "Традиционный чай из Аяваски",
+    "summary": "Как правильно приготовить и использовать традиционный напиток из Аяваски",
+    "categories": ["Растения Учителя и Процесс Диеты"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/традиционный-чай-из-аяваски.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=9YnFNzKf2_I"
+  }
+,
+  {
+    "id": "первоэлементы-растений",
+    "title": "Первоэлементы растений",
+    "summary": "Основные элементы и энергии, присутствующие в энтеогенных растениях",
+    "categories": ["Растения Учителя и Процесс Диеты"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/первоэлементы-растений.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=CBSHalpPYgA"
+  }
+,
+  {
+    "id": "про-камбо",
+    "title": "Про Камбо",
+    "summary": "Свойства и применение лягушачьего яда Камбо в целительских практиках",
+    "categories": ["Растения Учителя и Процесс Диеты"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/про-камбо.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=7GLL5lA4VVM"
+  }
+,
+  {
+    "id": "отношение-к-процессу-с-растениями",
+    "title": "Отношение к процессу с растениями",
+    "summary": "Как правильно относиться к работе с энтеогенами и церемониям",
+    "categories": ["Растения Учителя и Процесс Диеты"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/отношение-к-процессу-с-растениями.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=SXfctEEqFrs"
+  }
+,
+  {
+    "id": "нужен-ли-шаман-в-церемониях-с-аяваской",
+    "title": "Нужен ли шаман в церемониях с Аяваской",
+    "summary": "Роль шамана в церемониях и можно ли проводить их самостоятельно",
+    "categories": ["Растения Учителя и Процесс Диеты"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/нужен-ли-шаман-в-церемониях-с-аяваской.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=Ttukk0cglXA"
+  }
+,
+  {
+    "id": "сакральность-марихуаны",
+    "title": "Сакральность марихуаны",
+    "summary": "Духовное значение и сакральное использование марихуаны",
+    "categories": ["Растения Учителя и Процесс Диеты"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/сакральность-марихуаны.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=mpyGZ2P9wj0"
+  }
+,
+  {
+    "id": "противопоказания-к-употреблению-аяваски",
+    "title": "Противопоказания к употреблению Аяваски",
+    "summary": "Когда нельзя принимать Аяваску и какие существуют противопоказания",
+    "categories": ["Растения Учителя и Процесс Диеты"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/противопоказания-к-употреблению-аяваски.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=_BsCV4xpwok"
+  }
+,
+  {
+    "id": "отношение-к-деньгам-и-долгам",
+    "title": "Отношение к деньгам и долгам",
+    "summary": "Как относиться к материальным ценностям и финансовым обязательствам",
+    "categories": ["Растения Учителя и Процесс Диеты"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/отношение-к-деньгам-и-долгам.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=qAxTDGtcnHI"
+  }
+,
+  {
+    "id": "нужно-ли-делать-запросы-отношение-к-церемонии",
+    "title": "Нужно ли делать запросы. Отношение к церемонии",
+    "summary": "Нужно ли формулировать намерения перед церемониями с растениями",
+    "categories": ["Растения Учителя и Процесс Диеты"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/нужно-ли-делать-запросы-отношение-к-церемонии.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=qD0YfrmZCUk"
+  }
+,
+  {
+    "id": "диета-с-лимоном",
+    "title": "Диета с Лимоном",
+    "summary": "Очищающая диета с лимоном и её роль в подготовке к церемониям",
+    "categories": ["Растения Учителя и Процесс Диеты"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/диета-с-лимоном.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=xWirrjvOSAM"
+  }
+,
+  {
+    "id": "церемония-с-тое-дурманом",
+    "title": "Церемония с Тое (Дурманом)",
+    "summary": "Проведение и особенности церемоний с дурманом Тое",
+    "categories": ["Растения Учителя и Процесс Диеты"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/церемония-с-тое-дурманом.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=SbiEAcXh0L4"
+  }
+,
+  {
+    "id": "сакральное-использование-энтеогенов",
+    "title": "Сакральное использование энтеогенов",
+    "summary": "Духовное применение растений силы в сакральных практиках",
+    "categories": ["Растения Учителя и Процесс Диеты"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/сакральное-использование-энтеогенов.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=Oct1Hknnxlw"
+  }
+,
+  {
+    "id": "аяваска-шаманизм",
+    "title": "Аяваска шаманизм",
+    "summary": "Связь Аяваски с шаманскими традициями и практиками",
+    "categories": ["Растения Учителя и Процесс Диеты","Целительство и Энергетические практики"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/аяваска-шаманизм.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=kvl4lSI84RI"
+  }
+,
+  {
+    "id": "как-распознать-сакральное-послание",
+    "title": "Как распознать сакральное послание",
+    "summary": "Как отличить истинные духовные послания от обычных мыслей",
+    "categories": ["Растения Учителя и Процесс Диеты","Внутренние развитие"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/как-распознать-сакральное-послание.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=tQJv1uUajfE"
+  }
+,
+  {
+    "id": "айуаска-что-такое-свобода",
+    "title": "Айуаска. Что такое свобода",
+    "summary": "Понимание свободы через опыт с Аяваской",
+    "categories": ["Растения Учителя и Процесс Диеты","Внутренние развитие"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/айуаска-что-такое-свобода.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=2LjEUOmqy18"
+  }
+,
+  {
+    "id": "безоценочное-служение-как-почистить-род",
+    "title": "Безоценочное служение. Как почистить род",
+    "summary": "Методы очищения родовых связей через безоценочное служение",
+    "categories": ["Целительство и Энергетические практики","Внутренние развитие","Энергетическая защита и очищение"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/безоценочное-служение-как-почистить-род.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=UIVNpqQQdVc"
+  }
+,
+  {
+    "id": "роль-мужчины-и-женщины-баланс-в-отношениях",
+    "title": "Роль мужчины и женщины.  Баланс в отношениях",
+    "summary": "Сакральные роли мужчины и женщины в гармоничных отношениях, где каждый дополняет другого без жестких стереотипов",
+    "categories": ["Взаимоотношения и семья"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/роль-мужчины-и-женщины-баланс-в-отношениях.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=ruhCNQIUr1Q"
+  }
+,
+  {
+    "id": "энергетическая-связь-с-другим-человеком",
+    "title": "Энергетическая связь с другим человеком",
+    "summary": "Как возникают и как управлять энергетическими связями между людьми",
+    "categories": ["Взаимоотношения и семья"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/энергетическая-связь-с-другим-человеком.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=j_b1pbf19-s"
+  }
+,
+  {
+    "id": "личные-границы-как-защитить-сво-поле",
+    "title": "Личные границы. Как защитить своё поле",
+    "summary": "Установление и защита личных энергетических границ",
+    "categories": ["Взаимоотношения и семья"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/личные-границы-как-защитить-сво-поле.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=k8buJfQASyc"
+  }
+,
+  {
+    "id": "иметь-или-не-иметь-детей",
+    "title": "Иметь или не иметь детей",
+    "summary": "Размышления о выборе иметь детей и его духовном значении",
+    "categories": ["Взаимоотношения и семья"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/иметь-или-не-иметь-детей.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=nVhkt3vAjg4"
+  }
+,
+  {
+    "id": "воспитание-детей",
+    "title": "Воспитание детей",
+    "summary": "Принципы сакрального воспитания и развития детей",
+    "categories": ["Взаимоотношения и семья"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/воспитание-детей.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=QWfK3VWemek"
+  }
+,
+  {
+    "id": "создание-гармоничных-отношений-в-паре",
+    "title": "Создание гармоничных отношений в паре",
+    "summary": "Как построить гармоничные и осознанные отношения в паре",
+    "categories": ["Взаимоотношения и семья"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/создание-гармоничных-отношений-в-паре.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=WBQeygFE8HE"
+  }
+,
+  {
+    "id": "расставание-с-любимыми-как-пережить-потерю-близких",
+    "title": "Расставание с любимыми. Как пережить потерю близких",
+    "summary": "Как справиться с горем потери и пройти через расставание",
+    "categories": ["Взаимоотношения и семья"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/расставание-с-любимыми-как-пережить-потерю-близких.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=FMpJ29LDHg8"
+  }
+,
+  {
+    "id": "влияние-рода",
+    "title": "Влияние рода",
+    "summary": "Как родовые связи влияют на нашу жизнь и судьбу",
+    "categories": ["Взаимоотношения и семья"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/влияние-рода.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=nwGJI249YB8"
+  }
+,
+  {
+    "id": "гармония-в-отношениях-принять-или-исправить",
+    "title": "Гармония в отношениях. Принять или исправить",
+    "summary": "Принимать людей такими, какие они есть, или пытаться их изменить",
+    "categories": ["Взаимоотношения и семья"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/гармония-в-отношениях-принять-или-исправить.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=rQSkBGLCq_U"
+  }
+,
+  {
+    "id": "гармония-в-паре-любовь-сексуальные-отношения",
+    "title": "Гармония в паре. Любовь. Сексуальные отношения",
+    "summary": "Любовь и сексуальность в гармоничных отношениях",
+    "categories": ["Взаимоотношения и семья"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/гармония-в-паре-любовь-сексуальные-отношения.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=i9oM7CFkgMw"
+  }
+,
+  {
+    "id": "сексуальные-отношения",
+    "title": "Сексуальные отношения",
+    "summary": "Сакральное понимание сексуальности и интимных отношений",
+    "categories": ["Взаимоотношения и семья"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/сексуальные-отношения.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=P0i5BcCatNE"
+  }
+,
+  {
+    "id": "любовь-в-паре",
+    "title": "Любовь в паре",
+    "summary": "Что такое настоящая любовь в отношениях между мужчиной и женщиной",
+    "categories": ["Взаимоотношения и семья"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/любовь-в-паре.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=xl6zuw8fnrU"
+  }
+,
+  {
+    "id": "вселенская-структура",
+    "title": "Вселенская структура",
+    "summary": "Структура мироздания и законы, управляющие вселенной",
+    "categories": ["Внутренние развитие"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/вселенская-структура.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=Qsy2_Ws0KB0"
+  }
+,
+  {
+    "id": "влияние-эмоций-стресс-и-выгорание",
     "title": "Влияние эмоций. Стресс и выгорание",
-    "summary": "Как эмоции влияют на наш корпус, энергетику и физику и как можно избежать стресса и выгорания?",
-    "category": "Внутренние развитие",
+    "summary": "Как эмоции влияют на здоровье и как справляться со стрессом",
+    "categories": ["Внутренние развитие"],
     "author": "Dos Mundos",
-    "contentUrl": "/articles/emotions.html",
+    "contentUrl": "/articles/влияние-эмоций-стресс-и-выгорание.html",
     "youtubeUrl": "https://www.youtube.com/watch?v=H_GNlv70WeI"
-  },
+  }
+,
   {
-    "id": "reptilians",
-    "title": "Внутренее определение. Рептилоиды и их роль",
-    "summary": "Основной вопрос текста - роль рептилоидов и их влияние на развитие человечества.",
-    "category": "Внутренние развитие",
+    "id": "своевременность",
+    "title": "Своевременность",
+    "summary": "Понимание правильного времени для действий и решений",
+    "categories": ["Внутренние развитие"],
     "author": "Dos Mundos",
-    "contentUrl": "/articles/reptilians.html",
+    "contentUrl": "/articles/своевременность.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=euIOynOgWug"
+  }
+,
+  {
+    "id": "внутренее-определение-рептилоиды-и-их-роль",
+    "title": "Внутренее определение. Рептилоиды и их роль",
+    "summary": "Внутренние рептилоидные структуры и их влияние на поведение",
+    "categories": ["Внутренние развитие"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/внутренее-определение-рептилоиды-и-их-роль.html",
     "youtubeUrl": "https://www.youtube.com/watch?v=MfPsi61xqgU"
+  }
+,
+  {
+    "id": "как-распознать-свои-мысли-и-прийти-к-ясности",
+    "title": "Как распознать свои мысли и прийти к ясности",
+    "summary": "Различение собственных мыслей и достижение ментальной ясности",
+    "categories": ["Внутренние развитие"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/как-распознать-свои-мысли-и-прийти-к-ясности.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=5FGeGrTfu_4"
+  }
+,
+  {
+    "id": "что-такое-сны",
+    "title": "Что такое сны",
+    "summary": "Значение снов и как их правильно интерпретировать",
+    "categories": ["Внутренние развитие"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/что-такое-сны.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=nRo30RL2jFo"
+  }
+,
+  {
+    "id": "служение-как-инструмент-цельности",
+    "title": "Служение как инструмент цельности",
+    "summary": "Служение другим как путь к внутренней целостности",
+    "categories": ["Внутренние развитие"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/служение-как-инструмент-цельности.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=dxUvgEn_0F4"
+  }
+,
+  {
+    "id": "что-такое-сакральное-начало",
+    "title": "Что такое сакральное начало",
+    "summary": "Понимание сакрального начала жизни и бытия",
+    "categories": ["Внутренние развитие"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/что-такое-сакральное-начало.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=CMld7aqYOtI"
+  }
+,
+  {
+    "id": "закон-пустоты",
+    "title": "Закон пустоты",
+    "summary": "Универсальный закон пустоты и его применение в жизни",
+    "categories": ["Внутренние развитие"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/закон-пустоты.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=WED5FzcmYGo"
+  }
+,
+  {
+    "id": "богатство-в-сакральном-пути",
+    "title": "Богатство в Сакральном Пути",
+    "summary": "Истинное понимание богатства на духовном пути",
+    "categories": ["Внутренние развитие"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/богатство-в-сакральном-пути.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=wyydDv5lhH0"
+  }
+,
+  {
+    "id": "дисциплина",
+    "title": "Дисциплина",
+    "summary": "Значение дисциплины в духовном развитии",
+    "categories": ["Внутренние развитие"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/дисциплина.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=4dw7NOYXl38"
+  }
+,
+  {
+    "id": "что-такое-медитация-как-работать-с-умом",
+    "title": "Что такое медитация. Как работать с умом",
+    "summary": "Основы медитации и техники работы с мыслями",
+    "categories": ["Внутренние развитие"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/что-такое-медитация-как-работать-с-умом.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=31kMf6ao0fo"
+  }
+,
+  {
+    "id": "сопротивление-к-изменениям",
+    "title": "Сопротивление к изменениям",
+    "summary": "Почему мы сопротивляемся изменениям и как с этим работать",
+    "categories": ["Внутренние развитие"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/сопротивление-к-изменениям.html",
+    "youtubeUrl": null
+  }
+,
+  {
+    "id": "что-такое-сомнения",
+    "title": "Что такое сомнения",
+    "summary": "",
+    "categories": ["Внутренние развитие"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/что-такое-сомнения.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=TnIvB0g-l2U"
+  }
+,
+  {
+    "id": "голос-эго-или-зов-вселенной",
+    "title": "Голос эго или зов вселенной",
+    "summary": "",
+    "categories": ["Внутренние развитие"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/голос-эго-или-зов-вселенной.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=EVclx2ny1cQ"
+  }
+,
+  {
+    "id": "что-такое-сознание-баланс-между-умом-телом-и-душой",
+    "title": "Что такое сознание_ Баланс между Умом, Телом и Душой",
+    "summary": "",
+    "categories": ["Внутренние развитие"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/что-такое-сознание-баланс-между-умом-телом-и-душой.html",
+    "youtubeUrl": null
+  }
+,
+  {
+    "id": "сила-предков",
+    "title": "Сила Предков",
+    "summary": "",
+    "categories": ["Внутренние развитие"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/сила-предков.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=jRjWWhO1otk"
+  }
+,
+  {
+    "id": "про-страх-внутренние-эмоциональные-конфликты",
+    "title": "Про страх. Внутренние эмоциональные конфликты",
+    "summary": "",
+    "categories": ["Внутренние развитие"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/про-страх-внутренние-эмоциональные-конфликты.html",
+    "youtubeUrl": null
+  }
+,
+  {
+    "id": "фильм-матрица-манипуляции-через-медиа",
+    "title": "Фильм Матрица.  Манипуляции через медиа",
+    "summary": "Анализ манипуляций сознанием через средства массовой информации и параллели с фильмом Матрица",
+    "categories": ["Внутренние развитие"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/фильм-матрица-манипуляции-через-медиа.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=E4fBWMCQATw"
+  }
+,
+  {
+    "id": "как-услышать-себя-фантазии-и-сакральное",
+    "title": "Как услышать себя. Фантазии и Сакральное",
+    "summary": "",
+    "categories": ["Внутренние развитие"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/как-услышать-себя-фантазии-и-сакральное.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=QedE-jYZye0"
+  }
+,
+  {
+    "id": "нужно-ли-читать-книги-безграничная-вселенная",
+    "title": "Нужно ли читать книги. Безграничная вселенная",
+    "summary": "",
+    "categories": ["Внутренние развитие"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/нужно-ли-читать-книги-безграничная-вселенная.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=VSkGkTfeM8w"
+  }
+,
+  {
+    "id": "духовные-мускулы",
+    "title": "Духовные мускулы",
+    "summary": "",
+    "categories": ["Внутренние развитие"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/духовные-мускулы.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=QA7FK2vfJ6o"
+  }
+,
+  {
+    "id": "сила-слова",
+    "title": "Сила слова",
+    "summary": "",
+    "categories": ["Внутренние развитие"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/сила-слова.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=spPrrdaYsVc"
+  }
+,
+  {
+    "id": "о-новом-человеке-к-2027-году-различия-двух-планов-сакрального-и-материального",
+    "title": "О новом человеке к 2027 году.  Различия двух планов сакрального и материального",
+    "summary": "Будущее человечества и различия между мирами: мутация сознания на сакральном плане и развитие технологий на материальном",
+    "categories": ["Внутренние развитие"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/о-новом-человеке-к-2027-году-различия-двух-планов-сакрального-и-материального.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=rl1uOqTDQO0"
+  }
+,
+  {
+    "id": "влияние-затмений",
+    "title": "Влияние затмений",
+    "summary": "",
+    "categories": ["Внутренние развитие"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/влияние-затмений.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=VtwXlOsohpk"
+  }
+,
+  {
+    "id": "служение",
+    "title": "Служение",
+    "summary": "",
+    "categories": ["Внутренние развитие"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/служение.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=ggxehZ5u4w4"
+  }
+,
+  {
+    "id": "манипуляции-в-учениях-дисциплина-простая-жизнь",
+    "title": "Манипуляции в учениях. Дисциплина. Простая жизнь",
+    "summary": "",
+    "categories": ["Внутренние развитие"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/манипуляции-в-учениях-дисциплина-простая-жизнь.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=gSnxrBkJcss"
+  }
+,
+  {
+    "id": "максимальная-реализация",
+    "title": "Максимальная реализация",
+    "summary": "",
+    "categories": ["Внутренние развитие"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/максимальная-реализация.html",
+    "youtubeUrl": "https://youtu.be/K2s9XQiGt0c"
+  }
+,
+  {
+    "id": "амулеты-очистка-от-негативных-энергий",
+    "title": "Амулеты, очистка от негативных энергий",
+    "summary": "",
+    "categories": ["Внутренние развитие"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/амулеты-очистка-от-негативных-энергий.html",
+    "youtubeUrl": null
+  }
+,
+  {
+    "id": "дисциплина-что-это-и-как-это-тренировать",
+    "title": "Дисциплина. Что это и как это тренировать",
+    "summary": "",
+    "categories": ["Внутренние развитие"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/дисциплина-что-это-и-как-это-тренировать.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=S-7ETr0syyk"
+  }
+,
+  {
+    "id": "как-побороть-усталось-инструменты-развития",
+    "title": "Как побороть усталось. Инструменты развития",
+    "summary": "",
+    "categories": ["Внутренние развитие"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/как-побороть-усталось-инструменты-развития.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=nY_MOnrbhBE"
+  }
+,
+  {
+    "id": "что-такое-страхи-манипуляции-состоянием",
+    "title": "Что такое страхи. Манипуляции состоянием",
+    "summary": "",
+    "categories": ["Внутренние развитие"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/что-такое-страхи-манипуляции-состоянием.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=xTbj2zFDd8E"
+  }
+,
+  {
+    "id": "про-простую-жизнь",
+    "title": "Про простую жизнь",
+    "summary": "",
+    "categories": ["Внутренние развитие"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/про-простую-жизнь.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=iqycscMIFI0"
+  }
+,
+  {
+    "id": "религиозные-противоречия-и-ритуалы-сакральность-девы-марии-подключение-к-божественной-природе",
+    "title": "Религиозные противоречия и ритуалы.  Сакральность девы Марии.  Подключение к божественной природе",
+    "summary": "Анализ религиозных противоречий и сакральных практик, манипуляции в религиях и путь к внутреннему единению с божественным",
+    "categories": ["Внутренние развитие"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/религиозные-противоречия-и-ритуалы-сакральность-девы-марии-подключение-к-божественной-природе.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=oIIYFutJwE4"
+  }
+,
+  {
+    "id": "что-такое-ясность",
+    "title": "Что такое ясность",
+    "summary": "",
+    "categories": ["Внутренние развитие"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/что-такое-ясность.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=FNKM8yshDW8"
+  }
+,
+  {
+    "id": "голос-эго-и-вселенские-послания",
+    "title": "Голос эго и вселенские послания",
+    "summary": "",
+    "categories": ["Внутренние развитие"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/голос-эго-и-вселенские-послания.html",
+    "youtubeUrl": null
+  }
+,
+  {
+    "id": "что-такое-жить-просто-чувствовать-или-думать",
+    "title": "Что такое жить просто. Чувствовать или думать",
+    "summary": "",
+    "categories": ["Внутренние развитие"],
+    "author": "Dos Mundos",
+    "contentUrl": "/articles/что-такое-жить-просто-чувствовать-или-думать.html",
+    "youtubeUrl": "https://www.youtube.com/watch?v=jrvTHZxX_2w"
   }
 ]
