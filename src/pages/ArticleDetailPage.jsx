@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { getLocaleString } from '@/lib/locales';
+import { supabase } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, User, Youtube, Share2 } from 'lucide-react';
 
@@ -30,43 +31,76 @@ const ArticleDetailPage = () => {
   useEffect(() => {
     const fetchArticleData = async () => {
       try {
-        // Fetch index to get metadata
-        const indexResponse = await fetch('/articles/index.json');
-        if (!indexResponse.ok) throw new Error('Failed to fetch index');
-        const indexData = await indexResponse.json();
-        
-        const foundArticle = indexData.find(a => a.id === articleId);
-        
-        if (!foundArticle) {
+        const { data: articleData, error } = await supabase
+          .from('articles')
+          .select('*')
+          .eq('slug', articleId)
+          .single();
+
+        if (error || !articleData) {
+          console.error('Error fetching article from Supabase:', error);
+          // Fallback to local file system
+          try {
+            const indexResponse = await fetch('/articles/index.json');
+            if (!indexResponse.ok) throw new Error('Failed to fetch index');
+            const indexData = await indexResponse.json();
+            const foundArticle = indexData.find(a => a.id === articleId);
+            
+            if (foundArticle) {
+              setArticle(foundArticle);
+              const contentResponse = await fetch(foundArticle.contentUrl);
+              if (contentResponse.ok) {
+                const htmlText = await contentResponse.text();
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(htmlText, 'text/html');
+                setContent(doc.body.innerHTML);
+              }
+              setLoading(false);
+              return;
+            }
+          } catch (e) {
+            console.error('Fallback failed:', e);
+          }
+          
           navigate(`/${lang}/articles`);
           return;
         }
-        
-        setArticle(foundArticle);
 
-        // Fetch content
-        const contentResponse = await fetch(foundArticle.contentUrl);
-        if (contentResponse.ok) {
-          const htmlText = await contentResponse.text();
-          
-          // Extract body content
+        // Transform Supabase data
+        const transformedArticle = {
+          id: articleData.slug,
+          title: articleData.title[lang] || articleData.title['ru'] || articleData.title['en'],
+          summary: articleData.summary[lang] || articleData.summary['ru'] || articleData.summary['en'],
+          categories: articleData.categories || [],
+          author: articleData.author,
+          youtubeUrl: articleData.youtube_url
+        };
+
+        setArticle(transformedArticle);
+        
+        // Get content
+        const rawContent = articleData.content[lang] || articleData.content['ru'] || articleData.content['en'] || '';
+        
+        // Parse HTML to extract body content if it's a full document
+        if (rawContent.includes('<html') || rawContent.includes('<body')) {
           const parser = new DOMParser();
-          const doc = parser.parseFromString(htmlText, 'text/html');
-          const bodyContent = doc.body.innerHTML;
-          
-          setContent(bodyContent);
+          const doc = parser.parseFromString(rawContent, 'text/html');
+          setContent(doc.body.innerHTML);
         } else {
-          setContent('<p>Error loading content.</p>');
+          setContent(rawContent);
         }
+
       } catch (error) {
         console.error('Error fetching article:', error);
+        navigate(`/${lang}/articles`);
       } finally {
         setLoading(false);
       }
     };
 
     fetchArticleData();
-  }, [articleId, lang, navigate]);
+  }, [lang, articleId, navigate]);
+
 
   const getYoutubeEmbedUrl = (url) => {
     if (!url) return null;

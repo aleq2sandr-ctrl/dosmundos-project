@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getLocaleString } from '@/lib/locales';
+import { supabase } from '@/lib/supabaseClient';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { User, ArrowRight, Youtube, BookOpen, Search } from 'lucide-react';
@@ -31,22 +32,44 @@ const ArticlesPage = () => {
   useEffect(() => {
     const fetchArticles = async () => {
       try {
-        const response = await fetch('/articles/index.json');
-        if (response.ok) {
-          const data = await response.json();
-          setArticles(data);
-        } else {
-          console.error('Failed to fetch articles index');
+        const { data, error } = await supabase
+          .from('articles')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        if (data) {
+          // Transform data to match component expectations and handle localization
+          const transformedData = data.map(article => ({
+            id: article.slug,
+            title: article.title[lang] || article.title['ru'] || article.title['en'] || '',
+            summary: article.summary[lang] || article.summary['ru'] || article.summary['en'] || '',
+            categories: article.categories || [],
+            author: article.author,
+            youtubeUrl: article.youtube_url
+          }));
+          setArticles(transformedData);
         }
       } catch (error) {
         console.error('Error fetching articles:', error);
+        // Fallback to local JSON if Supabase fails (optional, but good for resilience)
+        try {
+          const response = await fetch('/articles/index.json');
+          if (response.ok) {
+            const data = await response.json();
+            setArticles(data);
+          }
+        } catch (e) {
+          console.error('Fallback failed:', e);
+        }
       } finally {
         setLoading(false);
       }
     };
 
     fetchArticles();
-  }, []);
+  }, [lang]);
 
   const categories = useMemo(() => {
     const allCats = new Set();
