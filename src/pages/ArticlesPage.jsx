@@ -114,9 +114,9 @@ const ArticlesPage = () => {
             {lang === 'ru' ? 'Блог' : 'Blog'}
           </h1>
           <p className="text-slate-600 max-w-2xl text-lg italic">
-            {lang === 'ru' 
-              ? 'Исследуйте глубины внутреннего мира через наши статьи и размышления.' 
-              : 'Explore the depths of the inner world through our articles and reflections.'}
+            {lang === 'ru'
+              ? 'Исследуйте глубины внутреннего мира через вселенские послания.'
+              : 'Explore the depths of the inner world through universal messages.'}
           </p>
         </div>
 
