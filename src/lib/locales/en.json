@@ -917,5 +917,13 @@
   "segmenting": "Segmenting...",
   "transcribing": "Transcribing...",
   "autoRecognizeQuestions": "Automatic AI question recognition",
-  "autoRecognizeQuestionsDesc": "Automatically generate questions when loading an episode"
+  "autoRecognizeQuestionsDesc": "Automatically generate questions when loading an episode",
+  "blog_title": "Blog",
+  "blog_subtitle": "Explore the depths of the inner world through universal messages.",
+  "search_articles_placeholder": "Search articles...",
+  "all_categories": "All",
+  "read_article": "Read",
+  "back_to_articles": "Back to articles",
+  "watch_on_youtube": "Watch on YouTube",
+  "video_version": "Video version"
 }

@@ -849,5 +849,13 @@
   "segmenting": "Сегментация...",
   "transcribing": "Транскрибирую...",
   "autoRecognizeQuestions": "Автоматическое распознавание вопросов через ИИ",
-  "autoRecognizeQuestionsDesc": "Автоматически генерировать вопросы при загрузке эпизода"
+  "autoRecognizeQuestionsDesc": "Автоматически генерировать вопросы при загрузке эпизода",
+  "blog_title": "Блог",
+  "blog_subtitle": "Исследуйте глубины внутреннего мира через вселенские послания.",
+  "search_articles_placeholder": "Поиск статей...",
+  "all_categories": "Все",
+  "read_article": "Читать",
+  "back_to_articles": "Назад к статьям",
+  "watch_on_youtube": "Смотреть на YouTube",
+  "video_version": "Видео версия статьи"
 }

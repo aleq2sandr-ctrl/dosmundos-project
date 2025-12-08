@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getLocaleString } from '@/lib/locales';
-import { supabase } from '@/lib/supabaseClient';
+import { articleService } from '@/lib/articleService';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { User, ArrowRight, Youtube, BookOpen, Search, Loader2 } from 'lucide-react';
@@ -24,7 +24,7 @@ const getCategoryColor = (category) => {
 
 const ArticlesPage = () => {
   const { lang } = useParams();
-  const [rawArticles, setRawArticles] = useState([]);
+  const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -43,72 +43,22 @@ const ArticlesPage = () => {
     if (node) observer.current.observe(node);
   }, [loading]);
 
-  // Fetch raw data once
+  // Fetch articles using service
   useEffect(() => {
     const fetchArticles = async () => {
-      // If we already have data, don't refetch
-      if (rawArticles.length > 0) {
-        setLoading(false);
-        return;
-      }
-
+      setLoading(true);
       try {
-        const { data, error } = await supabase
-          .from('articles')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
-
-        if (data) {
-          setRawArticles(data);
-        }
+        const data = await articleService.getArticles(lang);
+        setArticles(data);
       } catch (error) {
         console.error('Error fetching articles:', error);
-        // Fallback to local JSON
-        try {
-          const response = await fetch('/articles/index.json');
-          if (response.ok) {
-            const data = await response.json();
-            // Normalize local data structure to match DB if needed, 
-            // but for now assuming local JSON structure is compatible enough or we handle it
-            // Actually local JSON has flat structure, DB has JSONB. 
-            // We need to handle this difference if fallback is used.
-            // For simplicity in this optimization, we assume DB works or we map local data to "raw" format
-            // But local data is already "processed" for specific lang usually? 
-            // No, index.json contains all data but flat. 
-            // Let's just store it.
-            setRawArticles(data.map(a => ({
-              slug: a.id,
-              title: { [lang]: a.title, ru: a.title }, // Mock structure
-              summary: { [lang]: a.summary, ru: a.summary },
-              categories: a.categories,
-              author: a.author,
-              youtube_url: a.youtubeUrl
-            })));
-          }
-        } catch (e) {
-          console.error('Fallback failed:', e);
-        }
       } finally {
         setLoading(false);
       }
     };
 
     fetchArticles();
-  }, []); // Run once on mount
-
-  // Derive localized articles from raw data
-  const articles = useMemo(() => {
-    return rawArticles.map(article => ({
-      id: article.slug,
-      title: article.title?.[lang] || article.title?.['ru'] || article.title?.['en'] || '',
-      summary: article.summary?.[lang] || article.summary?.['ru'] || article.summary?.['en'] || '',
-      categories: article.categories || [],
-      author: article.author,
-      youtubeUrl: article.youtube_url
-    }));
-  }, [rawArticles, lang]);
+  }, [lang]);
 
   const categories = useMemo(() => {
     const allCats = new Set();
@@ -137,7 +87,7 @@ const ArticlesPage = () => {
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(a => 
-        a.title.toLowerCase().includes(query) || 
+        a.title?.toLowerCase().includes(query) || 
         (a.summary && a.summary.toLowerCase().includes(query))
       );
     }
@@ -145,17 +95,17 @@ const ArticlesPage = () => {
     return filtered;
   }, [articles, selectedCategory, searchQuery]);
 
+
+
   return (
     <div className="min-h-screen bg-[#fdfbf7] text-slate-900 font-serif">
       <div className="container mx-auto px-4 py-12">
         <div className="flex flex-col items-center mb-12 text-center">
           <h1 className="text-4xl md:text-5xl font-bold text-slate-900 mb-4 tracking-tight">
-            {lang === 'ru' ? 'Блог' : 'Blog'}
+            {getLocaleString('blog_title', lang)}
           </h1>
           <p className="text-slate-600 max-w-2xl text-lg italic">
-            {lang === 'ru'
-              ? 'Исследуйте глубины внутреннего мира через вселенские послания.'
-              : 'Explore the depths of the inner world through universal messages.'}
+            {getLocaleString('blog_subtitle', lang)}
           </p>
         </div>
 
@@ -165,7 +115,7 @@ const ArticlesPage = () => {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5" />
             <input
               type="text"
-              placeholder={lang === 'ru' ? 'Поиск статей...' : 'Search articles...'}
+              placeholder={getLocaleString('search_articles_placeholder', lang)}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2 rounded-full border border-slate-200 focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition-all font-sans"
@@ -186,7 +136,7 @@ const ArticlesPage = () => {
                     : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400 hover:text-slate-900'
                 }`}
               >
-                {cat === 'All' ? (lang === 'ru' ? 'Все' : 'All') : cat}
+                {cat === 'All' ? getLocaleString('all_categories', lang) : cat}
               </button>
             ))}
           </div>
@@ -243,7 +193,7 @@ const ArticlesPage = () => {
                               {article.author}
                             </div>
                             <span className="flex items-center gap-2 text-sm text-purple-700 font-medium group-hover:translate-x-1 transition-transform italic font-serif">
-                              {lang === 'ru' ? 'Читать' : 'Read'}
+                              {getLocaleString('read_article', lang)}
                               <ArrowRight className="w-4 h-4" />
                             </span>
                           </div>
