@@ -270,7 +270,24 @@ const AppContent = ({ user }) => {
 
 
 function App() {
-  const [showLangModal, setShowLangModal] = useState(false);
+  const [showLangModal, setShowLangModal] = useState(() => {
+    // Если язык уже сохранен, не показываем модалку
+    if (localStorage.getItem('podcastLang')) {
+      return false;
+    }
+
+    // Если в URL уже есть язык, не показываем модалку
+    const path = window.location.pathname;
+    const hasLangInUrl = SUPPORTED_LANGUAGES.some(lang => 
+      path.startsWith(`/${lang}/`) || path === `/${lang}`
+    );
+    
+    if (hasLangInUrl) {
+      return false;
+    }
+
+    return true;
+  });
   const [authLoading, setAuthLoading] = useState(true);
   const [user, setUser] = useState(null);
   const [offlineServicesReady, setOfflineServicesReady] = useState(false);
