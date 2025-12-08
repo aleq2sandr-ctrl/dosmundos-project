@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getLocaleString } from '@/lib/locales';
 import { supabase } from '@/lib/supabaseClient';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { User, ArrowRight, Youtube, BookOpen, Search } from 'lucide-react';
+import { User, ArrowRight, Youtube, BookOpen, Search, Loader2 } from 'lucide-react';
 
 // Color palette for categories
 const categoryColors = {
@@ -24,13 +24,34 @@ const getCategoryColor = (category) => {
 
 const ArticlesPage = () => {
   const { lang } = useParams();
-  const [articles, setArticles] = useState([]);
+  const [rawArticles, setRawArticles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [visibleCount, setVisibleCount] = useState(12);
+  
+  // Infinite scroll observer
+  const observer = useRef();
+  const lastArticleElementRef = useCallback(node => {
+    if (loading) return;
+    if (observer.current) observer.current.disconnect();
+    observer.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting) {
+        setVisibleCount(prev => prev + 12);
+      }
+    });
+    if (node) observer.current.observe(node);
+  }, [loading]);
 
+  // Fetch raw data once
   useEffect(() => {
     const fetchArticles = async () => {
+      // If we already have data, don't refetch
+      if (rawArticles.length > 0) {
+        setLoading(false);
+        return;
+      }
+
       try {
         const { data, error } = await supabase
           .from('articles')
@@ -40,25 +61,31 @@ const ArticlesPage = () => {
         if (error) throw error;
 
         if (data) {
-          // Transform data to match component expectations and handle localization
-          const transformedData = data.map(article => ({
-            id: article.slug,
-            title: article.title[lang] || article.title['ru'] || article.title['en'] || '',
-            summary: article.summary[lang] || article.summary['ru'] || article.summary['en'] || '',
-            categories: article.categories || [],
-            author: article.author,
-            youtubeUrl: article.youtube_url
-          }));
-          setArticles(transformedData);
+          setRawArticles(data);
         }
       } catch (error) {
         console.error('Error fetching articles:', error);
-        // Fallback to local JSON if Supabase fails (optional, but good for resilience)
+        // Fallback to local JSON
         try {
           const response = await fetch('/articles/index.json');
           if (response.ok) {
             const data = await response.json();
-            setArticles(data);
+            // Normalize local data structure to match DB if needed, 
+            // but for now assuming local JSON structure is compatible enough or we handle it
+            // Actually local JSON has flat structure, DB has JSONB. 
+            // We need to handle this difference if fallback is used.
+            // For simplicity in this optimization, we assume DB works or we map local data to "raw" format
+            // But local data is already "processed" for specific lang usually? 
+            // No, index.json contains all data but flat. 
+            // Let's just store it.
+            setRawArticles(data.map(a => ({
+              slug: a.id,
+              title: { [lang]: a.title, ru: a.title }, // Mock structure
+              summary: { [lang]: a.summary, ru: a.summary },
+              categories: a.categories,
+              author: a.author,
+              youtube_url: a.youtubeUrl
+            })));
           }
         } catch (e) {
           console.error('Fallback failed:', e);
@@ -69,7 +96,19 @@ const ArticlesPage = () => {
     };
 
     fetchArticles();
-  }, [lang]);
+  }, []); // Run once on mount
+
+  // Derive localized articles from raw data
+  const articles = useMemo(() => {
+    return rawArticles.map(article => ({
+      id: article.slug,
+      title: article.title?.[lang] || article.title?.['ru'] || article.title?.['en'] || '',
+      summary: article.summary?.[lang] || article.summary?.['ru'] || article.summary?.['en'] || '',
+      categories: article.categories || [],
+      author: article.author,
+      youtubeUrl: article.youtube_url
+    }));
+  }, [rawArticles, lang]);
 
   const categories = useMemo(() => {
     const allCats = new Set();
@@ -155,57 +194,74 @@ const ArticlesPage = () => {
 
         {loading ? (
           <div className="flex justify-center py-20">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-slate-900"></div>
+            <Loader2 className="h-12 w-12 animate-spin text-slate-900" />
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {filteredArticles.map((article) => (
-              <Link 
-                key={article.id} 
-                to={`/${lang}/articles/${article.id}`}
-                className="group"
-              >
-                <Card className="h-full bg-white border-slate-200 text-slate-900 overflow-hidden transition-all duration-500 hover:shadow-xl hover:shadow-slate-200/50 hover:-translate-y-1 group-hover:border-slate-300">
-                  <CardHeader className="pb-4">
-                    <div className="flex justify-between items-start mb-3">
-                      <div className="flex flex-wrap gap-1">
-                        {(Array.isArray(article.categories) ? article.categories : (article.category ? [article.category] : [])).map((cat, index) => (
-                          <span
-                            key={index}
-                            className={`px-2 py-1 rounded-full text-xs font-medium tracking-wide uppercase border font-sans ${getCategoryColor(cat)}`}
-                          >
-                            {cat}
-                          </span>
-                        ))}
-                      </div>
-                      {article.youtubeUrl && (
-                        <Youtube className="w-5 h-5 text-red-600 opacity-80" />
-                      )}
-                    </div>
-                    <CardTitle className="text-2xl font-bold leading-tight group-hover:text-purple-700 transition-colors">
-                      {article.title}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <CardDescription className="text-slate-600 text-base leading-relaxed line-clamp-3 mb-6">
-                      {article.summary}
-                    </CardDescription>
-                    
-                    <div className="flex items-center justify-between mt-auto pt-4 border-t border-slate-100 font-sans">
-                      <div className="flex items-center gap-2 text-xs text-slate-500 uppercase tracking-wider font-medium">
-                        <User className="w-3 h-3" />
-                        {article.author}
-                      </div>
-                      <span className="flex items-center gap-2 text-sm text-purple-700 font-medium group-hover:translate-x-1 transition-transform italic font-serif">
-                        {lang === 'ru' ? 'Читать' : 'Read'}
-                        <ArrowRight className="w-4 h-4" />
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {filteredArticles.slice(0, visibleCount).map((article, index) => {
+                const isLast = index === visibleCount - 1;
+                return (
+                  <div 
+                    key={article.id} 
+                    ref={isLast ? lastArticleElementRef : null}
+                    className="h-full"
+                  >
+                    <Link 
+                      to={`/${lang}/articles/${article.id}`}
+                      className="group h-full block"
+                    >
+                      <Card className="h-full bg-white border-slate-200 text-slate-900 overflow-hidden transition-all duration-500 hover:shadow-xl hover:shadow-slate-200/50 hover:-translate-y-1 group-hover:border-slate-300 flex flex-col">
+                        <CardHeader className="pb-4">
+                          <div className="flex justify-between items-start mb-3">
+                            <div className="flex flex-wrap gap-1">
+                              {(Array.isArray(article.categories) ? article.categories : (article.category ? [article.category] : [])).map((cat, index) => (
+                                <span
+                                  key={index}
+                                  className={`px-2 py-1 rounded-full text-xs font-medium tracking-wide uppercase border font-sans ${getCategoryColor(cat)}`}
+                                >
+                                  {cat}
+                                </span>
+                              ))}
+                            </div>
+                            {article.youtubeUrl && (
+                              <Youtube className="w-5 h-5 text-red-600 opacity-80" />
+                            )}
+                          </div>
+                          <CardTitle className="text-2xl font-bold leading-tight group-hover:text-purple-700 transition-colors">
+                            {article.title}
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="flex-grow flex flex-col">
+                          <CardDescription className="text-slate-600 text-base leading-relaxed line-clamp-3 mb-6 flex-grow">
+                            {article.summary}
+                          </CardDescription>
+                          
+                          <div className="flex items-center justify-between mt-auto pt-4 border-t border-slate-100 font-sans">
+                            <div className="flex items-center gap-2 text-xs text-slate-500 uppercase tracking-wider font-medium">
+                              <User className="w-3 h-3" />
+                              {article.author}
+                            </div>
+                            <span className="flex items-center gap-2 text-sm text-purple-700 font-medium group-hover:translate-x-1 transition-transform italic font-serif">
+                              {lang === 'ru' ? 'Читать' : 'Read'}
+                              <ArrowRight className="w-4 h-4" />
+                            </span>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  </div>
+                );
+              })}
+            </div>
+            
+            {/* Loading indicator for infinite scroll */}
+            {visibleCount < filteredArticles.length && (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
