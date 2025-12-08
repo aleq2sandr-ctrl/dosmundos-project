@@ -49,6 +49,11 @@ ${JSON.stringify(texts)}
       stream: false
     });
 
+    if (!response || !response.choices || !response.choices.length) {
+      console.error('Invalid API response:', JSON.stringify(response, null, 2));
+      return null;
+    }
+
     const content = response.choices[0].message.content;
     const jsonText = content.replace(/```json\n?|\n?```/g, '').trim();
     return JSON.parse(jsonText);

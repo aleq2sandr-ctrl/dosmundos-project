@@ -67,9 +67,21 @@ jobs:
 
       - name: Create deployment archive
         run: |
-          # Create archive containing only the built dist files
-          cd dist && tar -czf ../deploy.tar.gz .
-          ls -lh ../deploy.tar.gz
+          # Prepare deployment directory
+          mkdir -p deployment
+          
+          # Copy frontend build
+          cp -r dist deployment/
+          
+          # Copy backend files
+          cp server.js deployment/
+          cp package.json deployment/
+          cp -r api deployment/
+          
+          # Create archive
+          cd deployment && tar -czf ../deploy.tar.gz .
+          cd ..
+          ls -lh deploy.tar.gz
           echo "Archive created successfully"
 
       - name: Upload archive to VPS
