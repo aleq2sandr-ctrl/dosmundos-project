@@ -1,6 +1,6 @@
 // Версия кеша - обновляется при каждом деплое для принудительного обновления
 // IMPORTANT: Измените эту версию при каждом деплое, чтобы очистить старые кеши
-const CACHE_VERSION = 'v20251208-153500';
+const CACHE_VERSION = 'v20251208-154500';
 const STATIC_CACHE = 'static-' + CACHE_VERSION;
 const DYNAMIC_CACHE = 'dynamic-' + CACHE_VERSION;
 const AUDIO_CACHE = 'audio-' + CACHE_VERSION;
@@ -242,36 +242,14 @@ async function handleAudioRequest(request) {
     }
 
     if (isDeepSeek) {
-      console.log('[SW] Deep seek on non-cached file. Serving from network + Background Cache.');
+      console.log('[SW] Deep seek on non-cached file. Serving from network ONLY (perf optimization).');
       
-      // 1. Запускаем кеширование полного файла в фоне, если еще не запущено
-      if (!pendingCacheOperations.has(url.toString())) {
-        const cachePromise = (async () => {
-          try {
-            const fullRequest = new Request(request.url, {
-              method: 'GET',
-              headers: new Headers(request.headers),
-              mode: 'cors',
-              credentials: 'omit'
-            });
-            fullRequest.headers.delete('range');
-            
-            const response = await fetch(fullRequest);
-            if (response.ok) {
-              await manageCacheSize(cache, response.clone());
-              await cache.put(cacheKey, response);
-              console.log('[SW] Background caching complete:', request.url);
-            }
-          } catch (err) {
-            console.error('[SW] Background caching failed:', err);
-          }
-        })();
-        
-        pendingCacheOperations.set(url.toString(), cachePromise);
-        cachePromise.finally(() => pendingCacheOperations.delete(url.toString()));
-      }
+      // PERFORMANCE OPTIMIZATION:
+      // We do NOT start background caching here because it competes for bandwidth
+      // with the playback stream, causing long delays (20s+) on slower connections.
+      // We prioritize immediate playback over offline caching for deep seeks.
 
-      // 2. Возвращаем пользователю то, что он просил (Range request) из сети
+      // Возвращаем пользователю то, что он просил (Range request) из сети
       return fetch(request);
     }
 
