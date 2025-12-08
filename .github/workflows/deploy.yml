@@ -71,7 +71,7 @@ jobs:
           mkdir -p deployment
           
           # Copy frontend build
-          cp -r dist deployment/
+          cp -a dist/. deployment/
           
           # Copy backend files
           cp server.js deployment/
@@ -132,7 +132,7 @@ jobs:
             rm -f /tmp/deploy.tar.gz
 
             # Verify extraction
-            if [ ! -f "$DEPLOY_PATH/dist/index.html" ]; then
+            if [ ! -f "$DEPLOY_PATH/index.html" ]; then
               echo "ERROR: index.html not found after extraction!"
               exit 1
             fi
@@ -142,7 +142,7 @@ jobs:
             ls -lah "$DEPLOY_PATH" | head -20
             echo ""
             echo "=== Deployment info ==="
-            cat "$DEPLOY_PATH/dist/.deployment-info" 2>/dev/null || echo "No deployment info file"
+            cat "$DEPLOY_PATH/.deployment-info" 2>/dev/null || echo "No deployment info file"
             echo ""
             echo "Frontend deployment completed successfully!"
 
@@ -226,7 +226,7 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
           script: |
-            if [ ! -f "${{ secrets.VPS_PATH }}/dist/index.html" ]; then
+            if [ ! -f "${{ secrets.VPS_PATH }}/index.html" ]; then
               echo "ERROR: index.html not found after deployment!"
               exit 1
             fi
@@ -264,9 +264,9 @@ jobs:
           port: ${{ secrets.VPS_PORT }}
           script: |
             echo "Testing .deployment-info file access..."
-            if [ -f "${{ secrets.VPS_PATH }}/dist/.deployment-info" ]; then
+            if [ -f "${{ secrets.VPS_PATH }}/.deployment-info" ]; then
               echo "File exists on server:"
-              cat "${{ secrets.VPS_PATH }}/dist/.deployment-info"
+              cat "${{ secrets.VPS_PATH }}/.deployment-info"
               echo ""
               echo "Testing HTTP access (should work if Nginx is configured correctly):"
               curl -s http://localhost/.deployment-info || echo "HTTP test failed (this is OK if HTTPS is required)"
