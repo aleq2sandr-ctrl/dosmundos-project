@@ -31,6 +31,7 @@ import LivePage from '@/pages/LivePage';
 import ArticlesPage from '@/pages/ArticlesPage';
 import ArticleDetailPage from '@/pages/ArticleDetailPage';
 import { initGA4, trackPageView } from '@/lib/analyticsService';
+import PlayerDiagnostics from '@/components/debug/PlayerDiagnostics';
 
 // Поддерживаемые языки
 const SUPPORTED_LANGUAGES = ['ru', 'es', 'en', 'de', 'fr', 'pl'];
@@ -116,6 +117,7 @@ const LanguageRouteWrapper = ({ children }) => {
 const AppLayout = ({ user }) => {
   const location = useLocation();
   const { showAuthModal, closeAuthModal } = useEditorAuth();
+  const showDebug = new URLSearchParams(location.search).get('debug') === 'true';
   
   // Determine language from URL
   const pathParts = location.pathname.split('/');
@@ -130,6 +132,7 @@ const AppLayout = ({ user }) => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 text-white flex flex-col">
+      {showDebug && <PlayerDiagnostics />}
       <LanguageRedirect />
       <RouteTracker />
       

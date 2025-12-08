@@ -255,6 +255,7 @@ export const PlayerProvider = ({ children }) => {
     console.error('[PlayerContext] Audio error:', e.target.error);
     console.error('Audio error code:', e.target.error?.code);
     console.error('Audio error message:', e.target.error?.message);
+    console.error('Audio source:', e.target.src);
     
     // Stop playback on error
     setIsPlaying(false);
