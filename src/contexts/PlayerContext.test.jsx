@@ -46,7 +46,7 @@ describe('PlayerContext', () => {
       fireEvent.click(playButton);
     });
 
-    expect(screen.getByTestId('episode-slug')).toBe('test-episode');
+    expect(screen.getByTestId('episode-slug')).toHaveTextContent('test-episode');
     // expect(mockPlay).toHaveBeenCalled(); // This might be async in the implementation
   });
 

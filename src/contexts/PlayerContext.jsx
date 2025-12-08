@@ -22,128 +22,84 @@ export const PlayerProvider = ({ children }) => {
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Helper for safe playback
+  const safePlay = useCallback(async () => {
+    if (!audioRef.current) return;
+    try {
+      await audioRef.current.play();
+      setIsPlaying(true);
+      setAutoplayBlocked(false);
+    } catch (error) {
+      console.error('[PlayerContext] Play error:', error);
+      setIsPlaying(false);
+      if (error.name === 'NotAllowedError') {
+        setAutoplayBlocked(true);
+      }
+    }
+  }, []);
+
   // Play a specific episode
-  const playEpisode = useCallback((episode, startTime = 0) => {
+  const playEpisode = useCallback(async (episode, startTime = 0) => {
     console.log('🎵 [PlayerContext] playEpisode called:', {
       episodeSlug: episode.slug,
       startTime,
       audioUrl: episode.audioUrl || episode.audio_url
     });
     
-    const isSameEpisode = currentEpisode?.slug === episode.slug;
     const audioUrl = episode.audioUrl || episode.audio_url;
     
     if (!audioUrl) {
       console.error('[PlayerContext] No audio URL available for episode:', episode.slug);
       return;
     }
+
+    const isSameEpisode = currentEpisode?.slug === episode.slug;
+    const currentAudioUrl = currentEpisode?.audioUrl || currentEpisode?.audio_url;
+    const isSameAudio = audioUrl === currentAudioUrl;
     
-    if (!isSameEpisode) {
-      console.log('🎵 [PlayerContext] Loading new episode:', episode.slug);
-      setCurrentEpisode(episode);
-      setCurrentTime(startTime);
-      setIsPlaying(true);
-      setIsGlobalPlayerVisible(true);
-      setAutoplayBlocked(false); // Reset blocked state on new episode
-      
-      if (audioRef.current) {
-        console.log('🎵 [PlayerContext] Setting audio src:', audioUrl);
-        // Force reload for new episode
-        audioRef.current.src = audioUrl;
-        audioRef.current.currentTime = startTime;
-        audioRef.current.playbackRate = playbackRate;
-        audioRef.current.load(); // Ensure proper loading
-        
-        // Attempt play after load
-        const attemptPlay = () => {
-          console.log('🎵 [PlayerContext] Attempting to play, readyState:', audioRef.current.readyState);
-          if (audioRef.current && audioRef.current.readyState >= audioRef.current.HAVE_CURRENT_DATA) {
-            audioRef.current.play().then(() => {
-              console.log('🎵 [PlayerContext] Play successful');
-              setAutoplayBlocked(false);
-            }).catch(e => {
-              console.error("[PlayerContext] Play error:", e);
-              setIsPlaying(false);
-              if (e.name === 'NotAllowedError') {
-                console.log('🎵 [PlayerContext] Autoplay blocked by browser policy, waiting for user interaction');
-                setAutoplayBlocked(true);
-                // Don't retry autoplay if blocked by browser policy
-                return;
-              }
-              // Only retry for other types of errors
-              console.log('🎵 [PlayerContext] Retrying play after error');
-              setTimeout(attemptPlay, 100);
-            });
-          } else {
-            // Retry after a short delay
-            console.log('🎵 [PlayerContext] Audio not ready, retrying in 100ms');
-            setTimeout(attemptPlay, 100);
-          }
-        };
-        
-        // Start attempting to play
-        setTimeout(attemptPlay, 50);
-      } else {
-        console.error('🎵 [PlayerContext] No audioRef.current available');
+    if (isSameEpisode && isSameAudio) {
+      console.log('🎵 [PlayerContext] Same episode and audio, ensuring playback');
+      if (Math.abs(currentTime - startTime) > 1) {
+        seek(startTime);
       }
-    } else {
-      // Same episode slug - but audio track may have changed
-      const newAudioUrl = episode.audioUrl || episode.audio_url;
-      const currentAudioUrl = currentEpisode?.audioUrl || currentEpisode?.audio_url;
-
-      if (newAudioUrl && newAudioUrl !== currentAudioUrl) {
-        console.log('🎵 [PlayerContext] Same episode, switching audio track');
-        // Update current episode object to reflect new audio URL/lang
-        setCurrentEpisode(prev => ({ ...prev, ...episode }));
+      if (!isPlaying) {
+        safePlay();
+      }
+      return;
+    }
+    
+    console.log('🎵 [PlayerContext] Loading new episode/audio:', episode.slug);
+    
+    // Update state
+    setCurrentEpisode(episode);
+    setIsGlobalPlayerVisible(true);
+    setAutoplayBlocked(false);
+    
+    if (audioRef.current) {
+      // Pause current playback if any
+      audioRef.current.pause();
+      
+      // Set new source
+      audioRef.current.src = audioUrl;
+      audioRef.current.playbackRate = playbackRate;
+      
+      // Handle start time
+      if (startTime > 0) {
+        audioRef.current.currentTime = startTime;
         setCurrentTime(startTime);
-        setIsPlaying(true);
-        setIsGlobalPlayerVisible(true);
-        setAutoplayBlocked(false);
-
-        if (audioRef.current) {
-          const handleTrackSwitch = () => {
-            if (audioRef.current) {
-              console.log(`🎵 [PlayerContext] Audio loaded. Restoring time to: ${startTime}s`);
-              if (Number.isFinite(startTime) && startTime > 0) {
-                audioRef.current.currentTime = startTime;
-              }
-              
-              audioRef.current.play().then(() => {
-                console.log('🎵 [PlayerContext] Track switch play successful');
-                setAutoplayBlocked(false);
-              }).catch(e => {
-                console.error('[PlayerContext] Play error after track switch:', e);
-                setIsPlaying(false);
-                if (e.name === 'NotAllowedError') {
-                  setAutoplayBlocked(true);
-                }
-              });
-            }
-          };
-
-          // Use one-time event listener to ensure currentTime is set after metadata loads
-          // Add listener BEFORE changing src to ensure we don't miss the event
-          audioRef.current.addEventListener('loadedmetadata', handleTrackSwitch, { once: true });
-
-          audioRef.current.src = newAudioUrl;
-          audioRef.current.playbackRate = playbackRate;
-          audioRef.current.load();
-        }
       } else {
-        console.log('🎵 [PlayerContext] Same episode, ensuring playback');
-        // If same episode, just ensure it's playing
-        if (!isPlaying) {
-          togglePlay();
-        } else {
-          // If playing and seeking to different time
-          if (Math.abs(audioRef.current.currentTime - startTime) > 0.5) {
-            audioRef.current.currentTime = startTime;
-            setCurrentTime(startTime);
-          }
-        }
+        setCurrentTime(0);
+      }
+
+      // Load and play
+      try {
+        await audioRef.current.load();
+        await safePlay();
+      } catch (e) {
+        console.error('[PlayerContext] Error loading/playing:', e);
       }
     }
-  }, [currentEpisode, isPlaying, playbackRate]);
+  }, [currentEpisode, isPlaying, playbackRate, currentTime]);
 
   const togglePlay = useCallback(() => {
     if (!audioRef.current || !audioRef.current.src) {
@@ -156,66 +112,26 @@ export const PlayerProvider = ({ children }) => {
       audioRef.current.pause();
       setIsPlaying(false);
     } else {
-      // Ensure audio is ready before playing
-      if (audioRef.current.readyState >= audioRef.current.HAVE_CURRENT_DATA) {
-        audioRef.current.play().then(() => {
-          setIsPlaying(true);
-          setAutoplayBlocked(false);
-        }).catch(e => {
-          console.error('[PlayerContext] Play error:', e);
-          setIsPlaying(false);
-          if (e.name === 'NotAllowedError') {
-            setAutoplayBlocked(true);
-          }
-        });
-      } else {
-        // Wait for audio to be ready, then play
-        const onCanPlay = () => {
-          audioRef.current?.play().then(() => {
-            setIsPlaying(true);
-            setAutoplayBlocked(false);
-          }).catch(e => {
-            console.error('[PlayerContext] Play error after canplay:', e);
-            setIsPlaying(false);
-            if (e.name === 'NotAllowedError') {
-              setAutoplayBlocked(true);
-            }
-          });
-          audioRef.current?.removeEventListener('canplay', onCanPlay);
-        };
-        
-        audioRef.current.addEventListener('canplay', onCanPlay, { once: true });
-        
-        // Fallback timeout
-        setTimeout(() => {
-          if (audioRef.current) {
-            audioRef.current.removeEventListener('canplay', onCanPlay);
-          }
-        }, 2000);
-      }
+      safePlay();
     }
-  }, [isPlaying]);
+  }, [isPlaying, safePlay]);
 
   const seek = useCallback((time) => {
     if (!audioRef.current) return;
     
-    const clampedTime = Math.max(0, Math.min(time, duration || audioRef.current.duration || 0));
+    const duration = audioRef.current.duration;
+    // If duration is not available yet, we can still try to set currentTime if we know it's valid
+    // or just clamp to 0 if completely unknown. But usually metadata is loaded.
+    const maxTime = Number.isFinite(duration) ? duration : time; 
+    const clampedTime = Math.max(0, Math.min(time, maxTime));
     
     try {
       audioRef.current.currentTime = clampedTime;
       setCurrentTime(clampedTime);
-      
-      // If seeking while playing, ensure playback continues
-      if (isPlaying && audioRef.current.paused) {
-        audioRef.current.play().catch(e => {
-          console.error('[PlayerContext] Play error after seek:', e);
-          setIsPlaying(false);
-        });
-      }
     } catch (error) {
       console.error('[PlayerContext] Seek error:', error);
     }
-  }, [duration, isPlaying]);
+  }, []);
 
   const setRate = useCallback((rate) => {
     setPlaybackRate(rate);
@@ -360,6 +276,7 @@ export const PlayerProvider = ({ children }) => {
       {children}
       <audio
         ref={audioRef}
+        preload="auto"
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={handleLoadedMetadata}
         onEnded={handleEnded}
@@ -367,6 +284,7 @@ export const PlayerProvider = ({ children }) => {
         onPause={handlePause}
         onError={handleError}
         onWaiting={handleWaiting}
+        onStalled={handleWaiting}
         onCanPlay={handleCanPlay}
         onLoadStart={handleLoadStart}
         style={{ display: 'none' }}
