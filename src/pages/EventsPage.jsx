@@ -14,8 +14,8 @@ const EventsPage = () => {
       events: [
         {
           id: 'new-year',
-          title: "Новый год в джунглях",
-          date: "31 декабря - 7 января",
+          title: "Священная Церемония Очищения",
+          date: "31 декабря - 3 января 2025",
           location: "Dos Mundos, Yurimaguas",
           description: "Встречайте Новый год в сердце Амазонии. Уникальная программа, церемонии и погружение в природу.",
           image: "https://images.unsplash.com/photo-1546768292-fb12f6c92568?ixid=MXwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHw%3D&ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80", // Placeholder
@@ -39,8 +39,8 @@ const EventsPage = () => {
       events: [
         {
           id: 'new-year',
-          title: "Año Nuevo en la Selva",
-          date: "31 de diciembre - 7 de enero",
+          title: "Ceremonia Sagrada de Purificación",
+          date: "31 de diciembre - 3 de enero del 2025",
           location: "Dos Mundos, Yurimaguas",
           description: "Celebra el Año Nuevo en el corazón de la Amazonía. Programa único, ceremonias e inmersión en la naturaleza.",
           image: "https://images.unsplash.com/photo-1546768292-fb12f6c92568?ixid=MXwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHw%3D&ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80",
@@ -64,8 +64,8 @@ const EventsPage = () => {
       events: [
         {
           id: 'new-year',
-          title: "New Year in the Jungle",
-          date: "December 31 - January 7",
+          title: "Sacred Purification Ceremony",
+          date: "December 31 - January 3, 2025",
           location: "Dos Mundos, Yurimaguas",
           description: "Celebrate New Year in the heart of the Amazon. Unique program, ceremonies, and immersion in nature.",
           image: "https://images.unsplash.com/photo-1546768292-fb12f6c92568?ixid=MXwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHw%3D&ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80",
