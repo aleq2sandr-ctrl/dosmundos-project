@@ -62,6 +62,11 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Ping for connectivity check
+app.head('/ping', (req, res) => {
+  res.status(200).end();
+});
+
 // Serve static files from dist
 app.use(express.static(path.join(__dirname, 'dist')));
 

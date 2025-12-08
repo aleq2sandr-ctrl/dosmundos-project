@@ -282,7 +282,7 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
     if (action === 'add') {
       const questionPayload = { 
         episode_slug: episodeData.slug, 
-        time: questionData.time, 
+        time: Math.round(questionData.time), 
         title: questionData.title, 
         lang: questionData.lang || langForQuestions,
         is_intro: questionData.isIntro || false,
@@ -293,7 +293,7 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
     } else if (action === 'update') {
       const questionPayload = { 
         title: questionData.title, 
-        time: questionData.time, 
+        time: Math.round(questionData.time), 
         lang: questionData.lang || langForQuestions,
         is_intro: questionData.isIntro || false,
         is_full_transcript: questionData.isFullTranscript || false
