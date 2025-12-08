@@ -158,6 +158,7 @@ const AppLayout = ({ user }) => {
           } />
           
           {/* Новые маршруты с языковым префиксом */}
+          <Route path="/:lang" element={<Navigate to="episodes" replace />} />
           <Route path="/:lang/live" element={
             <LanguageRouteWrapper>
               <LivePage />
