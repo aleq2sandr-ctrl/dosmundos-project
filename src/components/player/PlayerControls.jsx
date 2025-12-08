@@ -29,7 +29,7 @@ const PlayerControls = ({
   if (variant === "timeAdjustment") {
     const handleTimeAdjustAndPlay = (amount) => {
       const currentAudioTime = audioRefCurrentTime ?? 0;
-      const duration = playerDuration ?? Infinity;
+      const duration = playerDuration || Infinity;
       const newTime = Math.max(0, Math.min(duration, currentAudioTime + amount));
 
       if (onAdjustTime) {

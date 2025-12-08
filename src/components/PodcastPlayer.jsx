@@ -312,8 +312,9 @@ const PodcastPlayer = ({
   };
   
   const handleSkip = (seconds) => {
-    const newTime = Math.max(0, Math.min(duration, currentTime + seconds));
-    seek(newTime);
+    // Don't clamp to duration here as it might be 0 if metadata hasn't loaded yet
+    // seek() in PlayerContext handles clamping using audioRef.current.duration as fallback
+    seek(currentTime + seconds);
   };
   
   const navigateQuestion = (direction) => {
