@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getLocaleString } from '@/lib/locales';
-import { articleService } from '@/lib/articleService';
+import { supabase } from '@/lib/supabaseClient';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { User, ArrowRight, Youtube, BookOpen, Search, Loader2 } from 'lucide-react';
@@ -24,7 +24,7 @@ const getCategoryColor = (category) => {
 
 const ArticlesPage = () => {
   const { lang } = useParams();
-  const [articles, setArticles] = useState([]);
+  const [rawArticles, setRawArticles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -43,22 +43,103 @@ const ArticlesPage = () => {
     if (node) observer.current.observe(node);
   }, [loading]);
 
-  // Fetch articles using service
+  // Fetch raw data once
   useEffect(() => {
     const fetchArticles = async () => {
       setLoading(true);
       try {
-        const data = await articleService.getArticles(lang);
-        setArticles(data);
+        // Try fetching from new schema first
+        const { data, error } = await supabase
+          .from('articles_v2')
+          .select(`
+            *,
+            article_translations(title, summary, language_code),
+            article_categories(
+              categories(
+                slug,
+                category_translations(name, language_code)
+              )
+            )
+          `)
+          .order('created_at', { ascending: false });
+
+        if (!error && data) {
+          // Transform new schema to component format
+          const transformed = data.map(a => {
+            const translation = a.article_translations.find(t => t.language_code === lang) || 
+                                a.article_translations.find(t => t.language_code === 'ru') || {};
+            
+            const categories = a.article_categories.map(ac => {
+              const catTrans = ac.categories.category_translations.find(t => t.language_code === lang) ||
+                               ac.categories.category_translations.find(t => t.language_code === 'ru');
+              return catTrans ? catTrans.name : ac.categories.slug;
+            });
+
+            return {
+              slug: a.slug,
+              title: { [lang]: translation.title },
+              summary: { [lang]: translation.summary },
+              categories: categories,
+              author: a.author,
+              youtube_url: a.youtube_url
+            };
+          });
+          setRawArticles(transformed);
+          setLoading(false);
+          return;
+        }
+
+        // Fallback to old schema if new one fails (e.g. tables not created yet)
+        console.warn('New schema fetch failed, falling back to old schema:', error);
+        
+        const { data: oldData, error: oldError } = await supabase
+          .from('articles')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (oldError) throw oldError;
+
+        if (oldData) {
+          setRawArticles(oldData);
+        }
       } catch (error) {
         console.error('Error fetching articles:', error);
+        // Fallback to local JSON
+        try {
+          const response = await fetch('/articles/index.json');
+          if (response.ok) {
+            const data = await response.json();
+            setRawArticles(data.map(a => ({
+              slug: a.id,
+              title: { [lang]: a.title, ru: a.title },
+              summary: { [lang]: a.summary, ru: a.summary },
+              categories: a.categories,
+              author: a.author,
+              youtube_url: a.youtubeUrl
+            })));
+          }
+        } catch (e) {
+          console.error('Fallback failed:', e);
+        }
       } finally {
         setLoading(false);
       }
     };
 
     fetchArticles();
-  }, [lang]);
+  }, [lang]); // Re-fetch when lang changes to get correct translations from DB (or optimize to fetch all langs)
+
+  // Derive localized articles from raw data
+  const articles = useMemo(() => {
+    return rawArticles.map(article => ({
+      id: article.slug,
+      title: article.title?.[lang] || article.title?.['ru'] || article.title?.['en'] || '',
+      summary: article.summary?.[lang] || article.summary?.['ru'] || article.summary?.['en'] || '',
+      categories: article.categories || [],
+      author: article.author,
+      youtubeUrl: article.youtube_url
+    }));
+  }, [rawArticles, lang]);
 
   const categories = useMemo(() => {
     const allCats = new Set();
@@ -87,15 +168,13 @@ const ArticlesPage = () => {
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(a => 
-        a.title?.toLowerCase().includes(query) || 
+        a.title.toLowerCase().includes(query) || 
         (a.summary && a.summary.toLowerCase().includes(query))
       );
     }
 
     return filtered;
   }, [articles, selectedCategory, searchQuery]);
-
-
 
   return (
     <div className="min-h-screen bg-[#fdfbf7] text-slate-900 font-serif">

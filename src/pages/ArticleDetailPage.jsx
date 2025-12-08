@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { getLocaleString } from '@/lib/locales';
-import { articleService } from '@/lib/articleService';
+import { supabase } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, User, Youtube, Share2 } from 'lucide-react';
 
@@ -31,18 +31,105 @@ const ArticleDetailPage = () => {
   useEffect(() => {
     const fetchArticleData = async () => {
       try {
-        const data = await articleService.getArticle(articleId, lang);
-        
-        if (!data) {
-          console.error('Article not found');
+        // Try fetching from new schema first
+        const { data: newArticleData, error: newError } = await supabase
+          .from('articles_v2')
+          .select(`
+            *,
+            article_translations(title, summary, content, language_code),
+            article_categories(
+              categories(
+                slug,
+                category_translations(name, language_code)
+              )
+            )
+          `)
+          .eq('slug', articleId)
+          .single();
+
+        if (!newError && newArticleData) {
+          const translation = newArticleData.article_translations.find(t => t.language_code === lang) || 
+                              newArticleData.article_translations.find(t => t.language_code === 'ru') || {};
+          
+          const categories = newArticleData.article_categories.map(ac => {
+            const catTrans = ac.categories.category_translations.find(t => t.language_code === lang) ||
+                             ac.categories.category_translations.find(t => t.language_code === 'ru');
+            return catTrans ? catTrans.name : ac.categories.slug;
+          });
+
+          setArticle({
+            id: newArticleData.slug,
+            title: translation.title,
+            summary: translation.summary,
+            categories: categories,
+            author: newArticleData.author,
+            youtubeUrl: newArticleData.youtube_url
+          });
+
+          const rawContent = translation.content || '';
+          if (rawContent.includes('<html') || rawContent.includes('<body')) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(rawContent, 'text/html');
+            setContent(doc.body.innerHTML);
+          } else {
+            setContent(rawContent);
+          }
+          setLoading(false);
+          return;
+        }
+
+        // Fallback to old schema
+        const { data: articleData, error } = await supabase
+          .from('articles')
+          .select('*')
+          .eq('slug', articleId)
+          .single();
+
+        if (error || !articleData) {
+          console.error('Error fetching article from Supabase:', error);
+          // Fallback to local file system
+          try {
+            const indexResponse = await fetch('/articles/index.json');
+            if (!indexResponse.ok) throw new Error('Failed to fetch index');
+            const indexData = await indexResponse.json();
+            const foundArticle = indexData.find(a => a.id === articleId);
+            
+            if (foundArticle) {
+              setArticle(foundArticle);
+              const contentResponse = await fetch(foundArticle.contentUrl);
+              if (contentResponse.ok) {
+                const htmlText = await contentResponse.text();
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(htmlText, 'text/html');
+                setContent(doc.body.innerHTML);
+              }
+              setLoading(false);
+              return;
+            }
+          } catch (e) {
+            console.error('Fallback failed:', e);
+          }
+          
           navigate(`/${lang}/articles`);
           return;
         }
 
-        setArticle(data);
+        // Transform Supabase data
+        const transformedArticle = {
+          id: articleData.slug,
+          title: articleData.title[lang] || articleData.title['ru'] || articleData.title['en'],
+          summary: articleData.summary[lang] || articleData.summary['ru'] || articleData.summary['en'],
+          categories: articleData.categories || [],
+          author: articleData.author,
+          youtubeUrl: articleData.youtube_url
+        };
+
+        setArticle(transformedArticle);
         
-        // Parse HTML content
-        const rawContent = data.content || '';
+        // Get content
+        const rawContent = articleData.content[lang] || articleData.content['ru'] || articleData.content['en'] || '';
+        
+        // Parse HTML to extract body content if it's a full document
         if (rawContent.includes('<html') || rawContent.includes('<body')) {
           const parser = new DOMParser();
           const doc = parser.parseFromString(rawContent, 'text/html');
