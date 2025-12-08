@@ -1,6 +1,6 @@
 // Версия кеша - обновляется при каждом деплое для принудительного обновления
 // IMPORTANT: Измените эту версию при каждом деплое, чтобы очистить старые кеши
-const CACHE_VERSION = 'v20251124-123500';
+const CACHE_VERSION = 'v20251208-153500';
 const STATIC_CACHE = 'static-' + CACHE_VERSION;
 const DYNAMIC_CACHE = 'dynamic-' + CACHE_VERSION;
 const AUDIO_CACHE = 'audio-' + CACHE_VERSION;
@@ -173,7 +173,8 @@ function isAudioRequest(request) {
   // Проверяем по домену (для наших аудиофайлов)
   const isAudioDomain = url.hostname.includes('srvstatic.kz') || 
                        url.hostname.includes('archive.org') ||
-                       url.hostname.includes('r2.dev');
+                       url.hostname.includes('r2.dev') ||
+                       url.hostname.includes('hostingersite.com');
   
   return isAudioDestination || hasAudioExtension || acceptsAudio || hasAudioParam || isAudioDomain;
 }
@@ -287,15 +288,32 @@ async function handleAudioRequest(request) {
     // Удаляем Range заголовок
     fullRequest.headers.delete('range');
     
-    const response = await fetch(fullRequest);
+    // Try to fetch with no-cors if cors fails (for opaque responses)
+    let response;
+    try {
+      response = await fetch(fullRequest);
+    } catch (e) {
+      console.log('[SW] CORS fetch failed, trying no-cors', e);
+      const noCorsRequest = new Request(request.url, {
+        method: 'GET',
+        headers: new Headers(request.headers),
+        mode: 'no-cors',
+        credentials: 'omit'
+      });
+      noCorsRequest.headers.delete('range');
+      response = await fetch(noCorsRequest);
+    }
     
-    if (response.ok && response.status === 200) {
+    if ((response.ok && response.status === 200) || response.type === 'opaque') {
       const responseForCache = response.clone();
       
-      manageCacheSize(cache, responseForCache.clone())
-        .then(() => cache.put(cacheKey, responseForCache))
-        .then(() => console.log('[SW] Audio cached fully:', request.url))
-        .catch(err => console.error('[SW] Cache put failed:', err));
+      // Only cache if we can read it (not opaque) or if we decide to cache opaque (risky for quota)
+      if (response.type !== 'opaque') {
+        manageCacheSize(cache, responseForCache.clone())
+          .then(() => cache.put(cacheKey, responseForCache))
+          .then(() => console.log('[SW] Audio cached fully:', request.url))
+          .catch(err => console.error('[SW] Cache put failed:', err));
+      }
       
       return response;
     }

@@ -87,14 +87,13 @@ export const PlayerProvider = ({ children }) => {
       }
     } else {
       // Same episode slug - but audio track may have changed
-      const rawNewAudioUrl = episode.audioUrl || episode.audio_url;
-      const newAudioUrl = getAudioUrl({ ...episode, audio_url: rawNewAudioUrl });
+      const newAudioUrl = episode.audioUrl || episode.audio_url;
       const currentAudioUrl = currentEpisode?.audioUrl || currentEpisode?.audio_url;
 
       if (newAudioUrl && newAudioUrl !== currentAudioUrl) {
         console.log('🎵 [PlayerContext] Same episode, switching audio track');
         // Update current episode object to reflect new audio URL/lang
-        setCurrentEpisode(prev => ({ ...prev, ...episode, audioUrl: newAudioUrl, audio_url: newAudioUrl }));
+        setCurrentEpisode(prev => ({ ...prev, ...episode }));
         setCurrentTime(startTime);
         setIsPlaying(true);
         setIsGlobalPlayerVisible(true);
