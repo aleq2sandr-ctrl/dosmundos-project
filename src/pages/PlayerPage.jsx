@@ -68,6 +68,14 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
   const playerControlsContainerRef = useRef(null);
   const [allEpisodesForPrefetch, setAllEpisodesForPrefetch] = useState([]);
   const [editingQuestion, setEditingQuestion] = useState(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+
+  // Reset edit mode when user logs out
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setIsEditMode(false);
+    }
+  }, [isAuthenticated]);
   
   // Removed automatic recognition flags — recognition must now be triggered manually
 
@@ -284,9 +292,10 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
         episode_slug: episodeData.slug, 
         time: Math.round(questionData.time), 
         title: questionData.title, 
-        lang: questionData.lang || langForQuestions,
-        is_intro: questionData.isIntro || false,
-        is_full_transcript: questionData.isFullTranscript || false
+        lang: questionData.lang || langForQuestions
+        // is_intro and is_full_transcript are not in the DB schema yet
+        // is_intro: questionData.isIntro || false,
+        // is_full_transcript: questionData.isFullTranscript || false
       };
       const { error } = await supabase.from('timecodes').insert(questionPayload).select().single();
       dbError = error;
@@ -294,9 +303,10 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
       const questionPayload = { 
         title: questionData.title, 
         time: Math.round(questionData.time), 
-        lang: questionData.lang || langForQuestions,
-        is_intro: questionData.isIntro || false,
-        is_full_transcript: questionData.isFullTranscript || false
+        lang: questionData.lang || langForQuestions
+        // is_intro and is_full_transcript are not in the DB schema yet
+        // is_intro: questionData.isIntro || false,
+        // is_full_transcript: questionData.isFullTranscript || false
       };
       const { error } = await supabase.from('timecodes').update(questionPayload).eq('id', questionData.id).select().single();
       dbError = error;
@@ -888,6 +898,8 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
                 onToggleShowTranscript={handleToggleShowTranscript}
                 user={user}
                 onTranscriptUpdate={handleTranscriptUpdate}
+                isEditMode={isEditMode}
+                setIsEditMode={setIsEditMode}
                 fetchTranscriptForEpisode={fetchTranscriptForEpisode}
                 isOfflineMode={isOfflineMode}
                 onRecognizeText={handleRecognizeText}
@@ -937,6 +949,7 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
             onSaveEditedSegment={handleSegmentEdit}
             onAddQuestionFromSegment={openAddQuestionFromSegmentDialog}
             onEditQuestion={handleEditQuestion}
+            isEditMode={isEditMode}
           />
         </div>
       </div>

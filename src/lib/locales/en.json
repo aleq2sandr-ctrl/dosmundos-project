@@ -1,4 +1,6 @@
 {
+  "enterEditMode": "Enter Edit Mode",
+  "exitEditMode": "Exit Edit Mode",
   "appName": "Dos Mundos Radio",
   "loading": "Loading...",
   "loadingPodcast": "Loading podcast...",

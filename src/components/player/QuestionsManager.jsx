@@ -30,7 +30,8 @@ const QuestionsManager = ({
   onTranscriptLocalUpdate,
   onSaveEditedSegment,
   onAddQuestionFromSegment,
-  onEditQuestion
+  onEditQuestion,
+  isEditMode
 }) => {
   const [activeQuestionId, setActiveQuestionId] = useState(null);
   const [expandedById, setExpandedById] = useState({});
@@ -102,7 +103,11 @@ const QuestionsManager = ({
   const handleActivateQuestion = useCallback((q) => {
     onQuestionJump(q.time, `question-${q.id}`, true);
     setActiveQuestionId(q.id);
-    if (!disableAutomaticCollapse) setExpandedById({ [q.id]: true });
+    if (!disableAutomaticCollapse) {
+      setExpandedById({ [q.id]: true });
+    } else {
+      setExpandedById(prev => ({ ...prev, [q.id]: true }));
+    }
   }, [onQuestionJump, disableAutomaticCollapse]);
 
   const handleSegmentClick = useCallback((timeInSeconds) => {
@@ -161,6 +166,7 @@ const QuestionsManager = ({
           segmentToHighlight={segmentToHighlight}
           transcriptLoading={transcriptLoading}
           questionRangeEndMs={questionEndTimeMsMap[q.id]}
+          isEditMode={isEditMode}
         />
       ))}
     </div>

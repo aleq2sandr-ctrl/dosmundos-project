@@ -61,7 +61,9 @@ const PodcastPlayer = ({
   isRecognizingText,
   isRecognizingQuestions,
   isSmartSegmenting,
-  shouldPreserveState = false
+  shouldPreserveState = false,
+  isEditMode,
+  setIsEditMode
 }) => {
   
   const { toast } = useToast();
@@ -544,6 +546,10 @@ const PodcastPlayer = ({
           onOpenAddQuestionDialog={handleOpenAddQuestionDialogFromPlayer}
           episodeDate={episodeDate}
           isOfflineMode={isOfflineMode}
+          isEditMode={isEditMode}
+          setIsEditMode={setIsEditMode}
+          isAuthenticated={isAuthenticated}
+          openAuthModal={openAuthModal}
           // Audio Track Props
           availableAudioVariants={episodeData?.available_variants || []}
           selectedAudioLang={selectedAudioLang}

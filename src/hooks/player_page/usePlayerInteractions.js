@@ -8,7 +8,11 @@ const usePlayerInteractions = (audioRef, playerControlsContainerRef, episodeSlug
   const [jumpDetails, setJumpDetails] = useState({ time: null, id: null, questionId: null, playAfterJump: false, segmentToHighlight: null });
   const [showFloatingControls, setShowFloatingControls] = useState(false);
   const [playerState, setPlayerState] = useState({ isPlaying: false, currentTime: 0, duration: 0, activeQuestionTitle: '' });
-  const [showTranscriptUI, setShowTranscriptUI] = useState(initialShowTranscript);
+  const [showTranscriptUI, setShowTranscriptUI] = useState(() => {
+    // Check localStorage first, fallback to initialShowTranscript
+    const saved = localStorage.getItem('showTranscriptUI');
+    return saved !== null ? saved === 'true' : initialShowTranscript;
+  });
 
 
   const didDefaultAutoplayRef = useRef(false);
@@ -98,7 +102,11 @@ const usePlayerInteractions = (audioRef, playerControlsContainerRef, episodeSlug
   }, []);
 
   const handleToggleShowTranscript = useCallback(() => {
-    setShowTranscriptUI(prev => !prev);
+    setShowTranscriptUI(prev => {
+      const newValue = !prev;
+      localStorage.setItem('showTranscriptUI', String(newValue));
+      return newValue;
+    });
   }, []);
 
   const handleFloatingPlayerSkip = useCallback((seconds) => {

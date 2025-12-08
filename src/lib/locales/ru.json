@@ -1,4 +1,6 @@
 {
+  "enterEditMode": "Войти в режим редактирования",
+  "exitEditMode": "Выйти из режима редактирования",
   "appName": "Dos Mundos Radio",
   "loading": "Загрузка...",
   "loadingPodcast": "Загрузка подкаста...",
