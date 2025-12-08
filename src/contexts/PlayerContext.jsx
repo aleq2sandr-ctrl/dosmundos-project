@@ -23,20 +23,14 @@ export const PlayerProvider = ({ children }) => {
 
   // Play a specific episode
   const playEpisode = useCallback((episode, startTime = 0) => {
-    // Sanitize audio URL using the shared utility
-    // This handles the Hostinger domain fix and other potential issues
-    const rawAudioUrl = episode.audioUrl || episode.audio_url;
-    const sanitizedAudioUrl = getAudioUrl({ ...episode, audio_url: rawAudioUrl });
-    
     console.log('🎵 [PlayerContext] playEpisode called:', {
       episodeSlug: episode.slug,
       startTime,
-      rawAudioUrl,
-      sanitizedAudioUrl
+      audioUrl: episode.audioUrl || episode.audio_url
     });
     
     const isSameEpisode = currentEpisode?.slug === episode.slug;
-    const audioUrl = sanitizedAudioUrl;
+    const audioUrl = episode.audioUrl || episode.audio_url;
     
     if (!audioUrl) {
       console.error('[PlayerContext] No audio URL available for episode:', episode.slug);
