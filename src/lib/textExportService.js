@@ -124,9 +124,9 @@ class TextExportService {
       // Экспорт выбранных вопросов
       const filteredQuestions = questions.filter(q => selectedQuestions.includes(q.id));
       if (format === 'txt') {
-        content = this.generateQuestionsTXT(filteredQuestions, options, transcript);
+        content = this.generateQuestionsTXT(filteredQuestions, options, transcript, questions);
       } else if (format === 'doc') {
-        content = this.generateQuestionsDOC(filteredQuestions, options, transcript);
+        content = this.generateQuestionsDOC(filteredQuestions, options, transcript, questions);
       }
     }
     
@@ -286,17 +286,21 @@ class TextExportService {
   }
 
   // Генерация TXT для вопросов
-  generateQuestionsTXT(questions, options, transcript = null) {
+  generateQuestionsTXT(questions, options, transcript = null, allQuestions = null) {
     let text = '';
+    const sourceQuestions = allQuestions || questions;
     
-    questions.forEach((question, index) => {
+    questions.forEach((question) => {
       if (options.includeTimings) {
         text += `[${this.formatTime(question.time)}] `;
       }
       text += `ВОПРОС: ${question.title}\n`;
       
       // Получаем текст от этого вопроса до следующего
-      const questionText = this.getQuestionText(question, questions, index, transcript, options);
+      const originalIndex = sourceQuestions.findIndex(q => q.id === question.id);
+      const index = originalIndex !== -1 ? originalIndex : sourceQuestions.indexOf(question);
+
+      const questionText = this.getQuestionText(question, sourceQuestions, index, transcript, options);
       if (questionText.trim()) {
         text += `${questionText}\n`;
       }
@@ -307,10 +311,11 @@ class TextExportService {
   }
 
   // Генерация DOC для вопросов
-  generateQuestionsDOC(questions, options, transcript = null) {
+  generateQuestionsDOC(questions, options, transcript = null, allQuestions = null) {
     let html = '<html><head><meta charset="UTF-8"><title>Вопросы</title></head><body>';
+    const sourceQuestions = allQuestions || questions;
     
-    questions.forEach((question, index) => {
+    questions.forEach((question) => {
       html += '<h2>';
       if (options.includeTimings) {
         html += `[${this.formatTime(question.time)}] `;
@@ -318,7 +323,10 @@ class TextExportService {
       html += `${question.title}</h2>`;
       
       // Получаем текст от этого вопроса до следующего
-      const questionText = this.getQuestionText(question, questions, index, transcript, options);
+      const originalIndex = sourceQuestions.findIndex(q => q.id === question.id);
+      const index = originalIndex !== -1 ? originalIndex : sourceQuestions.indexOf(question);
+
+      const questionText = this.getQuestionText(question, sourceQuestions, index, transcript, options);
       if (questionText.trim()) {
         html += `<p>${questionText}</p>`;
       }
