@@ -20,6 +20,7 @@ export const PlayerProvider = ({ children }) => {
   const [isGlobalPlayerVisible, setIsGlobalPlayerVisible] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Play a specific episode
   const playEpisode = useCallback((episode, startTime = 0) => {
@@ -247,10 +248,33 @@ export const PlayerProvider = ({ children }) => {
 
   const handleEnded = () => {
     setIsPlaying(false);
+    setIsLoading(false);
   };
 
-  const handlePlay = () => setIsPlaying(true);
-  const handlePause = () => setIsPlaying(false);
+  const handlePlay = () => {
+    setIsPlaying(true);
+    setIsLoading(false);
+  };
+
+  const handlePause = () => {
+    setIsPlaying(false);
+    setIsLoading(false);
+  };
+
+  const handleWaiting = () => {
+    console.log('🎵 [PlayerContext] Audio waiting/buffering...');
+    setIsLoading(true);
+  };
+
+  const handleCanPlay = () => {
+    console.log('🎵 [PlayerContext] Audio can play');
+    setIsLoading(false);
+  };
+
+  const handleLoadStart = () => {
+    console.log('🎵 [PlayerContext] Audio load start');
+    setIsLoading(true);
+  };
 
   const handleError = (e) => {
     console.error('[PlayerContext] Audio error:', e.target.error);
@@ -260,6 +284,7 @@ export const PlayerProvider = ({ children }) => {
     
     // Stop playback on error
     setIsPlaying(false);
+    setIsLoading(false);
     
     // Attempt to recover from network/decode errors
     if (e.target.error?.code === e.target.error?.MEDIA_ERR_NETWORK || 
@@ -329,7 +354,8 @@ export const PlayerProvider = ({ children }) => {
       setIsGlobalPlayerVisible,
       closeGlobalPlayer,
       autoplayBlocked,
-      setAutoplayBlocked
+      setAutoplayBlocked,
+      isLoading
     }}>
       {children}
       <audio
@@ -340,6 +366,9 @@ export const PlayerProvider = ({ children }) => {
         onPlay={handlePlay}
         onPause={handlePause}
         onError={handleError}
+        onWaiting={handleWaiting}
+        onCanPlay={handleCanPlay}
+        onLoadStart={handleLoadStart}
         style={{ display: 'none' }}
       />
     </PlayerContext.Provider>

@@ -10,6 +10,7 @@ import PlayerSettingsMenu from './PlayerSettingsMenu';
 const PlayerUIControls = React.memo(({
   activeQuestionTitle,
   isPlaying,
+  isLoading,
   currentLanguage,
   currentTime,
   duration,
@@ -95,6 +96,7 @@ const PlayerUIControls = React.memo(({
           </Button>
           <PlayerControls
             isPlaying={isPlaying}
+            isLoading={isLoading}
             onPlayPause={onTogglePlayPause}
             onSkip={onSkip}
             variant="compact"

@@ -87,7 +87,8 @@ const PodcastPlayer = ({
     audioRef: contextAudioRef,
     playEpisode,
     autoplayBlocked,
-    setAutoplayBlocked
+    setAutoplayBlocked,
+    isLoading
   } = usePlayer();
 
   // Sync autoplay blocked state
@@ -525,6 +526,7 @@ const PodcastPlayer = ({
         <PlayerUIControls
           activeQuestionTitle={activeQuestionTitleState}
           isPlaying={isPlayingState}
+          isLoading={isLoading}
           currentLanguage={currentLanguage}
           currentTime={currentTimeState}
           duration={durationState}

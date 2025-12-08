@@ -21,7 +21,17 @@ async function verifyMigration() {
 
   // Check Translations
   const { count: transCount } = await supabase.from('article_translations').select('*', { count: 'exact', head: true });
-  console.log(`Article Translations count: ${transCount}`);
+  console.log(`Article Translations count: ${transCount} (Expected: ${artCount * 6})`);
+
+  // Check Translations per language
+  const languages = ['ru', 'en', 'es', 'de', 'fr', 'pl'];
+  for (const lang of languages) {
+    const { count } = await supabase
+      .from('article_translations')
+      .select('*', { count: 'exact', head: true })
+      .eq('language_code', lang);
+    console.log(`Translations for ${lang}: ${count}`);
+  }
 
   // Check Category Links
   const { count: linkCount } = await supabase.from('article_categories').select('*', { count: 'exact', head: true });

@@ -1,10 +1,11 @@
 import React from 'react';
-import { Play, Pause, RotateCcw, RotateCw } from 'lucide-react';
+import { Play, Pause, RotateCcw, RotateCw, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getLocaleString } from '@/lib/locales';
 
 const PlayerControls = ({
   isPlaying,
+  isLoading,
   onPlayPause,
   onSkip,
   variant = "default",
@@ -89,7 +90,11 @@ const PlayerControls = ({
         className={`bg-purple-600 text-white hover:bg-purple-700 rounded-full flex items-center justify-center shadow-lg ${mainButtonSize}`}
         aria-label={isPlaying ? getLocaleString('playerPause', currentLanguage) : getLocaleString('playerPlay', currentLanguage)}
       >
-        {isPlaying ? <Pause className={mainIconSize} /> : <Play className={mainIconSize} />}
+        {isLoading ? (
+          <Loader2 className={`${mainIconSize} animate-spin`} />
+        ) : (
+          isPlaying ? <Pause className={mainIconSize} /> : <Play className={mainIconSize} />
+        )}
       </Button>
 
       <Button
