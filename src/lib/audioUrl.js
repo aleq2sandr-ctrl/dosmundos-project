@@ -7,7 +7,7 @@ export const getAudioUrl = (episode) => {
   // Приоритет: audio_url (полная ссылка из Supabase)
   if (episode.audio_url) {
     // Fix for broken Hostinger domain
-    if (episode.audio_url.includes('silver-lemur-512881.hostingersite.com')) {
+    if (episode.audio_url.includes('silver-lemur-512881.hostingersite.com') || episode.audio_url.includes('hostingersite.com')) {
       const filename = episode.audio_url.split('/').pop();
       return `${AUDIO_PUBLIC_BASE}/${filename}`;
     }

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useRef, useEffect, useCallback } from 'react';
+import { getAudioUrl } from '@/lib/audioUrl';
 
 const PlayerContext = createContext(null);
 
@@ -22,14 +23,20 @@ export const PlayerProvider = ({ children }) => {
 
   // Play a specific episode
   const playEpisode = useCallback((episode, startTime = 0) => {
+    // Sanitize audio URL using the shared utility
+    // This handles the Hostinger domain fix and other potential issues
+    const rawAudioUrl = episode.audioUrl || episode.audio_url;
+    const sanitizedAudioUrl = getAudioUrl({ ...episode, audio_url: rawAudioUrl });
+    
     console.log('🎵 [PlayerContext] playEpisode called:', {
       episodeSlug: episode.slug,
       startTime,
-      audioUrl: episode.audioUrl || episode.audio_url
+      rawAudioUrl,
+      sanitizedAudioUrl
     });
     
     const isSameEpisode = currentEpisode?.slug === episode.slug;
-    const audioUrl = episode.audioUrl || episode.audio_url;
+    const audioUrl = sanitizedAudioUrl;
     
     if (!audioUrl) {
       console.error('[PlayerContext] No audio URL available for episode:', episode.slug);
@@ -86,13 +93,14 @@ export const PlayerProvider = ({ children }) => {
       }
     } else {
       // Same episode slug - but audio track may have changed
-      const newAudioUrl = episode.audioUrl || episode.audio_url;
+      const rawNewAudioUrl = episode.audioUrl || episode.audio_url;
+      const newAudioUrl = getAudioUrl({ ...episode, audio_url: rawNewAudioUrl });
       const currentAudioUrl = currentEpisode?.audioUrl || currentEpisode?.audio_url;
 
       if (newAudioUrl && newAudioUrl !== currentAudioUrl) {
         console.log('🎵 [PlayerContext] Same episode, switching audio track');
         // Update current episode object to reflect new audio URL/lang
-        setCurrentEpisode(prev => ({ ...prev, ...episode }));
+        setCurrentEpisode(prev => ({ ...prev, ...episode, audioUrl: newAudioUrl, audio_url: newAudioUrl }));
         setCurrentTime(startTime);
         setIsPlaying(true);
         setIsGlobalPlayerVisible(true);
