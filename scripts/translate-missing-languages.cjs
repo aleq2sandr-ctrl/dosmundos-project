@@ -23,7 +23,7 @@ const LANG_NAMES = {
   pl: 'Polish'
 };
 
-async function translateText(text, targetLangCode, isHtml = false) {
+async function translateText(text, targetLangCode, isHtml = false, retryCount = 0) {
   if (!text) return '';
   
   const targetLang = LANG_NAMES[targetLangCode] || targetLangCode;
@@ -41,6 +41,9 @@ async function translateText(text, targetLangCode, isHtml = false) {
     temperature: 0.3
   });
 
+  // Add delay before request to avoid rate limits
+  await new Promise(resolve => setTimeout(resolve, 2000));
+
   return new Promise((resolve, reject) => {
     const req = https.request({
       hostname: 'api.deepseek.com',
@@ -54,9 +57,18 @@ async function translateText(text, targetLangCode, isHtml = false) {
     }, (res) => {
       let body = '';
       res.on('data', chunk => body += chunk);
-      res.on('end', () => {
+      res.on('end', async () => {
         if (res.statusCode !== 200) {
-          console.error(`API Error: ${res.statusCode} ${body}`);
+          console.error(`API Error: ${res.statusCode} ${body.substring(0, 100)}...`);
+          
+          // Retry on 429 (Too Many Requests) or 5xx errors, or 202 if it's a temporary state
+          if (retryCount < 3 && (res.statusCode === 429 || res.statusCode >= 500 || res.statusCode === 202)) {
+            console.log(`Retrying... (${retryCount + 1}/3)`);
+            await new Promise(r => setTimeout(r, 5000 * (retryCount + 1))); // Exponential backoff
+            resolve(await translateText(text, targetLangCode, isHtml, retryCount + 1));
+            return;
+          }
+          
           resolve(null); // Return null on failure
           return;
         }
