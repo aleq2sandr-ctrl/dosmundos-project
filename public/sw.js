@@ -539,11 +539,12 @@ async function queueOfflineRequest(request) {
 
 // Обработка сообщений от основного потока
 self.addEventListener('message', (event) => {
-  const { type, data } = event.data;
+  const { type } = event.data;
+  const payload = event.data.data || event.data;
   
   switch (type) {
     case 'CACHE_AUDIO':
-      cacheAudioFile(data.url);
+      if (payload && payload.url) cacheAudioFile(payload.url);
       break;
     case 'CLEAR_CACHE':
       clearAllCaches();
@@ -552,7 +553,7 @@ self.addEventListener('message', (event) => {
       syncOfflineRequests();
       break;
     case 'REFRESH_AUDIO_CACHE':
-      refreshAudioCache(data.url);
+      if (payload && payload.url) refreshAudioCache(payload.url);
       break;
   }
 });
