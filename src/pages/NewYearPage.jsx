@@ -8,15 +8,15 @@ const NewYearPage = () => {
 
   const content = {
     ru: {
-      title: "Священная Церемония Очищения",
-      subtitle: "31 декабря - 3 января 2025",
+      title: "Новый Год в центре Дос Мундос",
+      subtitle: "31 декабря - 3 января 2026",
       description: [
-        "Природа по божественному замыслу сохраняет в неприкосновенности древнюю мудрость — богатство, которое мы забыли под разрушительным влиянием мира, в котором живем. В этом смысле Центр Интегрального Развития 'Dos Mundos' спасает, переоценивает эти знания и распространяет их по всему миру. Так, в этот раз он стремится приблизить нас и ввести в мир физио-энергетического очищения через прием растений, очистительные ванны, соединение и синхронизацию с различными элементами, достигая гармонизации и выравнивания чакр или энергетических центров, которые жизненно важны для функционирования и равновесия всего нашего существования.",
+        "Природа по божественному замыслу сохраняет в неприкосновенности древнюю мудрость — богатство, которое мы забыли под разрушительным влиянием мира, в котором живем. В этом смысле Центр Интегрального Развития 'Dos Mundos' сохраняет, переоценивает эти знания и распространяет их по всему миру. Так, в этот раз он стремится приблизить нас и ввести в мир физио-энергетического очищения через прием растений, очистительные ванны, соединение и синхронизацию с различными элементами, достигая гармонизации и выравнивания чакр или энергетических центров, которые жизненно важны для функционирования и равновесия всего нашего существования.",
         "CDI 'Dos Mundos' представляет и предлагает вам Ванны Цветения (Baños de Florecimiento) как очистительные и обновляющие ванны с использованием различных амазонских, андских и прибрежных растений, которые помогают благополучию человека. Эти ванны имеют процесс приготовления, как это делали наши предки в различных событиях.",
         "В настоящее время, благодаря Вселенной, достигаются вдохновляющие результаты, за которые мы благодарны каждому из вас за то, что позволили нам быть частью вашего продвижения и трансформации."
       ],
       eventDetails: {
-        invitation: "31 декабря, 1, 2, 3... января 2025 года, вы сердечно приглашаетесь принять участие в СВЯЩЕННОЙ ЦЕРЕМОНИИ ОЧИЩЕНИЯ с 5 элементами (Ванны Цветения), которая пройдет на 19 км дороги Юримагуас - Тарапото.",
+        invitation: "31 декабря, 1, 2, 3... января 2025 года, вы приглашаетесь принять участие в СВЯЩЕННОЙ ЦЕРЕМОНИИ ОЧИЩЕНИЯ с 5 элементами (Ванны Цветения), которая пройдет на 19 км дороги Юримагуас - Тарапото.",
         includes: {
           title: "ВКЛЮЧАЕТ",
           items: [
@@ -42,15 +42,15 @@ const NewYearPage = () => {
       }
     },
     es: {
-      title: "Ceremonia Sagrada de Purificación",
-      subtitle: "31 de diciembre - 3 de enero del 2025",
+      title: "Año Nuevo en el Centro Dos Mundos",
+      subtitle: "31 de diciembre - 3 de enero del 2026",
       description: [
         "La naturaleza por creación divina, mantiene intacta la sabiduría ancestral, riqueza que hemos olvidado por la influencia desgarradora del mundo en el que vivimos. En este sentido, el Centro de Desarrollo Integral \"Dos Mundos\" rescata, revalora estos conocimientos y los difunde por el mundo entero. Es así, que en esta oportunidad busca acercarnos e introducirnos al mundo de la depuración Fisio energética a través de la ingesta de plantas, baños depurativos, conexión y sincronización con diversos elementos, logrando armonizar y alinear los chacras o centros energéticos, los cuales son vitales para el funcionamiento y equilibrio de toda nuestra existencia.",
         "El CDI \"Dos Mundos\", les presenta y ofrece los Baños de florecimiento, como baños depurativos y renovadores a través de las distintas plantas amazónicas, andinas y costeñas que ayudan al bienestar del hombre. Estos baños tienen un proceso de preparación como lo hacían nuestros antepasados en distintos eventos.",
         "Actualmente, gracias al Universo, se viene logrando resultados inspiradores de los cuales estamos agradecidos con cada uno de ustedes por permitirnos ser parte de su avance y transformación."
       ],
       eventDetails: {
-        invitation: "Este 31, 1, 2, 3… de enero del 2025, están cordialmente invitados a participar en la CEREMONIA SAGRADA DE PURIFICACIÓN con 5 elementos (Baños de Florecimiento) que se desarrollará en el km 19 carretera Yurimaguas - Tarapoto.",
+        invitation: "Este 31, 1, 2, 3… de enero del 2026, están cordialmente invitados a participar en la CEREMONIA SAGRADA DE PURIFICACIÓN con 5 elementos (Baños de Florecimiento) que se desarrollará en el km 19 carretera Yurimaguas - Tarapoto.",
         includes: {
           title: "INCLUYE",
           items: [
@@ -76,15 +76,15 @@ const NewYearPage = () => {
       }
     },
     en: {
-      title: "Sacred Purification Ceremony",
-      subtitle: "December 31 - January 3, 2025",
+      title: "New Year at Dos Mundos Center",
+      subtitle: "December 31 - January 3, 2026",
       description: [
         "Nature, by divine creation, keeps ancestral wisdom intact, a wealth we have forgotten due to the heartbreaking influence of the world we live in. In this sense, the Integral Development Center 'Dos Mundos' rescues, revalues these knowledges and spreads them throughout the world. Thus, on this opportunity, it seeks to bring us closer and introduce us to the world of Physio-energetic purification through the ingestion of plants, purifying baths, connection and synchronization with various elements, achieving harmony and alignment of the chakras or energy centers, which are vital for the functioning and balance of our entire existence.",
         "The CDI 'Dos Mundos' presents and offers you Flowering Baths, as purifying and renewing baths through the different Amazonian, Andean and coastal plants that help man's well-being. These baths have a preparation process as our ancestors did in different events.",
         "Currently, thanks to the Universe, inspiring results are being achieved for which we are grateful to each of you for allowing us to be part of your progress and transformation."
       ],
       eventDetails: {
-        invitation: "This December 31st, January 1st, 2nd, 3rd... 2025, you are cordially invited to participate in the SACRED PURIFICATION CEREMONY with 5 elements (Flowering Baths) which will take place at km 19 Yurimaguas - Tarapoto road.",
+        invitation: "This December 31st, January 1st, 2nd, 3rd... 2026, you are cordially invited to participate in the SACRED PURIFICATION CEREMONY with 5 elements (Flowering Baths) which will take place at km 19 Yurimaguas - Tarapoto road.",
         includes: {
           title: "INCLUDES",
           items: [
