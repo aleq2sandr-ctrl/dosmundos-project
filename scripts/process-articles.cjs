@@ -54,9 +54,17 @@ function findFile(title, fileList) {
     return null;
 }
 
-// Helper to generate ID
+// Helper to generate ID (Slug)
 function generateId(title) {
-    return crypto.createHash('md5').update(title).digest('hex').substring(0, 10);
+    const mapping = {
+        'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'yo', 'ж': 'zh',
+        'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm', 'н': 'n', 'о': 'o',
+        'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u', 'ф': 'f', 'х': 'kh', 'ц': 'ts',
+        'ч': 'ch', 'ш': 'sh', 'щ': 'shch', 'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu',
+        'я': 'ya', ' ': '-'
+    };
+    
+    return title.toLowerCase().split('').map(char => mapping[char] || (/[a-z0-9-]/.test(char) ? char : '')).join('').replace(/-+/g, '-').replace(/^-|-$/g, '');
 }
 
 // Main process
@@ -115,14 +123,9 @@ async function main() {
             const bodyMatch = htmlContent.match(/<body[^>]*>([\s\S]*)<\/body>/i);
             const bodyContent = bodyMatch ? bodyMatch[1] : htmlContent;
             
-            // Clean up styles slightly if needed, but textutil output is usually okay-ish
-            // We might want to strip some inline styles or classes if they conflict, 
-            // but for now let's keep it as is or just wrap it.
-            
             fs.writeFileSync(htmlPath, bodyContent);
             
             // Generate Instant View HTML
-            // Needs to be a full HTML page
             const ivHtml = `<!DOCTYPE html>
 <html lang="ru">
 <head>
