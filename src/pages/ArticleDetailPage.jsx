@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { getLocaleString } from '@/lib/locales';
+import { getLocaleString, getPluralizedLocaleString } from '@/lib/locales';
 import { supabase } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, User, Youtube, Share2 } from 'lucide-react';
+import { ArrowLeft, User, Youtube, Share2, Clock, Calendar } from 'lucide-react';
+import { calculateReadingTime, formatArticleDate } from '@/lib/utils';
 
 // Color palette for categories (same as ArticlesPage)
 const categoryColors = {
@@ -48,14 +49,17 @@ const ArticleDetailPage = () => {
           .single();
 
         if (!newError && newArticleData) {
-          const translation = newArticleData.article_translations.find(t => t.language_code === lang) || 
-                              newArticleData.article_translations.find(t => t.language_code === 'ru') || {};
+          const translations = newArticleData.article_translations || [];
+          const translation = translations.find(t => t.language_code === lang) || 
+                              translations.find(t => t.language_code === 'ru') || {};
           
-          const categories = newArticleData.article_categories.map(ac => {
-            const catTrans = ac.categories.category_translations.find(t => t.language_code === lang) ||
-                             ac.categories.category_translations.find(t => t.language_code === 'ru');
-            return catTrans ? catTrans.name : ac.categories.slug;
-          });
+          const articleCategories = newArticleData.article_categories || [];
+          const categories = articleCategories.map(ac => {
+            const catTranslations = ac.categories?.category_translations || [];
+            const catTrans = catTranslations.find(t => t.language_code === lang) ||
+                             catTranslations.find(t => t.language_code === 'ru');
+            return catTrans ? catTrans.name : ac.categories?.slug;
+          }).filter(Boolean);
 
           setArticle({
             id: newArticleData.slug,
@@ -63,7 +67,8 @@ const ArticleDetailPage = () => {
             summary: translation.summary,
             categories: categories,
             author: newArticleData.author,
-            youtubeUrl: newArticleData.youtube_url
+            youtubeUrl: newArticleData.youtube_url,
+            publishedAt: newArticleData.published_at
           });
 
           const rawContent = translation.content || '';
@@ -220,11 +225,45 @@ const ArticleDetailPage = () => {
               {article.title}
             </h1>
             
-            <div className="flex items-center justify-center gap-6 text-slate-500 text-sm uppercase tracking-wider font-medium border-y border-slate-200 py-4 font-sans">
+            <div className="flex flex-wrap md:flex-nowrap items-center justify-center gap-4 md:gap-4 text-slate-500 text-sm uppercase tracking-wider font-medium border-y border-slate-200 py-4 font-sans">
               <div className="flex items-center gap-2">
                 <User className="w-4 h-4" />
                 {article.author}
               </div>
+              {article.publishedAt && (
+                <>
+                  <span className="hidden md:inline text-slate-300">•</span>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4" />
+                    <span className="normal-case">{formatArticleDate(article.publishedAt, lang)}</span>
+                  </div>
+                </>
+              )}
+              {content && (
+                <>
+                  <span className="hidden md:inline text-slate-300">•</span>
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4" />
+                    <span className="normal-case">{getPluralizedLocaleString('reading_time_minutes', lang, calculateReadingTime(content, lang), { count: calculateReadingTime(content, lang) })}</span>
+                  </div>
+                </>
+              )}
+              {article.youtubeUrl && (
+                <>
+                  <span className="hidden md:inline text-slate-300">•</span>
+                  <a 
+                    href={article.youtubeUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 hover:text-red-600 transition-colors group/yt"
+                  >
+                    <Youtube className="w-4 h-4 group-hover/yt:text-red-600" />
+                    <span className="normal-case border-b border-transparent group-hover/yt:border-red-600">
+                      {getLocaleString('watch_on_youtube', lang)}
+                    </span>
+                  </a>
+                </>
+              )}
             </div>
           </header>
 
@@ -239,28 +278,7 @@ const ArticleDetailPage = () => {
             dangerouslySetInnerHTML={{ __html: content }}
           />
           
-          {article.youtubeUrl && (
-            <div className="mt-16 flex justify-center">
-              <a 
-                href={article.youtubeUrl} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 px-6 py-4 bg-white border border-slate-200 text-slate-900 rounded-xl hover:bg-slate-50 transition-all shadow-md hover:shadow-lg hover:-translate-y-1 font-sans group"
-              >
-                <div className="bg-red-600 text-white p-2 rounded-full group-hover:scale-110 transition-transform">
-                  <Youtube className="w-6 h-6" />
-                </div>
-                <div className="text-left">
-                  <div className="font-bold text-lg leading-none mb-1">
-                    {getLocaleString('watch_on_youtube', lang)}
-                  </div>
-                  <div className="text-xs text-slate-500 font-medium uppercase tracking-wider">
-                    {getLocaleString('video_version', lang)}
-                  </div>
-                </div>
-              </a>
-            </div>
-          )}
+
         </article>
       </div>
     </div>

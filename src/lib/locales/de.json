@@ -870,5 +870,16 @@
   "recognizingQuestions": "Fragen werden erkannt...",
   "transcribing": "Transkribiere...",
   "autoRecognizeQuestions": "Automatische KI-Fragen-Erkennung",
-  "autoRecognizeQuestionsDesc": "Fragen automatisch beim Laden einer Episode generieren"
+  "autoRecognizeQuestionsDesc": "Fragen automatisch beim Laden einer Episode generieren",
+  "blog_title": "Blog",
+  "blog_subtitle": "Erforschen Sie die Tiefen der inneren Welt durch universelle Botschaften.",
+  "search_articles_placeholder": "Artikel suchen...",
+  "all_categories": "Alle",
+  "read_article": "Lesen",
+  "back_to_articles": "Zurück zu Artikeln",
+  "watch_on_youtube": "Auf YouTube ansehen",
+  "video_version": "Videoversion",
+  "reading_time_minutes_one": "{count} Minute Lesezeit",
+  "reading_time_minutes_many": "{count} Minuten Lesezeit",
+  "published_on": "Veröffentlicht"
 }

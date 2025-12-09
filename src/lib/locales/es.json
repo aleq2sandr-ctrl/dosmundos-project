@@ -889,5 +889,8 @@
   "read_article": "Leer",
   "back_to_articles": "Volver a los artículos",
   "watch_on_youtube": "Ver en YouTube",
-  "video_version": "Versión en video"
+  "video_version": "Versión en video",
+  "reading_time_minutes_one": "{count} minuto de lectura",
+  "reading_time_minutes_many": "{count} minutos de lectura",
+  "published_on": "Publicado"
 }

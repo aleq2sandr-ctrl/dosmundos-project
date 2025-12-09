@@ -859,5 +859,9 @@
   "read_article": "Читать",
   "back_to_articles": "Назад к статьям",
   "watch_on_youtube": "Смотреть на YouTube",
-  "video_version": "Видео версия статьи"
+  "video_version": "Видео версия статьи",
+  "reading_time_minutes_one": "{count} минута чтения",
+  "reading_time_minutes_few": "{count} минуты чтения",
+  "reading_time_minutes_many": "{count} минут чтения",
+  "published_on": "Опубликовано"
 }

@@ -870,5 +870,16 @@
   "recognizingQuestions": "Reconnaissance des questions...",
   "transcribing": "Transcription...",
   "autoRecognizeQuestions": "Reconnaissance automatique des questions par IA",
-  "autoRecognizeQuestionsDesc": "Générer automatiquement des questions lors du chargement d'un épisode"
+  "autoRecognizeQuestionsDesc": "Générer automatiquement des questions lors du chargement d'un épisode",
+  "blog_title": "Blog",
+  "blog_subtitle": "Explorez les profondeurs du monde intérieur à travers des messages universels.",
+  "search_articles_placeholder": "Rechercher des articles...",
+  "all_categories": "Tous",
+  "read_article": "Lire",
+  "back_to_articles": "Retour aux articles",
+  "watch_on_youtube": "Regarder sur YouTube",
+  "video_version": "Version vidéo",
+  "reading_time_minutes_one": "{count} minute de lecture",
+  "reading_time_minutes_many": "{count} minutes de lecture",
+  "published_on": "Publié"
 }

@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getLocaleString } from '@/lib/locales';
+import { getLocaleString, getPluralizedLocaleString } from '@/lib/locales';
 import { supabase } from '@/lib/supabaseClient';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { User, ArrowRight, Youtube, BookOpen, Search, Loader2 } from 'lucide-react';
+import { User, ArrowRight, Youtube, BookOpen, Search, Loader2, Clock, Calendar } from 'lucide-react';
+import { calculateReadingTime, formatArticleDate } from '@/lib/utils';
 
 // Color palette for categories
 const categoryColors = {
@@ -48,12 +49,12 @@ const ArticlesPage = () => {
     const fetchArticles = async () => {
       setLoading(true);
       try {
-        // Try fetching from new schema first
+                // Try fetching from new schema first
         const { data, error } = await supabase
           .from('articles_v2')
           .select(`
             *,
-            article_translations(title, summary, language_code),
+            article_translations(title, summary, content, language_code),
             article_categories(
               categories(
                 slug,
@@ -61,27 +62,32 @@ const ArticlesPage = () => {
               )
             )
           `)
-          .order('created_at', { ascending: false });
+          .order('published_at', { ascending: false });
 
         if (!error && data) {
           // Transform new schema to component format
           const transformed = data.map(a => {
-            const translation = a.article_translations.find(t => t.language_code === lang) || 
-                                a.article_translations.find(t => t.language_code === 'ru') || {};
+            const translations = a.article_translations || [];
+            const translation = translations.find(t => t.language_code === lang) || 
+                                translations.find(t => t.language_code === 'ru') || {};
             
-            const categories = a.article_categories.map(ac => {
-              const catTrans = ac.categories.category_translations.find(t => t.language_code === lang) ||
-                               ac.categories.category_translations.find(t => t.language_code === 'ru');
-              return catTrans ? catTrans.name : ac.categories.slug;
-            });
+            const articleCategories = a.article_categories || [];
+            const categories = articleCategories.map(ac => {
+              const catTranslations = ac.categories?.category_translations || [];
+              const catTrans = catTranslations.find(t => t.language_code === lang) ||
+                               catTranslations.find(t => t.language_code === 'ru');
+              return catTrans ? catTrans.name : ac.categories?.slug;
+            }).filter(Boolean);
 
             return {
               slug: a.slug,
               title: { [lang]: translation.title },
               summary: { [lang]: translation.summary },
+              content: { [lang]: translation.content },
               categories: categories,
               author: a.author,
-              youtube_url: a.youtube_url
+              youtube_url: a.youtube_url,
+              published_at: a.published_at
             };
           });
           setRawArticles(transformed);
@@ -135,9 +141,11 @@ const ArticlesPage = () => {
       id: article.slug,
       title: article.title?.[lang] || article.title?.['ru'] || article.title?.['en'] || '',
       summary: article.summary?.[lang] || article.summary?.['ru'] || article.summary?.['en'] || '',
+      content: article.content?.[lang] || article.content?.['ru'] || article.content?.['en'] || '',
       categories: article.categories || [],
       author: article.author,
-      youtubeUrl: article.youtube_url
+      youtubeUrl: article.youtube_url,
+      publishedAt: article.published_at
     }));
   }, [rawArticles, lang]);
 
@@ -266,15 +274,34 @@ const ArticlesPage = () => {
                             {article.summary}
                           </CardDescription>
                           
-                          <div className="flex items-center justify-between mt-auto pt-4 border-t border-slate-100 font-sans">
-                            <div className="flex items-center gap-2 text-xs text-slate-500 uppercase tracking-wider font-medium">
-                              <User className="w-3 h-3" />
-                              {article.author}
+                          <div className="space-y-3 mt-auto">
+                            {/* Date and Reading Time */}
+                            <div className="flex items-center gap-4 text-xs text-slate-500 font-sans">
+                              {article.publishedAt && (
+                                <div className="flex items-center gap-1.5">
+                                  <Calendar className="w-3.5 h-3.5" />
+                                  <span>{formatArticleDate(article.publishedAt, lang)}</span>
+                                </div>
+                              )}
+                              {article.content && (
+                                <div className="flex items-center gap-1.5">
+                                  <Clock className="w-3.5 h-3.5" />
+                                  <span>{getPluralizedLocaleString('reading_time_minutes', lang, calculateReadingTime(article.content, lang), { count: calculateReadingTime(article.content, lang) })}</span>
+                                </div>
+                              )}
                             </div>
-                            <span className="flex items-center gap-2 text-sm text-purple-700 font-medium group-hover:translate-x-1 transition-transform italic font-serif">
-                              {getLocaleString('read_article', lang)}
-                              <ArrowRight className="w-4 h-4" />
-                            </span>
+                            
+                            {/* Author and Read Link */}
+                            <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                              <div className="flex items-center gap-2 text-xs text-slate-500 uppercase tracking-wider font-medium">
+                                <User className="w-3 h-3" />
+                                {article.author}
+                              </div>
+                              <span className="flex items-center gap-2 text-sm text-purple-700 font-medium group-hover:translate-x-1 transition-transform italic font-serif">
+                                {getLocaleString('read_article', lang)}
+                                <ArrowRight className="w-4 h-4" />
+                              </span>
+                            </div>
                           </div>
                         </CardContent>
                       </Card>
