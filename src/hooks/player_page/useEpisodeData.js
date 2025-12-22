@@ -6,6 +6,7 @@ import { getLocaleString } from '@/lib/locales';
 import { getAudioUrl } from '@/lib/audioUrl';
 import { getFullTextFromUtterances } from '@/hooks/transcript/transcriptProcessingUtils';
 import { reconstructTranscriptFromChunks } from '@/lib/transcriptChunkingService';
+import r2Service from '@/lib/r2Service';
 
 // Utility function to check if a file exists on Archive.org
 export const checkEpisodeFileExists = async (episode) => {

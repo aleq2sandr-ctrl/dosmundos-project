@@ -215,10 +215,14 @@ class AudioCacheService {
         const reader = response.body.getReader();
         const chunks = [];
 
-        while (true) {
+        let reading = true;
+        while (reading) {
           const { done, value } = await reader.read();
 
-          if (done) break;
+          if (done) {
+            reading = false;
+            break;
+          }
 
           chunks.push(value);
           loaded += value.length;

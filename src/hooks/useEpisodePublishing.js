@@ -138,24 +138,25 @@ const useEpisodePublishing = (currentLanguage) => {
       // Пока просто возвращаем true
       return true;
 
-      if (updateError) {
-        throw new Error(`Failed to unpublish episode: ${updateError.message}`);
-      }
+      // TODO: Раскомментировать когда функционал unpublish будет нужен
+      // if (updateError) {
+      //   throw new Error(`Failed to unpublish episode: ${updateError.message}`);
+      // }
 
-      // Убираем из списка опубликованных
-      setPublishedEpisodes(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(itemData.id);
-        return newSet;
-      });
+      // // Убираем из списка опубликованных
+      // setPublishedEpisodes(prev => {
+      //   const newSet = new Set(prev);
+      //   newSet.delete(itemData.id);
+      //   return newSet;
+      // });
 
-      toast({
-        title: 'Episode Unpublished',
-        description: `${itemData.episodeTitle} has been unpublished`,
-        duration: 3000
-      });
+      // toast({
+      //   title: 'Episode Unpublished',
+      //   description: `${itemData.episodeTitle} has been unpublished`,
+      //   duration: 3000
+      // });
 
-      return true;
+      // return true;
 
     } catch (error) {
       console.error('Error unpublishing episode:', error);

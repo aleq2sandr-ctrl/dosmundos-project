@@ -81,9 +81,10 @@ const useTranscript = (episodeSlug, episodeAudioUrl, episodeLang, currentLanguag
         
         // Используем только edited_transcript_data
         const displayData = data.edited_transcript_data;
+        const hasCompact = displayData && Array.isArray(displayData.utterances);
 
         if (data.status === 'completed') {
-          if (hasCompact && displayData) {
+          if (hasCompact) {
             setTranscript(displayData);
             // Clear any pending finalize retries
             if (finalizeRetryRef.current.timeoutId) {

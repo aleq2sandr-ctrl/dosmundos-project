@@ -223,7 +223,7 @@ const useTranscriptAssemblyAI = (
     setIsLoadingTranscriptState(true);
     setTranscriptErrorState(null);
     
-    const assemblyLangToUse = langCodeForAssembly || determineAssemblyLangForEpisode();
+    let assemblyLangToUse = langCodeForAssembly || determineAssemblyLangForEpisode();
     if (assemblyLangToUse === 'mixed') {
       assemblyLangToUse = currentLanguage === 'ru' ? 'ru' : 'es';
     }
