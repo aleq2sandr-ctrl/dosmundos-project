@@ -24,7 +24,7 @@ import { getAudioUrl } from '@/lib/audioUrl';
 import { usePlayer } from '@/contexts/PlayerContext';
 import deepgramService from '@/lib/deepgramService';
 import { generateQuestionsOpenAI } from '@/lib/openAIService';
-import { saveFullTranscriptToStorage } from '@/lib/transcriptStorageService';
+// import { saveFullTranscriptToStorage } from '@/lib/transcriptStorageService';
 
 
 const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
@@ -574,21 +574,38 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
       return;
     }
 
-    const langForTranscription = episodeData.lang === 'all' ? currentLanguage : episodeData.lang;
+    const langForTranscription = episodeData.lang === 'all' ? 'mixed' : episodeData.lang;
 
     // Helper to process and save transcript result
     const processAndSaveTranscript = async (result, transcriptDbId) => {
-      // 1. Save RAW to VPS
+      // Determine final language from detection if available
+      let finalLang = langForTranscription;
+      if ((langForTranscription === 'mixed' || langForTranscription === 'all') && result.detected_language) {
+        finalLang = result.detected_language;
+        console.log(`[PlayerPage] Detected language: ${finalLang} (was ${langForTranscription})`);
+      }
+
+      // 1. Save RAW to Storage (VPS/API first, then Supabase Fallback)
       let storageUrl = null;
       
+      // Optimize JSON size: remove redundant word-level data if file is too large
+      const optimizedResult = { ...result };
+      if (optimizedResult.words && optimizedResult.words.length > 5000) {
+            console.log('[PlayerPage] Optimizing JSON size: removing flat words array');
+            delete optimizedResult.words; 
+      }
+      const rawJson = JSON.stringify(optimizedResult);
+
+      // Try VPS/API first
       try {
+        console.log('[PlayerPage] Attempting to save via API (VPS)...');
         const vpsResponse = await fetch('/api/save-transcript', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             episodeSlug: episodeData.slug,
-            lang: langForTranscription,
-            transcriptData: result, // RAW data
+            lang: finalLang,
+            transcriptData: optimizedResult,
             provider: 'deepgram'
           })
         });
@@ -597,16 +614,46 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
           const vpsResult = await vpsResponse.json();
           if (vpsResult.success) {
              storageUrl = vpsResult.url;
-             console.log('[PlayerPage] VPS save successful:', storageUrl);
+             console.log('[PlayerPage] VPS/API save successful:', storageUrl);
           } else {
-             console.error('[PlayerPage] VPS save returned error:', vpsResult.error);
-             // Don't block flow, but log error
+             console.error('[PlayerPage] VPS/API save returned error:', vpsResult.error);
           }
         } else {
-          console.warn('[PlayerPage] VPS API failed:', vpsResponse.status);
+          console.warn('[PlayerPage] VPS/API failed:', vpsResponse.status);
         }
       } catch (e) {
-        console.error('[PlayerPage] VPS save failed:', e);
+        console.error('[PlayerPage] VPS/API save failed (will try fallback):', e);
+      }
+
+      // Fallback to Supabase Storage if API failed
+      if (!storageUrl) {
+        try {
+          console.log('[PlayerPage] Falling back to direct Supabase Storage upload...');
+          const fileName = `${episodeData.slug}_${finalLang.toUpperCase()}_deepgram.json`;
+          
+          // Check size before upload (approximate)
+          const sizeInBytes = new TextEncoder().encode(rawJson).length;
+          console.log(`[PlayerPage] Uploading transcript JSON size: ${(sizeInBytes / 1024 / 1024).toFixed(2)} MB`);
+
+          const { error: uploadError } = await supabase.storage
+            .from('transcript')
+            .upload(fileName, rawJson, {
+              contentType: 'application/json',
+              upsert: true
+            });
+          
+          if (!uploadError) {
+            const { data: { publicUrl } } = supabase.storage
+              .from('transcript')
+              .getPublicUrl(fileName);
+            storageUrl = publicUrl;
+            console.log('[PlayerPage] Save to Supabase Storage successful:', storageUrl);
+          } else {
+            console.error('[PlayerPage] Supabase Storage upload failed:', uploadError);
+          }
+        } catch (sbError) {
+          console.error('[PlayerPage] Supabase Storage error:', sbError);
+        }
       }
 
       // 2. Process data
@@ -620,10 +667,30 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
         provider: 'deepgram',
         provider_id: result.id,
         edited_transcript_data: editedData,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
+        lang: finalLang // Ensure correct language is saved
       };
       if (storageUrl) {
         updatePayload.storage_url = storageUrl;
+      }
+
+      // If language changed from mixed to specific, handle potential conflict
+      if (finalLang !== langForTranscription) {
+          // Check if a transcript with the detected language already exists
+          const { data: existingTarget } = await supabase
+            .from('transcripts')
+            .select('id')
+            .eq('episode_slug', episodeData.slug)
+            .eq('lang', finalLang)
+            .maybeSingle();
+            
+          if (existingTarget) {
+             console.log(`[PlayerPage] Transcript for ${finalLang} already exists (id: ${existingTarget.id}). Updating it and removing temporary mixed record.`);
+             // Update the existing target row instead
+             transcriptDbId = existingTarget.id;
+             // Delete the temporary 'mixed' row we created
+             await supabase.from('transcripts').delete().eq('episode_slug', episodeData.slug).eq('lang', langForTranscription);
+          }
       }
 
       const { error } = await supabase

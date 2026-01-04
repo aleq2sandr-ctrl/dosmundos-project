@@ -107,6 +107,9 @@ export const supabase = createClient(finalUrl, finalKey, {
       delete headers['content-profile'];
       delete headers['http2-settings'];
       delete headers['upgrade'];
+      delete headers['cache-control'];
+      delete headers['x-client-info'];
+      delete headers['x-upsert'];
       
       // Add HTTP/2 compatibility headers
       headers['connection'] = 'keep-alive';
@@ -188,6 +191,9 @@ if (isSelfHosted) {
       delete headers['content-profile'];
       delete headers['http2-settings'];
       delete headers['upgrade'];
+      delete headers['cache-control'];
+      delete headers['x-client-info'];
+      delete headers['x-upsert'];
       
       // Убеждаемся что API ключ сохранен
       if (!headers['apikey'] && cleanAnonKey) {

@@ -1,9 +1,14 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import saveTranscript from './api/save-transcript.js';
+import { scheduleTempCleanup } from './src/lib/transcriptStorageService.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Schedule cleanup on server start
+scheduleTempCleanup(1); // Run every 1 hour
 
 // Middleware
 app.use(cors({
@@ -20,6 +25,7 @@ app.use(express.text({ limit: '50mb' }));
 // API routes
 app.post('/api/save-transcript', async (req, res) => {
   console.log('POST /api/save-transcript called');
+  console.log('Body size:', req.body ? Buffer.byteLength(JSON.stringify(req.body)) / 1024 / 1024 : 0, 'MB');
   try {
     await saveTranscript(req, res);
   } catch (error) {

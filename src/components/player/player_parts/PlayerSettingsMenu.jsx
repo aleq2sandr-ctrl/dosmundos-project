@@ -142,12 +142,10 @@ const PlayerSettingsMenu = ({
 
         <DropdownMenuSeparator className="bg-slate-600" />
 
-        {!hasTranscript && (
-          <DropdownMenuItem onClick={onRecognizeText} disabled={isRecognizingText} className="focus:bg-slate-600 text-slate-200">
-            <Mic className="mr-2 h-4 w-4 text-emerald-400" />
-            <span>{isRecognizingText ? getLocaleString('transcribing', currentLanguage) || 'Распознавание текста...' : getLocaleString('recognizeText', currentLanguage) || 'Распознать текст'}</span>
-          </DropdownMenuItem>
-        )}
+        <DropdownMenuItem onClick={onRecognizeText} disabled={isRecognizingText} className="focus:bg-slate-600 text-slate-200">
+          <Mic className="mr-2 h-4 w-4 text-emerald-400" />
+          <span>{isRecognizingText ? getLocaleString('transcribing', currentLanguage) || 'Распознавание текста...' : getLocaleString('recognizeText', currentLanguage) || 'Распознать текст'}</span>
+        </DropdownMenuItem>
 
         {!hasQuestions && (
           <DropdownMenuItem onClick={onRecognizeQuestions} disabled={isRecognizingQuestions} className="focus:bg-slate-600 text-slate-200">

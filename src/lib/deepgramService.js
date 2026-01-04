@@ -57,8 +57,9 @@ export const normalizeDeepgramResponse = (deepgramData) => {
 
   const results = deepgramData.results;
   const utterances = results.utterances || [];
-  const channel = results.channels?.[0]?.alternatives?.[0];
-  const words = channel?.words || [];
+  const channelData = results.channels?.[0];
+  const alternative = channelData?.alternatives?.[0];
+  const words = alternative?.words || [];
 
   // Convert Deepgram utterances (seconds) to AssemblyAI format (milliseconds)
   const normalizedUtterances = utterances.map(u => ({
@@ -85,8 +86,9 @@ export const normalizeDeepgramResponse = (deepgramData) => {
   return {
     utterances: normalizedUtterances,
     words: normalizedWords,
-    confidence: channel?.confidence,
-    text: channel?.transcript,
+    confidence: alternative?.confidence,
+    text: alternative?.transcript,
+    detected_language: channelData?.detected_language,
     id: deepgramData.metadata?.request_id,
     status: 'completed'
   };
@@ -100,18 +102,23 @@ export const submitTranscription = async (audioUrl, language, episodeSlug, curre
     // Initialize API key first
     await initializeDeepgram();
 
-    // Determine language (strictly 'ru' or 'es')
-    const targetLanguage = language === 'ru' ? 'ru' : 'es';
-
     // Construct URL with query parameters as per Deepgram documentation
-    const params = new URLSearchParams({
+    const paramsObj = {
       model: 'nova-3',
-      language: targetLanguage,
       punctuate: 'true',
       smart_format: 'true',
       utterances: 'true',
       diarize: 'true'
-    });
+    };
+
+    // If language is specific (ru/es), force it. Otherwise use detection.
+    if (language === 'ru' || language === 'es') {
+      paramsObj.language = language;
+    } else {
+      paramsObj.detect_language = 'true';
+    }
+
+    const params = new URLSearchParams(paramsObj);
 
     const response = await fetch(`${DEEPGRAM_BASE_URL}/listen?${params.toString()}`, {
       method: 'POST',

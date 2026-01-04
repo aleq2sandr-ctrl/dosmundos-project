@@ -29,7 +29,7 @@ import { EditorAuthModal } from '@/components/EditorAuthModal';
 import EditHistoryAdminPage from '@/pages/EditHistoryAdminPage';
 import LivePage from '@/pages/LivePage';
 import { initGA4, trackPageView } from '@/lib/analyticsService';
-import { scheduleTempCleanup } from '@/lib/transcriptStorageService';
+// import { scheduleTempCleanup } from '@/lib/transcriptStorageService';
 
 // Поддерживаемые языки
 const SUPPORTED_LANGUAGES = ['ru', 'es', 'en', 'de', 'fr', 'pl'];
@@ -281,8 +281,10 @@ function App() {
         // Инициализируем оптимизированную систему кэша
         await cacheIntegration.init();
 
-        // Запускаем регулярную очистку temp файлов
-        scheduleTempCleanup(1); // Очистка каждый час
+        // Запускаем регулярную очистку temp файлов (только если функция доступна)
+        if (typeof scheduleTempCleanup === 'function') {
+          scheduleTempCleanup(1); // Очистка каждый час
+        }
 
         setOfflineServicesReady(true);
         console.log('[App] Optimized cache system and temp cleanup initialized successfully');

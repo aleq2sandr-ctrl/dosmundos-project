@@ -308,6 +308,7 @@ export const reconstructTranscriptFromChunks = async (episodeSlug, lang) => {
       .order('chunk_index');
 
     if (chunksError) {
+      logger.error('[transcriptChunkingService] Failed to fetch chunks', { error: chunksError.message });
       throw new Error(`Failed to fetch chunks: ${chunksError.message}`);
     }
 
@@ -322,7 +323,12 @@ export const reconstructTranscriptFromChunks = async (episodeSlug, lang) => {
       logger.info('[transcriptChunkingService] No chunks found');
       return null;
     }
-    logger.info('[transcriptChunkingService] Reconstruct: chunks fetched', { episodeSlug, lang, count: chunks.length });
+    
+    logger.info('[transcriptChunkingService] Reconstruct: chunks fetched', { 
+      episodeSlug, 
+      lang, 
+      count: chunks.length 
+    });
 
     // Восстанавливаем текст (если нет текстовых чанков — собираем из utterances)
     const textChunks = chunks
@@ -332,7 +338,31 @@ export const reconstructTranscriptFromChunks = async (episodeSlug, lang) => {
     let fullText = '';
     if (textChunks.length > 0) {
       for (const chunk of textChunks) {
-        fullText += chunk.chunk_data.text;
+        fullText += chunk.chunk_data.text || '';
+      }
+    }
+
+    // Восстанавливаем utterances из utterances chunks (оригинальные)
+    const utteranceChunks = chunks
+      .filter(c => c.chunk_type === 'utterances')
+      .sort((a, b) => a.chunk_index - b.chunk_index);
+
+    const utteranceUtterances = [];
+    for (const chunk of utteranceChunks) {
+      if (chunk.chunk_data && Array.isArray(chunk.chunk_data.utterances)) {
+        utteranceUtterances.push(...chunk.chunk_data.utterances);
+      }
+    }
+
+    // Восстанавливаем utterances из edited_transcript chunks (отредактированные)
+    const editedTranscriptChunks = chunks
+      .filter(c => c.chunk_type === 'edited_transcript')
+      .sort((a, b) => a.chunk_index - b.chunk_index);
+
+    const editedTranscriptUtterances = [];
+    for (const chunk of editedTranscriptChunks) {
+      if (chunk.chunk_data && Array.isArray(chunk.chunk_data.utterances)) {
+        editedTranscriptUtterances.push(...chunk.chunk_data.utterances);
       }
     }
 
@@ -343,34 +373,39 @@ export const reconstructTranscriptFromChunks = async (episodeSlug, lang) => {
 
     const transcriptUtterances = [];
     for (const chunk of transcriptChunks) {
-      transcriptUtterances.push(...chunk.chunk_data.utterances);
-    }
-
-    // Восстанавливаем utterances из edited_transcript chunks (отредактированные)
-    const editedTranscriptChunks = chunks
-      .filter(c => c.chunk_type === 'edited_transcript')
-      .sort((a, b) => a.chunk_index - b.chunk_index);
-
-    const editedTranscriptUtterances = [];
-    for (const chunk of editedTranscriptChunks) {
-      editedTranscriptUtterances.push(...chunk.chunk_data.utterances);
+      if (chunk.chunk_data && Array.isArray(chunk.chunk_data.utterances)) {
+        transcriptUtterances.push(...chunk.chunk_data.utterances);
+      }
     }
 
     // Приоритет отредактированным utterances, если они есть
-    const finalUtterances = editedTranscriptUtterances.length > 0 ? editedTranscriptUtterances : transcriptUtterances;
+    let finalUtterances = [];
+    if (editedTranscriptUtterances.length > 0) {
+      finalUtterances = editedTranscriptUtterances;
+      logger.debug('[transcriptChunkingService] Using edited transcript utterances');
+    } else if (utteranceUtterances.length > 0) {
+      finalUtterances = utteranceUtterances;
+      logger.debug('[transcriptChunkingService] Using utterances chunks');
+    } else if (transcriptUtterances.length > 0) {
+      finalUtterances = transcriptUtterances;
+      logger.debug('[transcriptChunkingService] Using transcript chunks');
+    }
     
     // Сортируем utterances по времени
-    finalUtterances.sort((a, b) => a.start - b.start);
+    if (finalUtterances.length > 0) {
+      finalUtterances.sort((a, b) => a.start - b.start);
+    }
     
     logger.debug('[transcriptChunkingService] Reconstruct: utterances assembled', { 
       transcriptUtterances: transcriptUtterances.length,
       editedTranscriptUtterances: editedTranscriptUtterances.length,
+      utteranceUtterances: utteranceUtterances.length,
       finalUtterances: finalUtterances.length,
       hasTextChunks: textChunks.length > 0 
     });
 
     return {
-      text: fullText || finalUtterances.map(u => u.text).join(' '),
+      text: fullText || finalUtterances.map(u => u.text || '').join(' '),
       utterances: finalUtterances,
       words: [], // Можно восстановить если нужно
       reconstructed: true,

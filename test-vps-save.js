@@ -4,9 +4,19 @@ const testData = {
   episodeSlug: 'test-vps-' + Date.now(),
   lang: 'en',
   transcriptData: {
-    text: 'VPS bucket test transcript',
-    utterances: [{ start: 0, end: 5, text: 'Test utterance', speaker: 'Test' }],
-    words: [{ start: 0, end: 1, text: 'test', confidence: 1.0 }]
+    text: 'VPS bucket test transcript '.repeat(100000), // ~1.2MB
+    utterances: Array.from({length: 10000}, (_, i) => ({
+      start: i * 100, 
+      end: i * 100 + 50, 
+      text: `Test utterance ${i}`,
+      speaker: `Speaker ${i % 5}`
+    })),
+    words: Array.from({length: 50000}, (_, i) => ({
+      start: i * 10,
+      end: i * 10 + 5,
+      text: 'test',
+      confidence: 1.0
+    }))
   }
 };
 
@@ -17,7 +27,7 @@ const postData = JSON.stringify(testData);
 
 const options = {
   hostname: 'localhost',
-  port: 5174,
+  port: 3000,
   path: '/api/save-transcript',
   method: 'POST',
   headers: {

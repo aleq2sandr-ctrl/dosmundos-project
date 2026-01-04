@@ -242,6 +242,91 @@ const mapWordsToUtterances = (utterances, words) => {
   return wordLists;
 };
 
+// Helper to merge a list of utterances into one
+const mergeBuffer = (buffer) => {
+  if (!buffer || buffer.length === 0) return null;
+  if (buffer.length === 1) return buffer[0];
+  
+  const first = buffer[0];
+  const last = buffer[buffer.length - 1];
+  
+  return {
+      ...first,
+      end: last.end,
+      text: buffer.map(u => u.text).join(' '),
+      words: buffer.flatMap(u => u.words || []),
+      // Preserve ID of the first one, or create new? Keeping first is usually fine.
+  };
+};
+
+// Merge consecutive utterances from the same speaker if total duration < 2 minutes
+// And try to respect sentence boundaries
+const mergeShortUtterances = (utterances) => {
+  if (!utterances || utterances.length === 0) return [];
+
+  const merged = [];
+  let buffer = [utterances[0]];
+
+  for (let i = 1; i < utterances.length; i++) {
+    const next = utterances[i];
+    const currentFirst = buffer[0];
+    
+    // Check speaker change
+    if (next.speaker !== currentFirst.speaker) {
+        // Speaker changed. Flush buffer.
+        merged.push(mergeBuffer(buffer));
+        buffer = [next];
+        continue;
+    }
+
+    // Check duration
+    const potentialDuration = next.end - currentFirst.start;
+    
+    if (potentialDuration > MAX_SEGMENT_DURATION_MS) {
+        // Limit reached. We need to flush the buffer.
+        // Try to split buffer at a sentence ending if the last one doesn't end with one.
+        
+        const lastInBuffer = buffer[buffer.length - 1];
+        const hasSentenceEnd = /[.?!]$/.test(lastInBuffer.text.trim());
+        
+        if (!hasSentenceEnd) {
+             // Backtrack to find a sentence end
+             let splitIdx = -1;
+             // Look back, but don't make the first part too short if possible? 
+             // Just look for any sentence end.
+             for (let j = buffer.length - 1; j >= 0; j--) {
+                 if (/[.?!]$/.test(buffer[j].text.trim())) {
+                     splitIdx = j;
+                     break;
+                 }
+             }
+             
+             if (splitIdx !== -1 && splitIdx < buffer.length - 1) {
+                 // Found a better split point
+                 const firstPart = buffer.slice(0, splitIdx + 1);
+                 const secondPart = buffer.slice(splitIdx + 1);
+                 
+                 merged.push(mergeBuffer(firstPart));
+                 buffer = [...secondPart, next]; // Start new buffer with remainder + next
+                 continue;
+             }
+        }
+        
+        // No better split found, or last one was good.
+        merged.push(mergeBuffer(buffer));
+        buffer = [next];
+    } else {
+        buffer.push(next);
+    }
+  }
+  
+  if (buffer.length > 0) {
+      merged.push(mergeBuffer(buffer));
+  }
+  
+  return merged;
+};
+
 export const processTranscriptData = (data) => {
   if (!data || !Array.isArray(data.utterances)) {
     return { ...data, utterances: [] };
@@ -252,43 +337,34 @@ export const processTranscriptData = (data) => {
   const wordsPerUtterance = mapWordsToUtterances(utterances, allWords);
 
   let totalSplitCount = 0;
-  const processedUtterances = utterances.flatMap((utt, idx) => {
+  // First pass: Split long utterances
+  const splitUtterances = utterances.flatMap((utt, idx) => {
     const utteranceWithWords = {
       ...utt,
       words: (wordsPerUtterance[idx] && wordsPerUtterance[idx].length > 0) ? wordsPerUtterance[idx] : (utt.words || [])
     };
     const splitted = splitLongUtterance(utteranceWithWords);
     
-    // Логируем разбиение длинных сегментов
     if (splitted.length > 1) {
       totalSplitCount += splitted.length - 1;
-      logger.debug('[TranscriptProcessing] Long utterance split:', {
-        originalId: utt.id || utt.start,
-        originalDuration: utt.end - utt.start,
-        originalTextLength: (utt.text || '').length,
-        splitCount: splitted.length,
-        hasWords: !!(utteranceWithWords.words && utteranceWithWords.words.length > 0)
-      });
-    }
-    
-    // Log only extremely long utterances to reduce console spam
-    if ((utt.end - utt.start) > 300000) {
-      logger.debug('[TranscriptProcessing] Long utterance detected:', {
-        start: utt.start,
-        end: utt.end,
-        durationMs: utt.end - utt.start,
-        originalTextLen: (utt.text || '').length,
-        splitCount: splitted.length
-      });
     }
     return splitted;
   }).filter(utt => utt.text && utt.text.trim() !== "");
+
+  // Second pass: Merge short consecutive utterances from same speaker
+  const processedUtterances = mergeShortUtterances(splitUtterances);
   
   if (totalSplitCount > 0) {
     logger.info('[TranscriptProcessing] Segment splitting completed:', {
       originalCount: utterances.length,
+      splitCount: splitUtterances.length,
       finalCount: processedUtterances.length,
       totalSplits: totalSplitCount
+    });
+  } else {
+     logger.info('[TranscriptProcessing] Processing completed:', {
+      originalCount: utterances.length,
+      finalCount: processedUtterances.length
     });
   }
   
