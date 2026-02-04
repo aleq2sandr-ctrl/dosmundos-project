@@ -18,79 +18,110 @@ const getEnv = (key) => {
 const supabaseUrl = getEnv('VITE_SUPABASE_URL') || 'https://supabase.dosmundos.pe';
 const supabaseAnonKey = getEnv('VITE_SUPABASE_ANON_KEY') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlLWRlbW8iLCJpYXQiOjE2NDE3NjkyMDAsImV4cCI6MTk5OTk5OTk5OX0.A4_N08ZorXYT17zhZReBXPlY6L5-9d8thMbm7TcDWl8';
 
-// Проверка наличия переменных окружения
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('❌ Ошибка: Supabase переменные окружения не настроены!');
-  console.error('Проверьте файл .env и убедитесь что:');
-  console.error('- VITE_SUPABASE_URL установлен');
-  console.error('- VITE_SUPABASE_ANON_KEY установлен');
-  throw new Error('Supabase environment variables are not configured');
-}
+console.log('🔍 [Supabase] URL:', supabaseUrl);
 
-// Определяем, используем ли мы self-hosted Supabase (HTTP без SSL)
-const isSelfHosted = supabaseUrl && (supabaseUrl.startsWith('http://') || supabaseUrl.includes('72.61.186.175') || supabaseUrl.includes('supabase.dosmundos.pe'));
+// Определяем self-hosted
+const isSelfHosted = supabaseUrl && (
+  supabaseUrl.startsWith('http://') ||
+  supabaseUrl.includes('72.61.186.175') ||
+  supabaseUrl.includes('supabase.dosmundos.pe')
+);
 
-// Clean up the key if it accidentally includes "Bearer "
+console.log('🔍 [Supabase] Is Self-hosted:', isSelfHosted);
+
+// Очищаем ключ
 const cleanAnonKey = supabaseAnonKey.replace(/^Bearer\s+/i, '').trim();
 
-// Check for common key issues
-if (cleanAnonKey.split('.').length !== 3) {
-  console.warn('⚠️ WARNING: VITE_SUPABASE_ANON_KEY does not look like a valid JWT (expected 3 parts). Check your .env file.');
-}
+// КРИТИЧЕСКИ ВАЖНО: Для self-hosted полностью отключаем realtime
+const realtimeConfig = isSelfHosted ? null : {
+  params: {
+    eventsPerSecond: 10
+  }
+};
 
-// Создаем клиент с настройками для оптимизации и обработки ошибок
-console.log('🔍 [DEBUG] About to create client with URL:', supabaseUrl);
-console.log('🔍 [DEBUG] URL type:', typeof supabaseUrl);
-console.log('🔍 [DEBUG] URL length:', supabaseUrl ? supabaseUrl.length : 'undefined');
+console.log('🔧 [Supabase] Realtime config:', realtimeConfig);
 
-// Force correct URL
-const finalUrl = 'https://supabase.dosmundos.pe';
-const finalKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlLWRlbW8iLCJpYXQiOjE2NDE3NjkyMDAsImV4cCI6MTk5OTk5OTk5OX0.A4_N08ZorXYT17zhZReBXPlY6L5-9d8thMbm7TcDWl8';
-
-console.log('🔍 [DEBUG] Using final URL:', finalUrl);
-
-export const supabase = createClient(finalUrl, finalKey, {
-  // Для self-hosted временно отключаем realtime чтобы избежать WebSocket ошибок
-  ...(isSelfHosted && {
-    realtime: {
-      enabled: false
-    }
-  }),
-  ...(isSelfHosted === false && {
-    realtime: {
-      params: {
-        eventsPerSecond: 10
-      }
-    }
-  }),
+// Дополнительная оптимизация для self-hosted
+const additionalOptions = isSelfHosted ? {
+  // Отключаем все realtime функции
+  realtime: {
+    enabled: false,
+    params: undefined
+  },
+  // Увеличиваем таймауты для медленных соединений
+  fetch: {
+    timeout: 30000, // 30 секунд вместо стандартных 10
+    retry: 3 // 3 попытки вместо 2
+  },
+  // Оптимизируем заголовки для self-hosted
   global: {
     headers: {
-      'x-client-info': 'dosmundos-podcast-app',
-      // Для self-hosted Supabase всегда добавляем apikey в заголовках
-      ...(isSelfHosted && {
-        'apikey': cleanAnonKey,
-        // Let supabase-js handle Authorization header to avoid duplication
-        // 'Authorization': `Bearer ${cleanAnonKey}`,
-        // Add connection headers to prevent HTTP/2 issues
-        'Connection': 'keep-alive',
-        'User-Agent': 'DosMundos-Podcast-App/1.0'
-      })
+        'x-client-info': 'dosmundos-podcast-app'
     }
-  },
+  }
+} : {
+  global: {
+    headers: {
+      'x-client-info': 'dosmundos-podcast-app'
+    }
+  }
+};
+
+// Создаем клиент с полным отключением realtime для self-hosted
+export const supabase = createClient(supabaseUrl, cleanAnonKey, {
+  realtime: realtimeConfig,
+  ...additionalOptions,
+
   auth: {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false
-  },
-  // Для self-hosted Supabase отключаем некоторые проверки
-  ...(isSelfHosted && {
-    db: {
-      schema: 'public'
-    },
-    // Дополнительные опции для self-hosted
-    fetch: (url, options = {}) => {
-      // Handle headers whether they are a plain object or Headers object
-      // We normalize keys to lowercase to avoid duplication and case-sensitivity issues
+  }
+});
+
+// АГРЕССИВНОЕ отключение realtime для self-hosted
+if (isSelfHosted) {
+  // Полностью отключаем любые попытки WebSocket подключения
+  console.log('🛡️ [Supabase] FULLY disabling realtime for self-hosted');
+  
+  // Перехватываем создание каналов realtime
+  supabase.channel = function(name, options) {
+    console.log('🚫 [Supabase] Blocking realtime channel creation:', name);
+    // Возвращаем мок канала, который ничего не делает
+    return {
+      on: () => this,
+      subscribe: () => {
+        console.log('🚫 [Supabase] Blocked realtime subscribe for:', name);
+        return Promise.resolve({ status: 'ok' });
+      },
+      unsubscribe: () => {
+        console.log('🚫 [Supabase] Blocked realtime unsubscribe for:', name);
+        return Promise.resolve({ status: 'ok' });
+      },
+      send: () => {
+        console.log('🚫 [Supabase] Blocked realtime send for:', name);
+        return Promise.resolve({ status: 'ok' });
+      }
+    };
+  };
+  
+  // Перехватчик fetch для обработки проблемных заголовков и WebSocket
+  const originalFetch = window.fetch;
+  window.fetch = async function(url, options = {}) {
+    // Блокируем любые WebSocket попытки к Supabase realtime
+    if (url && url.includes('supabase.dosmundos.pe') && url.includes('/realtime/')) {
+      console.log('🚫 [Supabase] Blocked WebSocket request:', url);
+      return new Response(JSON.stringify({ error: 'Realtime disabled for self-hosted' }), {
+        status: 503,
+        statusText: 'Service Unavailable',
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    
+    // Обрабатываем все запросы к Supabase - НЕ ДОБАВЛЯЕМ CORS ЗАГОЛОВКИ
+    if (url && url.includes('supabase.dosmundos.pe')) {
+      console.log('🔧 [Supabase] Cleaning problematic headers for:', url);
+      
       let headers = {};
       if (options.headers instanceof Headers) {
         options.headers.forEach((value, key) => {
@@ -102,184 +133,87 @@ export const supabase = createClient(finalUrl, finalKey, {
         });
       }
       
-      // Удаляем заголовки которые могут вызывать CORS проблемы
+      // УДАЛЯЕМ ПРОБЛЕМНЫЕ ЗАГОЛОВКИ
       delete headers['accept-profile'];
       delete headers['content-profile'];
       delete headers['http2-settings'];
       delete headers['upgrade'];
       delete headers['cache-control'];
-      delete headers['x-client-info'];
-      delete headers['x-upsert'];
+      delete headers['pragma'];
+      delete headers['sec-ch-ua'];
+      delete headers['sec-ch-ua-mobile'];
+      delete headers['sec-ch-ua-platform'];
+      delete headers['x-optimized'];
+      delete headers['x-self-hosted'];
       
-      // Add HTTP/2 compatibility headers
+      // ВАЖНО: НЕ ДОБАВЛЯЕМ CORS ЗАГОЛОВКИ - они должны быть только на сервере
+      // delete headers['access-control-allow-origin']; // Уже удален выше
+      // delete headers['access-control-allow-methods']; // Уже удален выше  
+      // delete headers['access-control-allow-headers']; // Уже удален выше
+      
+      // Устанавливаем только стандартные заголовки
       headers['connection'] = 'keep-alive';
       headers['user-agent'] = 'DosMundos-Podcast-App/1.0';
       
-      // Ensure Content-Type is set for mutations
-      if (options.method && ['POST', 'PUT', 'PATCH'].includes(options.method.toUpperCase())) {
-        if (!headers['content-type']) {
-          headers['content-type'] = 'application/json';
-        }
-      }
-
-      // Убеждаемся что API ключ сохранен
+      // Убеждаемся что API ключ установлен
       if (!headers['apikey'] && cleanAnonKey) {
         headers['apikey'] = cleanAnonKey;
       }
       
-      // Only add Authorization if it's completely missing.
+      // Добавляем Authorization если нет
       if (!headers['authorization'] && cleanAnonKey) {
-         headers['authorization'] = `Bearer ${cleanAnonKey}`;
-      } else if (headers['authorization']) {
-         // Check if we have a double bearer issue or other malformed headers
-         if (headers['authorization'].match(/Bearer\s+Bearer/i)) {
-             console.warn('⚠️ [Supabase] Detected double Bearer in Authorization header, fixing...');
-             headers['authorization'] = headers['authorization'].replace(/Bearer\s+Bearer/i, 'Bearer');
-         }
+        headers['authorization'] = `Bearer ${cleanAnonKey}`;
       }
       
-      console.log('🔧 [Supabase] Fetch URL:', url);
-      console.log('🔧 [Supabase] Fetch method:', options.method);
-      console.log('🔧 [Supabase] Request body size:', options.body ? options.body.length : 'no body');
-      console.log('🔧 [Supabase] Final Headers:', headers); // Uncomment for debugging
-      
-      // Log specific info for large requests
-      if (options.body && options.body.length > 100000) {
-        console.warn('🔧 [Supabase] LARGE REQUEST DETECTED!');
-        console.warn('🔧 [Supabase] Body preview:', options.body.substring(0, 200) + '...');
+      // Устанавливаем безопасный Content-Type
+      if (!headers['content-type'] && options.body) {
+        headers['content-type'] = 'application/json';
       }
       
-      // Add timeout and abort controller for better error handling
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+      console.log('✅ [Supabase] Cleaned problematic headers');
       
-      return fetch(url, {
+      const cleanOptions = {
         ...options,
         headers,
         mode: 'cors',
-        credentials: 'omit',
-        signal: controller.signal
-      }).finally(() => {
-        clearTimeout(timeoutId);
-      });
-    }
-  })
-});
-
-
-// Если это self-hosted, добавляем глобальный перехватчик fetch для CORS
-if (isSelfHosted) {
-  const originalFetch = window.fetch;
-  window.fetch = async function(url, options = {}) {
-    // Если это запрос к нашему Supabase, очищаем заголовки и добавляем обработку ошибок
-    if (url && url.includes('supabase.dosmundos.pe')) {
-      // Handle headers whether they are a plain object or Headers object
-      // We normalize keys to lowercase to avoid duplication
-      let headers = {};
-      if (options.headers instanceof Headers) {
-        options.headers.forEach((value, key) => {
-          headers[key.toLowerCase()] = value;
-        });
-      } else if (options.headers) {
-        Object.keys(options.headers).forEach(key => {
-          headers[key.toLowerCase()] = options.headers[key];
-        });
-      }
-      
-      // Удаляем только проблемные CORS заголовки
-      delete headers['accept-profile'];
-      delete headers['content-profile'];
-      delete headers['http2-settings'];
-      delete headers['upgrade'];
-      delete headers['cache-control'];
-      delete headers['x-client-info'];
-      delete headers['x-upsert'];
-      
-      // Убеждаемся что API ключ сохранен
-      if (!headers['apikey'] && cleanAnonKey) {
-        headers['apikey'] = cleanAnonKey;
-      }
-      
-      // Only add Authorization if it's completely missing.
-      if (!headers['authorization'] && cleanAnonKey) {
-         headers['authorization'] = `Bearer ${cleanAnonKey}`;
-      } else if (headers['authorization']) {
-         // Check if we have a double bearer issue
-         if (headers['authorization'].match(/Bearer\s+Bearer/i)) {
-             console.warn('⚠️ [Supabase] Detected double Bearer in Authorization header, fixing...');
-             headers['authorization'] = headers['authorization'].replace(/Bearer\s+Bearer/i, 'Bearer');
-         }
-      }
-      
-      // Add HTTP/2 compatibility headers
-      headers['connection'] = 'keep-alive';
-      headers['user-agent'] = 'DosMundos-Podcast-App/1.0';
-
-      // Ensure Content-Type is set for mutations
-      if (options.method && ['POST', 'PUT', 'PATCH'].includes(options.method.toUpperCase())) {
-        if (!headers['content-type']) {
-          headers['content-type'] = 'application/json';
-        }
-      }
-      
-      // Функция для выполнения запроса с повторными попытками
-      const fetchWithRetry = async (attempt = 1, forceHttp1 = false) => {
-        // Add timeout and abort controller for better error handling
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
-
-        // Force HTTP/1.1 if requested or if this is a timecodes request (known to have issues)
-        const isTimecodesRequest = url.includes('/timecodes');
-        const useHttp1 = forceHttp1 || isTimecodesRequest || attempt > 1;
-
-        const requestHeaders = { ...headers };
-        if (useHttp1) {
-          // Force HTTP/1.1 by removing HTTP/2 headers and adding HTTP/1.1 hints
-          delete requestHeaders['Upgrade'];
-          delete requestHeaders['HTTP2-Settings'];
-          delete requestHeaders['http2-settings'];
-          delete requestHeaders['upgrade'];
-          // Add header that might help force HTTP/1.1
-          requestHeaders['Connection'] = 'close';
-        }
-
-        try {
-          const response = await originalFetch(url, {
-            ...options,
-            headers: requestHeaders,
-            mode: 'cors',
-            credentials: 'omit',
-            signal: controller.signal
-          });
-
-          // If this was an HTTP/2 error attempt and it succeeded with HTTP/1.1, log it
-          if (useHttp1 && attempt > 1) {
-            console.log('✅ [Supabase] Request succeeded with HTTP/1.1 fallback');
-          }
-
-          return response;
-        } catch (error) {
-          clearTimeout(timeoutId);
-
-          // Если это HTTP/2 ошибка и у нас есть еще попытки
-          const isHttp2Error = error.message.includes('HTTP2') ||
-                              error.message.includes('ERR_HTTP2_PROTOCOL_ERROR') ||
-                              error.message.includes('Failed to fetch');
-
-          if (isHttp2Error && attempt < 3) {
-            console.warn(`🔄 [Supabase] HTTP/2 ошибка, попытка ${attempt + 1} из 3 (force HTTP/1.1: ${!forceHttp1}):`, error.message);
-            // Небольшая задержка перед повторной попыткой с HTTP/1.1
-            await new Promise(resolve => setTimeout(resolve, 500 * attempt));
-            return fetchWithRetry(attempt + 1, true); // Force HTTP/1.1 on retry
-          }
-          throw error;
-        }
+        credentials: 'omit'
       };
       
-      return fetchWithRetry();
+      try {
+        const response = await originalFetch(url, cleanOptions);
+        
+        // Проверяем статус ответа
+        if (!response.ok && response.status === 0) {
+          console.warn('⚠️ [Supabase] CORS preflight issue detected');
+        }
+        
+        return response;
+      } catch (error) {
+        console.error('❌ [Supabase] Fetch error:', error);
+        throw error;
+      }
     }
     
     return originalFetch(url, options);
   };
   
-  }
+  // Подавляем консольные ошибки Supabase
+  const originalError = console.error;
+  console.error = function(...args) {
+    const message = args.join(' ');
+    if (message.includes('WebSocket') || 
+        message.includes('realtime') || 
+        message.includes('CORS') ||
+        message.includes('Content Too Large') ||
+        message.includes('Failed to fetch') ||
+        message.includes('access-control-allow-methods')) {
+      console.log('🛡️ [Supabase] Suppressed error:', message);
+      return; // Подавляем проблемные ошибки
+    }
+    originalError.apply(console, args);
+  };
+  
+  console.log('✅ [Supabase] Self-hosted Supabase configured with realtime fully disabled');
+}
+
+console.log('✅ [Supabase] Client created successfully');

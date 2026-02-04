@@ -19,7 +19,7 @@ import FestivalPage from '@/pages/FestivalPage';
 import EventsPage from '@/pages/EventsPage';
 import NewYearPage from '@/pages/NewYearPage';
 import VolunteersPage from '@/pages/VolunteersPage';
-import { supabase } from '@/lib/supabaseClient';
+import { supabase } from '@/lib/supabaseClient.js';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import cacheIntegration from '@/lib/cacheIntegration';
 import { useToast } from '@/components/ui/use-toast';
@@ -28,8 +28,10 @@ import { PlayerProvider } from '@/contexts/PlayerContext';
 import { EditorAuthModal } from '@/components/EditorAuthModal';
 import EditHistoryAdminPage from '@/pages/EditHistoryAdminPage';
 import LivePage from '@/pages/LivePage';
+import ArticlesPage from '@/pages/ArticlesPage';
+import ArticleDetailPage from '@/pages/ArticleDetailPage';
 import { initGA4, trackPageView } from '@/lib/analyticsService';
-// import { scheduleTempCleanup } from '@/lib/transcriptStorageService';
+import PlayerDiagnostics from '@/components/debug/PlayerDiagnostics';
 
 // Поддерживаемые языки
 const SUPPORTED_LANGUAGES = ['ru', 'es', 'en', 'de', 'fr', 'pl'];
@@ -115,6 +117,7 @@ const LanguageRouteWrapper = ({ children }) => {
 const AppLayout = ({ user }) => {
   const location = useLocation();
   const { showAuthModal, closeAuthModal } = useEditorAuth();
+  const showDebug = new URLSearchParams(location.search).get('debug') === 'true';
   
   // Determine language from URL
   const pathParts = location.pathname.split('/');
@@ -124,11 +127,12 @@ const AppLayout = ({ user }) => {
   const podcastData = {
     title: 'Dos Mundos',
     author: 'EL CENTRO DESARROLLO INTEGRAL',
-    image: 'https://silver-lemur-512881.hostingersite.com/wp-content/uploads/2025/02/logo-5-120x120.png'
+    image: '/img/logo-5-120x120.png'
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 text-white flex flex-col">
+      {showDebug && <PlayerDiagnostics />}
       <LanguageRedirect />
       <RouteTracker />
       
@@ -157,6 +161,7 @@ const AppLayout = ({ user }) => {
           } />
           
           {/* Новые маршруты с языковым префиксом */}
+          <Route path="/:lang" element={<Navigate to="episodes" replace />} />
           <Route path="/:lang/live" element={
             <LanguageRouteWrapper>
               <LivePage />
@@ -206,13 +211,22 @@ const AppLayout = ({ user }) => {
             </LanguageRouteWrapper>
           } />
           <Route path="/:lang/analytics" element={
-            <LanguageRouteWrapper>
-              <AnalyticsPage />
-            </LanguageRouteWrapper>
+            <AnalyticsPage />
           } />
           <Route path="/:lang/offline-settings" element={
             <LanguageRouteWrapper>
               <OfflineSettingsPage onBack={() => window.history.back()} />
+            </LanguageRouteWrapper>
+          } />
+
+          <Route path="/:lang/articles" element={
+            <LanguageRouteWrapper>
+              <ArticlesPage />
+            </LanguageRouteWrapper>
+          } />
+          <Route path="/:lang/articles/:articleId" element={
+            <LanguageRouteWrapper>
+              <ArticleDetailPage />
             </LanguageRouteWrapper>
           } />
           
@@ -260,7 +274,24 @@ const AppContent = ({ user }) => {
 
 
 function App() {
-  const [showLangModal, setShowLangModal] = useState(false);
+  const [showLangModal, setShowLangModal] = useState(() => {
+    // Если язык уже сохранен, не показываем модалку
+    if (localStorage.getItem('podcastLang')) {
+      return false;
+    }
+
+    // Если в URL уже есть язык, не показываем модалку
+    const path = window.location.pathname;
+    const hasLangInUrl = SUPPORTED_LANGUAGES.some(lang => 
+      path.startsWith(`/${lang}/`) || path === `/${lang}`
+    );
+    
+    if (hasLangInUrl) {
+      return false;
+    }
+
+    return true;
+  });
   const [authLoading, setAuthLoading] = useState(true);
   const [user, setUser] = useState(null);
   const [offlineServicesReady, setOfflineServicesReady] = useState(false);
@@ -281,13 +312,8 @@ function App() {
         // Инициализируем оптимизированную систему кэша
         await cacheIntegration.init();
 
-        // Запускаем регулярную очистку temp файлов (только если функция доступна)
-        if (typeof scheduleTempCleanup === 'function') {
-          scheduleTempCleanup(1); // Очистка каждый час
-        }
-
         setOfflineServicesReady(true);
-        console.log('[App] Optimized cache system and temp cleanup initialized successfully');
+        console.log('[App] Optimized cache system initialized successfully');
       } catch (error) {
         console.error('[App] Failed to initialize optimized cache:', error);
         setOfflineServicesReady(true);

@@ -1,4 +1,6 @@
 {
+  "enterEditMode": "Enter Edit Mode",
+  "exitEditMode": "Exit Edit Mode",
   "appName": "Dos Mundos Radio",
   "loading": "Loading...",
   "loadingPodcast": "Loading podcast...",
@@ -911,5 +913,22 @@
   "audioTrackSpanish": "Pepe",
   "recognizeText": "Recognize text",
   "recognizeQuestions": "Recognize questions",
-  "transcribing": "Transcribing..."
+  "recognizingText": "Recognizing text...",
+  "recognizingQuestions": "Recognizing questions...",
+  "smartSegmentation": "Smart Segmentation",
+  "segmenting": "Segmenting...",
+  "transcribing": "Transcribing...",
+  "autoRecognizeQuestions": "Automatic AI question recognition",
+  "autoRecognizeQuestionsDesc": "Automatically generate questions when loading an episode",
+  "blog_title": "Blog",
+  "blog_subtitle": "Explore the depths of the inner world through universal messages.",
+  "search_articles_placeholder": "Search articles...",
+  "all_categories": "All",
+  "read_article": "Read",
+  "back_to_articles": "Back to articles",
+  "watch_on_youtube": "Watch on YouTube",
+  "video_version": "Video version",
+  "reading_time_minutes_one": "{count} minute read",
+  "reading_time_minutes_many": "{count} minutes read",
+  "published_on": "Published"
 }

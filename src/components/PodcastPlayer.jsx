@@ -57,8 +57,13 @@ const PodcastPlayer = ({
   fetchTranscriptForEpisode,
   onRecognizeText,
   onRecognizeQuestions,
+  onSmartSegmentation,
   isRecognizingText,
-  isRecognizingQuestions
+  isRecognizingQuestions,
+  isSmartSegmenting,
+  shouldPreserveState = false,
+  isEditMode,
+  setIsEditMode
 }) => {
   
   const { toast } = useToast();
@@ -82,7 +87,8 @@ const PodcastPlayer = ({
     audioRef: contextAudioRef,
     playEpisode,
     autoplayBlocked,
-    setAutoplayBlocked
+    setAutoplayBlocked,
+    isLoading
   } = usePlayer();
 
   // Sync autoplay blocked state
@@ -307,8 +313,9 @@ const PodcastPlayer = ({
   };
   
   const handleSkip = (seconds) => {
-    const newTime = Math.max(0, Math.min(duration, currentTime + seconds));
-    seek(newTime);
+    // Don't clamp to duration here as it might be 0 if metadata hasn't loaded yet
+    // seek() in PlayerContext handles clamping using audioRef.current.duration as fallback
+    seek(currentTime + seconds);
   };
   
   const navigateQuestion = (direction) => {
@@ -519,6 +526,7 @@ const PodcastPlayer = ({
         <PlayerUIControls
           activeQuestionTitle={activeQuestionTitleState}
           isPlaying={isPlayingState}
+          isLoading={isLoading}
           currentLanguage={currentLanguage}
           currentTime={currentTimeState}
           duration={durationState}
@@ -541,6 +549,10 @@ const PodcastPlayer = ({
           onOpenAddQuestionDialog={handleOpenAddQuestionDialogFromPlayer}
           episodeDate={episodeDate}
           isOfflineMode={isOfflineMode}
+          isEditMode={isEditMode}
+          setIsEditMode={setIsEditMode}
+          isAuthenticated={isAuthenticated}
+          openAuthModal={openAuthModal}
           // Audio Track Props
           availableAudioVariants={episodeData?.available_variants || []}
           selectedAudioLang={selectedAudioLang}
@@ -550,8 +562,10 @@ const PodcastPlayer = ({
           hasQuestions={hasQuestions}
           onRecognizeText={onRecognizeText}
           onRecognizeQuestions={onRecognizeQuestions}
+          onSmartSegmentation={onSmartSegmentation}
           isRecognizingText={isRecognizingText}
           isRecognizingQuestions={isRecognizingQuestions}
+          isSmartSegmenting={isSmartSegmenting}
         />
       </div>
     </div>

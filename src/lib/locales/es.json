@@ -875,5 +875,22 @@
   "audioTrackSpanish": "Pepe",
   "recognizeText": "Reconocer texto",
   "recognizeQuestions": "Reconocer preguntas",
-  "transcribing": "Transcribiendo..."
+  "recognizingText": "Reconociendo texto...",
+  "recognizingQuestions": "Reconociendo preguntas...",
+  "smartSegmentation": "Segmentación inteligente",
+  "segmenting": "Segmentando...",
+  "transcribing": "Transcribiendo...",
+  "autoRecognizeQuestions": "Reconocimiento automático de preguntas con IA",
+  "autoRecognizeQuestionsDesc": "Generar automáticamente preguntas al cargar un episodio",
+  "blog_title": "Blog",
+  "blog_subtitle": "Explora las profundidades del mundo interior a través de mensajes universales.",
+  "search_articles_placeholder": "Buscar artículos...",
+  "all_categories": "Todos",
+  "read_article": "Leer",
+  "back_to_articles": "Volver a los artículos",
+  "watch_on_youtube": "Ver en YouTube",
+  "video_version": "Versión en video",
+  "reading_time_minutes_one": "{count} minuto de lectura",
+  "reading_time_minutes_many": "{count} minutos de lectura",
+  "published_on": "Publicado"
 }

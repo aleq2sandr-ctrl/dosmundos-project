@@ -59,6 +59,58 @@ export const formatShortDate = (dateString, language = 'ru') => {
   }
 };
 
+// Функция для расчета времени чтения статьи
+// Средняя скорость чтения: 200 слов/мин для русского, 250 слов/мин для английского
+export const calculateReadingTime = (htmlContent, lang = 'ru') => {
+  if (!htmlContent) return 1;
+  
+  // Remove HTML tags
+  const textContent = htmlContent.replace(/<[^>]+>/g, ' ');
+  
+  // Count words (split by whitespace and filter empty strings)
+  const words = textContent.trim().split(/\s+/).filter(word => word.length > 0);
+  const wordCount = words.length;
+  
+  // Words per minute based on language
+  const wordsPerMinute = lang === 'ru' ? 200 : 250;
+  
+  // Calculate reading time in minutes, round up
+  const readingTime = Math.max(1, Math.ceil(wordCount / wordsPerMinute));
+  
+  return readingTime;
+};
+
+// Функция для форматирования даты статьи в зависимости от языка
+export const formatArticleDate = (dateString, lang = 'ru') => {
+  if (!dateString) return '';
+  
+  try {
+    const date = new Date(dateString);
+    
+    // Locale mapping
+    const localeMap = {
+      'ru': 'ru-RU',
+      'es': 'es-ES',
+      'en': 'en-US',
+      'de': 'de-DE',
+      'fr': 'fr-FR',
+      'pl': 'pl-PL'
+    };
+    
+    const locale = localeMap[lang] || 'ru-RU';
+    
+    // Format: "15 декабря 2024" or "December 15, 2024"
+    return new Intl.DateTimeFormat(locale, { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    }).format(date);
+  } catch (error) {
+    console.warn('Invalid date format:', dateString);
+    return '';
+  }
+};
+
 // Функция для преобразования аудио URL через прокси (для обхода CORS)
 export const getProxiedAudioUrl = (originalUrl) => originalUrl;
 

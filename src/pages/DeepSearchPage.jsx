@@ -131,28 +131,25 @@ const DeepSearchPage = ({ currentLanguage }) => {
         .from('episodes')
         .select(`
           slug, 
-          title, 
           date, 
-          lang,
-          episode_translations (
+          transcripts (
             title,
             lang
           )
-        `)
-        .or(`lang.eq.${currentLanguage},lang.eq.all`);
+        `);
       if (episodesError) throw episodesError;
 
       const tempEpisodeTitlesMap = dbEpisodes.reduce((acc, ep) => {
         // Try to find translation for current language
-        let displayTitle = ep.title;
-        if (ep.episode_translations && Array.isArray(ep.episode_translations)) {
-            const translation = ep.episode_translations.find(t => t.lang === currentLanguage);
+        let displayTitle = null;
+        if (ep.transcripts && Array.isArray(ep.transcripts)) {
+            const translation = ep.transcripts.find(t => t.lang === currentLanguage);
             if (translation && translation.title) {
                 displayTitle = translation.title;
             }
         }
         
-        acc[ep.slug] = formatEpisodeTitleForDisplay(displayTitle, ep.date, ep.lang, currentLanguage);
+        acc[ep.slug] = formatEpisodeTitleForDisplay(displayTitle, ep.date, 'all', currentLanguage);
         return acc;
       }, {});
       setEpisodeTitlesMap(tempEpisodeTitlesMap);
@@ -163,11 +160,35 @@ const DeepSearchPage = ({ currentLanguage }) => {
         .or(`lang.eq.${currentLanguage},lang.eq.all`);
       if (questionsError) throw questionsError;
 
-      const { data: dbTranscripts, error: transcriptsError } = await supabase
-        .from('transcripts')
-        .select('episode_slug, lang, edited_transcript_data')
-        .or(`lang.eq.${currentLanguage},lang.eq.all`);
-      if (transcriptsError) throw transcriptsError;
+      // Optimized transcript search using server-side Full Text Search
+      const getTsConfig = (lang) => {
+        const map = {
+            'ru': 'russian',
+            'en': 'english',
+            'es': 'spanish',
+            'de': 'german',
+            'fr': 'french',
+        };
+        return map[lang] || 'simple';
+      };
+
+      let dbTranscripts = [];
+      try {
+        const { data, error } = await supabase
+          .from('transcripts')
+          .select('episode_slug, lang, edited_transcript_data')
+          .or(`lang.eq.${currentLanguage},lang.eq.all`)
+          .textSearch('search_vector', query, {
+            type: 'websearch',
+            config: getTsConfig(currentLanguage)
+          })
+          .limit(20); // Limit results to prevent large payload
+        
+        if (error) throw error;
+        dbTranscripts = data || [];
+      } catch (err) {
+        console.error("Error searching transcripts:", err);
+      }
 
       let combinedResults = [];
 
@@ -179,7 +200,7 @@ const DeepSearchPage = ({ currentLanguage }) => {
       const fuseQuestions = new Fuse(dbQuestions.filter(q => {
           const episode = dbEpisodes.find(ep => ep.slug === q.episode_slug);
           return episode && 
-                 (episode.lang === 'all' ? q.lang === currentLanguage : q.lang === episode.lang) &&
+                 (q.lang === currentLanguage) &&
                  (q.is_intro || q.is_full_transcript || q.id === 'intro-virtual' || (q.title && q.title.trim() !== ''));
       }), fuseOptionsQuestions);
       
@@ -205,7 +226,7 @@ const DeepSearchPage = ({ currentLanguage }) => {
       const allUtterancesForSearch = [];
       dbTranscripts.forEach(transcript => {
         const episode = dbEpisodes.find(ep => ep.slug === transcript.episode_slug);
-        if (!episode || (episode.lang !== 'all' && episode.lang !== currentLanguage)) return;
+        if (!episode) return;
 
         const utterances = transcript.edited_transcript_data?.utterances || [];
         utterances.forEach(utt => {
@@ -213,7 +234,7 @@ const DeepSearchPage = ({ currentLanguage }) => {
                 text: utt.text,
                 start: utt.start,
                 episodeSlug: transcript.episode_slug,
-                episodeLang: episode.lang,
+                episodeLang: 'all',
                 id: `${transcript.episode_slug}-${utt.start}-${Math.random().toString(36).substring(7)}`
             });
         });
@@ -235,10 +256,10 @@ const DeepSearchPage = ({ currentLanguage }) => {
         
         const questionContext = dbQuestions.find(q => 
             q.episode_slug === segment.episodeSlug &&
-            (episode.lang === 'all' ? q.lang === currentLanguage : q.lang === episode.lang) &&
+            (q.lang === currentLanguage) &&
             (q.is_intro || q.is_full_transcript || q.id === 'intro-virtual' || (q.title && q.title.trim() !== '')) &&
             segment.start >= (q.time * 1000) &&
-            (dbQuestions.filter(nq => nq.episode_slug === segment.episodeSlug && (episode.lang === 'all' ? nq.lang === currentLanguage : nq.lang === episode.lang) && nq.time > q.time).sort((a,b) => a.time - b.time)[0]?.time * 1000 || Infinity) > segment.start
+            (dbQuestions.filter(nq => nq.episode_slug === segment.episodeSlug && (nq.lang === currentLanguage) && nq.time > q.time).sort((a,b) => a.time - b.time)[0]?.time * 1000 || Infinity) > segment.start
         )?.title;
 
         combinedResults.push({

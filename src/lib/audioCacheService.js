@@ -181,7 +181,17 @@ class AudioCacheService {
 
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
-        const response = await fetch(url);
+        // Handle CORS for audio files from dosmundos.pe
+        const fetchOptions = {};
+        if (url.includes('dosmundos.pe')) {
+          fetchOptions.mode = 'cors';
+          fetchOptions.credentials = 'omit';
+          fetchOptions.headers = {
+            'Connection': 'keep-alive',
+            'User-Agent': 'DosMundos-Podcast-App/1.0'
+          };
+        }
+        const response = await fetch(url, fetchOptions);
 
         if (!response.ok) {
           // Если это не последний attempt, пробуем еще раз
@@ -205,10 +215,14 @@ class AudioCacheService {
         const reader = response.body.getReader();
         const chunks = [];
 
-        while (true) {
+        let reading = true;
+        while (reading) {
           const { done, value } = await reader.read();
 
-          if (done) break;
+          if (done) {
+            reading = false;
+            break;
+          }
 
           chunks.push(value);
           loaded += value.length;

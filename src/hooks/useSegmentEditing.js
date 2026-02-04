@@ -1,7 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { getLocaleString } from '@/lib/locales';
-import logService from '@/lib/logService';
 import { useEditorAuth } from '@/contexts/EditorAuthContext';
 import { saveEditToHistory } from '@/services/editHistoryService';
 
@@ -99,7 +98,7 @@ const useSegmentEditing = (
         description: getLocaleString('transcriptSegmentUpdatedDesc', currentLanguage),
         className: "bg-green-600/80 border-green-500 text-white"
       });
-      restoreAudioState();
+      // restoreAudioState(); // Removed to prevent playback jump
     } catch (error) {
       console.error("Failed to save segment:", error);
       toast({ title: "Save Error", description: error.message, variant: "destructive" });
@@ -262,7 +261,7 @@ const useSegmentEditing = (
       }
       
       setEditingSegment(null);
-      restoreAudioState();
+      // restoreAudioState(); // Removed to prevent playback jump
     }
   }, [utterances, onSaveEditedSegment, toast, currentLanguage, restoreAudioState, textareaRef, user, episodeSlug, isAuthenticated, editor]);
 

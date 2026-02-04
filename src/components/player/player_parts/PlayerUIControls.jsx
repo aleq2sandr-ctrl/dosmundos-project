@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronLeft, ChevronRight, PlusCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, PlusCircle, Pencil, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import PlayerControls from '@/components/player/PlayerControls';
 import ProgressBar from '@/components/player/ProgressBar';
@@ -10,6 +10,7 @@ import PlayerSettingsMenu from './PlayerSettingsMenu';
 const PlayerUIControls = React.memo(({
   activeQuestionTitle,
   isPlaying,
+  isLoading,
   currentLanguage,
   currentTime,
   duration,
@@ -37,8 +38,14 @@ const PlayerUIControls = React.memo(({
   hasQuestions = false,
   onRecognizeText,
   onRecognizeQuestions,
+  onSmartSegmentation,
   isRecognizingText = false,
-  isRecognizingQuestions = false
+  isRecognizingQuestions = false,
+  isSmartSegmenting = false,
+  isEditMode,
+  setIsEditMode,
+  isAuthenticated,
+  openAuthModal
 }) => {
   
   return (
@@ -79,14 +86,17 @@ const PlayerUIControls = React.memo(({
             hasQuestions={hasQuestions}
             onRecognizeText={onRecognizeText}
             onRecognizeQuestions={onRecognizeQuestions}
+            onSmartSegmentation={onSmartSegmentation}
             isRecognizingText={isRecognizingText}
             isRecognizingQuestions={isRecognizingQuestions}
+            isSmartSegmenting={isSmartSegmenting}
           />
           <Button variant="ghost" size="icon" onClick={() => onNavigateQuestion(-1)} className="text-white/80 hover:text-white hover:bg-white/15 h-9 w-9 sm:h-10 sm:w-10 md:h-11 md:w-11" aria-label={getLocaleString('previousQuestion', currentLanguage)}>
             <ChevronLeft className="h-5 w-5 sm:h-5 sm:w-5 md:h-6 md:w-6" />
           </Button>
           <PlayerControls
             isPlaying={isPlaying}
+            isLoading={isLoading}
             onPlayPause={onTogglePlayPause}
             onSkip={onSkip}
             variant="compact"
@@ -95,15 +105,50 @@ const PlayerUIControls = React.memo(({
           <Button variant="ghost" size="icon" onClick={() => onNavigateQuestion(1)} className="text-white/80 hover:text-white hover:bg-white/15 h-9 w-9 sm:h-10 sm:w-10 md:h-11 md:w-11" aria-label={getLocaleString('nextQuestion', currentLanguage)}>
             <ChevronRight className="h-5 w-5 sm:h-5 sm:w-5 md:h-6 md:w-6" />
           </Button>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={onOpenAddQuestionDialog}
-            className="text-white/80 hover:text-white hover:bg-white/15 h-9 w-9 sm:h-10 sm:w-10 md:h-11 md:w-11" 
-            aria-label={getLocaleString('addQuestion', currentLanguage)}
-          >
-            <PlusCircle className="h-4 w-4 sm:h-5 sm:w-5 md:h-5 md:w-5" />
-          </Button>
+          
+          {/* Edit Mode Toggle / Add Question */}
+          {!isAuthenticated ? (
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={openAuthModal}
+              className="text-white/80 hover:text-white hover:bg-white/15 h-9 w-9 sm:h-10 sm:w-10 md:h-11 md:w-11" 
+              aria-label={getLocaleString('enterEditMode', currentLanguage)}
+            >
+              <Pencil className="h-4 w-4 sm:h-5 sm:w-5 md:h-5 md:w-5" />
+            </Button>
+          ) : !isEditMode ? (
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => setIsEditMode(true)}
+              className="text-white/80 hover:text-white hover:bg-white/15 h-9 w-9 sm:h-10 sm:w-10 md:h-11 md:w-11" 
+              aria-label={getLocaleString('enterEditMode', currentLanguage)}
+            >
+              <Pencil className="h-4 w-4 sm:h-5 sm:w-5 md:h-5 md:w-5" />
+            </Button>
+          ) : (
+            <div className="flex items-center">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={onOpenAddQuestionDialog}
+                className="text-white/80 hover:text-white hover:bg-white/15 h-9 w-9 sm:h-10 sm:w-10 md:h-11 md:w-11" 
+                aria-label={getLocaleString('addQuestion', currentLanguage)}
+              >
+                <PlusCircle className="h-4 w-4 sm:h-5 sm:w-5 md:h-5 md:w-5" />
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => setIsEditMode(false)}
+                className="text-white/80 hover:text-white hover:bg-white/15 h-9 w-9 sm:h-10 sm:w-10 md:h-11 md:w-11" 
+                aria-label={getLocaleString('exitEditMode', currentLanguage)}
+              >
+                <X className="h-4 w-4 sm:h-5 sm:w-5 md:h-5 md:w-5" />
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </div>

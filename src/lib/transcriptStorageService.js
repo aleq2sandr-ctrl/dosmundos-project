@@ -1,145 +1,91 @@
 import { createClient } from '@supabase/supabase-js';
 import logger from './logger.js';
 
+let supabaseClient = null;
+
 const getSupabaseServerClient = () => {
+  if (supabaseClient) return supabaseClient;
+
   // Server-side only - check Node.js environment
   if (typeof window !== 'undefined') {
     logger.warn('supabaseServerClient called in browser - using fallback');
-    return createClient(
+    supabaseClient = createClient(
       'https://supabase.dosmundos.pe',
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlLWRlbW8iLCJpYXQiOjE2NDE3NjkyMDAsImV4cCI6MTk5OTk5OTk5OX0.A4_N08ZorXYT17zhZReBXPlY6L5-9d8thMbm7TcDWl8'
     );
+    return supabaseClient;
   }
 
   const supabaseUrl = process.env.SUPABASE_URL || 'https://supabase.dosmundos.pe';
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SERVICE_ROLE_KEY;
 
   if (!supabaseServiceKey) {
-    logger.warn('No Supabase service key found, skipping database operations');
-    return null;
+    throw new Error('Supabase service key not found. Please set SUPABASE_SERVICE_ROLE_KEY or SERVICE_ROLE_KEY in .env');
   }
 
-  try {
-    return createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
-    });
-  } catch (error) {
-    logger.error('Failed to create Supabase client:', error);
-    return null;
-  }
-};
-
-// VPS Configuration
-const VPS_CONFIG = {
-  host: process.env.VPS_IP || '72.61.186.175',
-  user: process.env.VPS_USER || 'root',
-  password: process.env.VPS_PASSWORD || 'Qazsxdc@1234',
-  remotePath: '/var/storage/transcript/',
-  publicBase: 'https://dosmundos.pe/files/transcript/'
-};
-
-const saveToVPS = async (fileName, content) => {
-  if (typeof window !== 'undefined') {
-    throw new Error('VPS upload not supported in browser');
-  }
-
-  const { Client } = await import('ssh2');
-  
-  return new Promise((resolve, reject) => {
-    const conn = new Client();
-    
-    conn.on('ready', () => {
-      logger.info('SSH Connection ready');
-      
-      conn.sftp((err, sftp) => {
-        if (err) {
-          conn.end();
-          return reject(err);
-        }
-
-        const remoteFilePath = `${VPS_CONFIG.remotePath}${fileName}`;
-        const writeStream = sftp.createWriteStream(remoteFilePath);
-        
-        writeStream.on('close', () => {
-          logger.info(`✅ VPS upload successful: ${fileName}`);
-          conn.end();
-          const publicUrl = `${VPS_CONFIG.publicBase}${fileName}`;
-          resolve({ success: true, url: publicUrl });
-        });
-        
-        writeStream.on('error', (uploadErr) => {
-          logger.error('SFTP upload error:', uploadErr);
-          conn.end();
-          reject(uploadErr);
-        });
-        
-        writeStream.write(content);
-        writeStream.end();
-      });
-    }).on('error', (connErr) => {
-      logger.error('SSH Connection error:', connErr);
-      reject(connErr);
-    }).connect({
-      host: VPS_CONFIG.host,
-      port: 22,
-      username: VPS_CONFIG.user,
-      password: VPS_CONFIG.password,
-      readyTimeout: 20000
-    });
+  supabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
   });
+
+  return supabaseClient;
 };
 
 export const saveFullTranscriptToStorage = async (episodeSlug, lang, transcriptData, provider = 'unknown') => {
-  const fileName = `${episodeSlug}-${lang.toUpperCase()}-full.json`;
+  const fileName = `${episodeSlug}_${lang.toUpperCase()}_${provider}.json`;
   const content = JSON.stringify(transcriptData, null, 2);
-  const fileSizeMB = Buffer.byteLength(content, 'utf8') / (1024 * 1024);
 
-  logger.info(`Saving transcript: ${fileName} (${fileSizeMB.toFixed(2)}MB)`);
+  logger.info(`Uploading transcript to Supabase Storage: ${fileName}`);
 
-  // Always use VPS (Hybrid strategy disabled)
   try {
-    logger.info('Attempting VPS upload...');
-    const vpsResult = await saveToVPS(fileName, content);
-    logger.info('VPS upload successful, updating database...');
-    
-    // Update database with VPS URL (optional)
-    try {
-      const supabase = getSupabaseServerClient();
-      if (!supabase) {
-        logger.warn('No Supabase client available, skipping database update');
-        return { success: true, url: vpsResult.url, storage: 'vps', warning: 'Database update skipped - no Supabase client' };
-      }
+    const supabase = getSupabaseServerClient();
+    // Upload to Supabase Storage 'transcript' bucket (Node.js Buffer for server-side)
+    const fileBuffer = Buffer.from(content, 'utf8');
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('transcript')
+      .upload(fileName, fileBuffer, {
+        contentType: 'application/json',
+        upsert: true
+      });
 
-      const { error: dbError } = await supabase
-        .from('transcripts')
-        .update({
-          storage_url: vpsResult.url,
-          updated_at: new Date().toISOString()
-        })
-        .eq('episode_slug', episodeSlug)
-        .eq('lang', lang);
-
-      if (dbError) {
-        logger.warn('VPS upload OK but DB update failed:', dbError.message);
-        // Don't fail the whole request if just DB update fails, return success with warning
-        return { success: true, url: vpsResult.url, storage: 'vps', warning: 'DB update failed: ' + dbError.message };
-      }
-
-      logger.info('✅ VPS + DB update complete');
-      return { success: true, url: vpsResult.url, storage: 'vps' };
-
-    } catch (dbException) {
-      logger.error('CRITICAL DB ERROR:', dbException);
-      // Return success for the file upload even if DB update crashes
-      return { success: true, url: vpsResult.url, storage: 'vps', warning: 'DB update crashed: ' + (dbException.message || 'Unknown error') };
+    if (uploadError) {
+      logger.error('Supabase upload error:', uploadError);
+      return { success: false, error: uploadError.message };
     }
 
-  } catch (vpsError) {
-    logger.error('VPS upload failed:', vpsError.message);
-    return { success: false, error: `Storage failed: ${vpsError.message}` };
+    logger.info('Upload successful:', uploadData);
+
+    // Generate public URL
+    const { data: urlData } = supabase.storage
+      .from('transcript')
+      .getPublicUrl(fileName);
+
+    const publicUrl = urlData.publicUrl;
+    logger.info('Public URL:', publicUrl);
+
+    // Update database
+    const { error: dbError } = await supabase
+      .from('transcripts')
+      .update({
+        storage_url: publicUrl,
+        updated_at: new Date().toISOString()
+      })
+      .eq('episode_slug', episodeSlug)
+      .eq('lang', lang);
+
+    if (dbError) {
+      logger.error('Database update error:', dbError);
+      return { success: true, url: publicUrl, warning: 'DB update failed' };
+    }
+
+    logger.info('✅ Transcript saved to Supabase Storage and DB updated');
+    return { success: true, url: publicUrl };
+
+  } catch (error) {
+    logger.error('Supabase storage error:', error);
+    return { success: false, error: error.message };
   }
 };
 

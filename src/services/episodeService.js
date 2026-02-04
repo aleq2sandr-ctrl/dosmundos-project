@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabaseClient';
+import { supabase } from '@/lib/supabaseClient.js';
 
 /**
  * Service for managing episodes.

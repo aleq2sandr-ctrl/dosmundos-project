@@ -1,4 +1,6 @@
 {
+  "enterEditMode": "Войти в режим редактирования",
+  "exitEditMode": "Выйти из режима редактирования",
   "appName": "Dos Mundos Radio",
   "loading": "Загрузка...",
   "loadingPodcast": "Загрузка подкаста...",
@@ -843,5 +845,23 @@
   "audioTrackMixed": "Вместе",
   "recognizeText": "Распознать текст",
   "recognizeQuestions": "Распознать вопросы",
-  "transcribing": "Транскрибирую..."
+  "recognizingText": "Распознавание текста...",
+  "recognizingQuestions": "Распознавание вопросов...",
+  "smartSegmentation": "Умная сегментация",
+  "segmenting": "Сегментация...",
+  "transcribing": "Транскрибирую...",
+  "autoRecognizeQuestions": "Автоматическое распознавание вопросов через ИИ",
+  "autoRecognizeQuestionsDesc": "Автоматически генерировать вопросы при загрузке эпизода",
+  "blog_title": "Блог",
+  "blog_subtitle": "Исследуйте глубины внутреннего мира через вселенские послания.",
+  "search_articles_placeholder": "Поиск статей...",
+  "all_categories": "Все",
+  "read_article": "Читать",
+  "back_to_articles": "Назад к статьям",
+  "watch_on_youtube": "Смотреть на YouTube",
+  "video_version": "Видео версия статьи",
+  "reading_time_minutes_one": "{count} минута чтения",
+  "reading_time_minutes_few": "{count} минуты чтения",
+  "reading_time_minutes_many": "{count} минут чтения",
+  "published_on": "Опубликовано"
 }

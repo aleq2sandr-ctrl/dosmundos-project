@@ -503,9 +503,14 @@ export const applyRollback = async (edit) => {
             originalQuestion.episode_slug = episodeSlug;
           }
 
+          // Sanitize question data to remove fields not in DB schema
+          const questionToRestore = { ...originalQuestion };
+          delete questionToRestore.is_intro;
+          delete questionToRestore.is_full_transcript;
+
           const { error: insertError } = await supabase
             .from('timecodes')
-            .insert(originalQuestion);
+            .insert(questionToRestore);
 
           if (insertError) throw insertError;
           

@@ -33,7 +33,8 @@ const SegmentList = ({
   onOpenSpeakerAssignmentDialog,
   onInsertManualSegment,
   availableSpeakers = [],
-  onSetSegmentSpeaker
+  onSetSegmentSpeaker,
+  isEditMode
 }) => {
   
   const segmentsToDisplay = segments.slice(0, visibleSegmentsCount);
@@ -87,6 +88,7 @@ const SegmentList = ({
           onInsertManualSegment={onInsertManualSegment}
           availableSpeakers={availableSpeakers}
           onSetSegmentSpeaker={onSetSegmentSpeaker}
+          isEditMode={isEditMode}
         />
       ))}
       {!isReadingMode && (

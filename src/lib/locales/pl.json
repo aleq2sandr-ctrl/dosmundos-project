@@ -866,5 +866,21 @@
   "audioTrackSpanish": "Pepe",
   "recognizeText": "Rozpoznaj tekst",
   "recognizeQuestions": "Rozpoznaj pytania",
-  "transcribing": "Transkrybuję..."
+  "recognizingText": "Rozpoznawanie tekstu...",
+  "recognizingQuestions": "Rozpoznawanie pytań...",
+  "transcribing": "Transkrybuję...",
+  "autoRecognizeQuestions": "Automatyczne rozpoznawanie pytań przez AI",
+  "autoRecognizeQuestionsDesc": "Automatycznie generuj pytania podczas ładowania odcinka",
+  "blog_title": "Blog",
+  "blog_subtitle": "Odkryj głębie wewnętrznego świata poprzez uniwersalne przemówienia.",
+  "search_articles_placeholder": "Szukaj artykułów...",
+  "all_categories": "Wszystkie",
+  "read_article": "Czytaj",
+  "back_to_articles": "Powrót do artykułów",
+  "watch_on_youtube": "Obejrzyj na YouTube",
+  "video_version": "Wersja wideo",
+  "reading_time_minutes_one": "{count} minuta czytania",
+  "reading_time_minutes_few": "{count} minuty czytania",
+  "reading_time_minutes_many": "{count} minut czytania",
+  "published_on": "Opublikowano"
 }

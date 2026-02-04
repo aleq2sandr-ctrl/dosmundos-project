@@ -7,18 +7,19 @@ const Header = ({ podcastData, currentLanguage = 'ru' }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const translations = {
-    ru: { about: 'О центре', events: 'События', volunteers: 'Волонтерам', radio: 'Радио', live: 'LIVE' },
-    en: { about: 'About', events: 'Events', volunteers: 'Volunteers', radio: 'Radio', live: 'LIVE' },
-    es: { about: 'Sobre nosotros', events: 'Eventos', volunteers: 'Voluntarios', radio: 'Radio', live: 'LIVE' },
-    de: { about: 'Über uns', events: 'Veranstaltungen', volunteers: 'Freiwillige', radio: 'Radio', live: 'LIVE' },
-    fr: { about: 'À propos', events: 'Événements', volunteers: 'Bénévoles', radio: 'Radio', live: 'LIVE' },
-    pl: { about: 'O nas', events: 'Wydarzenia', volunteers: 'Wolontariat', radio: 'Radio', live: 'LIVE' },
+    ru: { about: 'О центре', events: 'События', volunteers: 'Волонтерам', radio: 'Радио', live: 'LIVE', articles: 'Статьи' },
+    en: { about: 'About', events: 'Events', volunteers: 'Volunteers', radio: 'Radio', live: 'LIVE', articles: 'Articles' },
+    es: { about: 'Sobre nosotros', events: 'Eventos', volunteers: 'Voluntarios', radio: 'Radio', live: 'LIVE', articles: 'Artículos' },
+    de: { about: 'Über uns', events: 'Veranstaltungen', volunteers: 'Freiwillige', radio: 'Radio', live: 'LIVE', articles: 'Artikel' },
+    fr: { about: 'À propos', events: 'Événements', volunteers: 'Bénévoles', radio: 'Radio', live: 'LIVE', articles: 'Articles' },
+    pl: { about: 'O nas', events: 'Wydarzenia', volunteers: 'Wolontariat', radio: 'Radio', live: 'LIVE', articles: 'Artykuły' },
   };
 
   const t = translations[currentLanguage] || translations.en;
 
   const navLinks = [
     { to: `/${currentLanguage}/about`, label: t.about },
+    { to: `/${currentLanguage}/articles`, label: t.articles },
     { to: `/${currentLanguage}/events`, label: t.events },
     { to: `/${currentLanguage}/volunteers`, label: t.volunteers },
     { to: `/${currentLanguage}/episodes`, label: t.radio },

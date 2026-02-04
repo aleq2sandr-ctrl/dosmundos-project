@@ -8,21 +8,30 @@ const NewYearPage = () => {
 
   const content = {
     ru: {
-      title: "Новый год в джунглях",
-      subtitle: "31 декабря - 7 января",
+      title: "Новый Год в центре Дос Мундос",
+      subtitle: "31 декабря - 3 января 2026",
       description: [
-        "Приглашаем вас встретить Новый год в сердце Амазонии, в центре Dos Mundos.",
-        "Это уникальная возможность начать год с очищения, обновления и глубокого погружения в себя и природу.",
-        "Программа включает в себя традиционные церемонии, медитации, прогулки по джунглям и общение с мастерами.",
-        "Мы создадим пространство для трансформации и наполнения новой энергией на весь предстоящий год."
+        "Природа по божественному замыслу сохраняет в неприкосновенности древнюю мудрость — богатство, которое мы забыли под разрушительным влиянием мира, в котором живем. В этом смысле Центр Интегрального Развития 'Dos Mundos' сохраняет, переоценивает эти знания и распространяет их по всему миру. Так, в этот раз он стремится приблизить нас и ввести в мир физио-энергетического очищения через прием растений, очистительные ванны, соединение и синхронизацию с различными элементами, достигая гармонизации и выравнивания чакр или энергетических центров, которые жизненно важны для функционирования и равновесия всего нашего существования.",
+        "CDI 'Dos Mundos' представляет и предлагает вам Ванны Цветения (Baños de Florecimiento) как очистительные и обновляющие ванны с использованием различных амазонских, андских и прибрежных растений, которые помогают благополучию человека. Эти ванны имеют процесс приготовления, как это делали наши предки в различных событиях.",
+        "В настоящее время, благодаря Вселенной, достигаются вдохновляющие результаты, за которые мы благодарны каждому из вас за то, что позволили нам быть частью вашего продвижения и трансформации."
       ],
-      schedule: {
-        title: "Программа",
-        items: [
-          "31 декабря: Прибытие, размещение, праздничный ужин и церемония перехода.",
-          "1-6 января: Ежедневные практики, церемонии, интеграция опыта.",
-          "7 января: Завершение программы, отъезд."
-        ]
+      eventDetails: {
+        invitation: "31 декабря, 1, 2, 3... января 2025 года, вы приглашаетесь принять участие в СВЯЩЕННОЙ ЦЕРЕМОНИИ ОЧИЩЕНИЯ с 5 элементами (Ванны Цветения), которая пройдет на 19 км дороги Юримагуас - Тарапото.",
+        includes: {
+          title: "ВКЛЮЧАЕТ",
+          items: [
+            "2 очистительные ванны (с растениями и солью)",
+            "3 гармонизирующие ванны (с цветами, кристаллами и святой водой)",
+            "Окуривание (Sahumada)"
+          ]
+        },
+        pricing: {
+          title: "ЦЕНЫ",
+          items: [
+            "Цена ванн: S/. 200.00",
+            "ПРОМОАКЦИЯ: Ванны S/. 200.00 + Аяуаска S/. 150.00 = S/. 350.00"
+          ]
+        }
       },
       contacts: {
         title: "Бронирование и вопросы:",
@@ -33,21 +42,30 @@ const NewYearPage = () => {
       }
     },
     es: {
-      title: "Año Nuevo en la Selva",
-      subtitle: "31 de diciembre - 7 de enero",
+      title: "Año Nuevo en el Centro Dos Mundos",
+      subtitle: "31 de diciembre - 3 de enero del 2026",
       description: [
-        "Te invitamos a recibir el Año Nuevo en el corazón de la Amazonía, en el centro Dos Mundos.",
-        "Es una oportunidad única para comenzar el año con purificación, renovación y una profunda inmersión en uno mismo y la naturaleza.",
-        "El programa incluye ceremonias tradicionales, meditaciones, caminatas por la selva y compartir con los maestros.",
-        "Crearemos un espacio para la transformación y recarga de nueva energía para todo el año venidero."
+        "La naturaleza por creación divina, mantiene intacta la sabiduría ancestral, riqueza que hemos olvidado por la influencia desgarradora del mundo en el que vivimos. En este sentido, el Centro de Desarrollo Integral \"Dos Mundos\" rescata, revalora estos conocimientos y los difunde por el mundo entero. Es así, que en esta oportunidad busca acercarnos e introducirnos al mundo de la depuración Fisio energética a través de la ingesta de plantas, baños depurativos, conexión y sincronización con diversos elementos, logrando armonizar y alinear los chacras o centros energéticos, los cuales son vitales para el funcionamiento y equilibrio de toda nuestra existencia.",
+        "El CDI \"Dos Mundos\", les presenta y ofrece los Baños de florecimiento, como baños depurativos y renovadores a través de las distintas plantas amazónicas, andinas y costeñas que ayudan al bienestar del hombre. Estos baños tienen un proceso de preparación como lo hacían nuestros antepasados en distintos eventos.",
+        "Actualmente, gracias al Universo, se viene logrando resultados inspiradores de los cuales estamos agradecidos con cada uno de ustedes por permitirnos ser parte de su avance y transformación."
       ],
-      schedule: {
-        title: "Programa",
-        items: [
-          "31 de diciembre: Llegada, alojamiento, cena festiva y ceremonia de transición.",
-          "1-6 de enero: Prácticas diarias, ceremonias, integración de la experiencia.",
-          "7 de enero: Cierre del programa, partida."
-        ]
+      eventDetails: {
+        invitation: "Este 31, 1, 2, 3… de enero del 2026, están cordialmente invitados a participar en la CEREMONIA SAGRADA DE PURIFICACIÓN con 5 elementos (Baños de Florecimiento) que se desarrollará en el km 19 carretera Yurimaguas - Tarapoto.",
+        includes: {
+          title: "INCLUYE",
+          items: [
+            "2 baños purificativos (con plantas y sal)",
+            "3 baños armonizantes (con flores, cristales y agua bendita)",
+            "Sahumada"
+          ]
+        },
+        pricing: {
+          title: "PRECIOS",
+          items: [
+            "Precio de Baños: S/. 200.00",
+            "PROMOCIÓN: Baños S/. 200.00 + Ayahuasca S/. 150.00 = S/. 350.00"
+          ]
+        }
       },
       contacts: {
         title: "Reservas y consultas:",
@@ -58,21 +76,30 @@ const NewYearPage = () => {
       }
     },
     en: {
-      title: "New Year in the Jungle",
-      subtitle: "December 31 - January 7",
+      title: "New Year at Dos Mundos Center",
+      subtitle: "December 31 - January 3, 2026",
       description: [
-        "We invite you to celebrate New Year in the heart of the Amazon, at the Dos Mundos center.",
-        "This is a unique opportunity to start the year with purification, renewal, and deep immersion in yourself and nature.",
-        "The program includes traditional ceremonies, meditations, jungle walks, and sharing with masters.",
-        "We will create a space for transformation and recharging with new energy for the entire coming year."
+        "Nature, by divine creation, keeps ancestral wisdom intact, a wealth we have forgotten due to the heartbreaking influence of the world we live in. In this sense, the Integral Development Center 'Dos Mundos' rescues, revalues these knowledges and spreads them throughout the world. Thus, on this opportunity, it seeks to bring us closer and introduce us to the world of Physio-energetic purification through the ingestion of plants, purifying baths, connection and synchronization with various elements, achieving harmony and alignment of the chakras or energy centers, which are vital for the functioning and balance of our entire existence.",
+        "The CDI 'Dos Mundos' presents and offers you Flowering Baths, as purifying and renewing baths through the different Amazonian, Andean and coastal plants that help man's well-being. These baths have a preparation process as our ancestors did in different events.",
+        "Currently, thanks to the Universe, inspiring results are being achieved for which we are grateful to each of you for allowing us to be part of your progress and transformation."
       ],
-      schedule: {
-        title: "Program",
-        items: [
-          "December 31: Arrival, accommodation, festive dinner, and transition ceremony.",
-          "January 1-6: Daily practices, ceremonies, integration of experience.",
-          "January 7: Program closing, departure."
-        ]
+      eventDetails: {
+        invitation: "This December 31st, January 1st, 2nd, 3rd... 2026, you are cordially invited to participate in the SACRED PURIFICATION CEREMONY with 5 elements (Flowering Baths) which will take place at km 19 Yurimaguas - Tarapoto road.",
+        includes: {
+          title: "INCLUDES",
+          items: [
+            "2 purifying baths (with plants and salt)",
+            "3 harmonizing baths (with flowers, crystals and holy water)",
+            "Smudging (Sahumada)"
+          ]
+        },
+        pricing: {
+          title: "PRICING",
+          items: [
+            "Baths Price: S/. 200.00",
+            "PROMOTION: Baths S/. 200.00 + Ayahuasca S/. 150.00 = S/. 350.00"
+          ]
+        }
       },
       contacts: {
         title: "Booking and inquiries:",
@@ -118,17 +145,35 @@ const NewYearPage = () => {
             </div>
           </div>
 
-          {/* Schedule */}
-          <div className="bg-slate-800/50 rounded-2xl p-8 border border-white/5">
-            <h2 className="text-2xl font-bold text-white mb-6">{t.schedule.title}</h2>
-            <ul className="space-y-4">
-              {t.schedule.items.map((item, index) => (
-                <li key={index} className="flex gap-4">
-                  <div className="w-2 h-2 mt-2.5 rounded-full bg-orange-400 shrink-0" />
-                  <span className="text-slate-300">{item}</span>
-                </li>
-              ))}
-            </ul>
+          {/* Event Details */}
+          <div className="bg-slate-800/50 rounded-2xl p-8 border border-white/5 space-y-8">
+            <p className="text-lg text-slate-300 font-medium">{t.eventDetails.invitation}</p>
+            
+            {/* Includes */}
+            <div>
+              <h3 className="text-xl font-bold text-white mb-4 text-orange-400">{t.eventDetails.includes.title}</h3>
+              <ul className="space-y-3">
+                {t.eventDetails.includes.items.map((item, index) => (
+                  <li key={index} className="flex gap-3">
+                    <div className="w-1.5 h-1.5 mt-2.5 rounded-full bg-orange-400 shrink-0" />
+                    <span className="text-slate-300">{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Pricing */}
+            <div>
+              <h3 className="text-xl font-bold text-white mb-4 text-orange-400">{t.eventDetails.pricing.title}</h3>
+              <ul className="space-y-3">
+                {t.eventDetails.pricing.items.map((item, index) => (
+                  <li key={index} className="flex gap-3">
+                    <div className="w-1.5 h-1.5 mt-2.5 rounded-full bg-orange-400 shrink-0" />
+                    <span className="text-slate-300 font-semibold">{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
 
           {/* Contacts */}

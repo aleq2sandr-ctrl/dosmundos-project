@@ -49,7 +49,7 @@ jobs:
           port: ${{ secrets.VPS_PORT }}
           script: |
             if [ -d "${{ secrets.VPS_PATH }}" ]; then
-              BACKUP_DIR="/var/www/dosmundos/backup-$(date +%Y%m%d-%H%M%S)"
+              BACKUP_DIR="${{ secrets.VPS_PATH }}/backup-$(date +%Y%m%d-%H%M%S)"
               mkdir -p "$BACKUP_DIR"
               cp -r "${{ secrets.VPS_PATH }}"/* "$BACKUP_DIR/" 2>/dev/null || true
               echo "Backup created at $BACKUP_DIR"
@@ -67,9 +67,21 @@ jobs:
 
       - name: Create deployment archive
         run: |
-          cd dist
-          tar -czf ../deploy.tar.gz .
-          ls -lh ../deploy.tar.gz
+          # Prepare deployment directory
+          mkdir -p deployment
+          
+          # Copy frontend build
+          cp -a dist/. deployment/
+          
+          # Copy backend files
+          cp server.js deployment/
+          cp package.json deployment/
+          cp -r api deployment/
+          
+          # Create archive
+          cd deployment && tar -czf ../deploy.tar.gz .
+          cd ..
+          ls -lh deploy.tar.gz
           echo "Archive created successfully"
 
       - name: Upload archive to VPS
@@ -82,7 +94,7 @@ jobs:
           source: "deploy.tar.gz"
           target: "/tmp/"
 
-      - name: Cleanup old files and extract new deployment
+      - name: Deploy to VPS
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -94,35 +106,37 @@ jobs:
             echo "=== Starting deployment ==="
             DEPLOY_PATH="${{ secrets.VPS_PATH }}"
             mkdir -p "$DEPLOY_PATH"
-            
-            # Show current state
-            echo "Current directory contents:"
-            ls -lah "$DEPLOY_PATH" | head -10 || echo "Directory is empty or doesn't exist"
-            
-            # Remove old files (except backup directories)
-            echo "Removing old files (keeping backups)..."
-            cd "$DEPLOY_PATH"
-            find . -mindepth 1 -maxdepth 1 ! -name 'backup-*' -exec rm -rf {} \; || true
-            
+
+            # Backup current deployment
+            if [ -d "$DEPLOY_PATH" ] && [ "$(ls -A $DEPLOY_PATH)" ]; then
+              BACKUP_DIR="$DEPLOY_PATH/backup-$(date +%Y%m%d-%H%M%S)"
+              mkdir -p "$BACKUP_DIR"
+              cp -r "$DEPLOY_PATH"/* "$BACKUP_DIR/" 2>/dev/null || true
+              echo "Backup created at $BACKUP_DIR"
+            fi
+
             # Verify archive exists
             if [ ! -f "/tmp/deploy.tar.gz" ]; then
               echo "ERROR: Archive /tmp/deploy.tar.gz not found!"
               exit 1
             fi
-            
-            # Extract new files
-            echo "Extracting new files..."
+
+            # Extract new files directly to deployment path
+            echo "Extracting new files to $DEPLOY_PATH..."
+            cd "$DEPLOY_PATH"
+            # Clean current directory first
+            rm -rf ./*
             tar -xzf /tmp/deploy.tar.gz
-            
+
             # Clean up archive
             rm -f /tmp/deploy.tar.gz
-            
+
             # Verify extraction
             if [ ! -f "$DEPLOY_PATH/index.html" ]; then
               echo "ERROR: index.html not found after extraction!"
               exit 1
             fi
-            
+
             # List deployed files
             echo "=== Deployed files ==="
             ls -lah "$DEPLOY_PATH" | head -20
@@ -130,7 +144,68 @@ jobs:
             echo "=== Deployment info ==="
             cat "$DEPLOY_PATH/.deployment-info" 2>/dev/null || echo "No deployment info file"
             echo ""
-            echo "Deployment completed successfully!"
+            echo "Frontend deployment completed successfully!"
+
+      - name: Update API server code
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            set -e
+            echo "=== Updating API server code ==="
+            API_PATH="${{ secrets.VPS_PATH }}"
+
+            # Check if it's a git repository
+            if [ -d "$API_PATH/.git" ]; then
+              echo "Pulling latest changes from git..."
+              cd "$API_PATH"
+              git pull origin main || git pull origin master || echo "Git pull failed, but continuing..."
+            else
+              echo "Not a git repository, skipping git pull"
+            fi
+
+            # Install/update dependencies if package.json exists
+            if [ -f "$API_PATH/package.json" ]; then
+              echo "Installing/updating npm dependencies..."
+              cd "$API_PATH"
+              npm ci || npm install || echo "npm install failed, but continuing..."
+            fi
+
+      - name: Restart API server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            set -e
+            echo "=== Restarting API server ==="
+            API_PATH="${{ secrets.VPS_PATH }}"
+
+            # Try to restart with PM2 first
+            if command -v pm2 >/dev/null 2>&1; then
+              echo "Restarting with PM2..."
+              cd "$API_PATH"
+              pm2 restart dosmundos-api || pm2 start server.js --name dosmundos-api || echo "PM2 restart failed"
+            elif [ -f "$API_PATH/package.json" ] && grep -q '"start"' "$API_PATH/package.json"; then
+              # Try with systemd
+              echo "Trying to restart systemd service..."
+              sudo systemctl restart dosmundos-api || sudo service dosmundos-api restart || echo "Systemd restart failed"
+            else
+              echo "Could not determine how to restart API server"
+            fi
+
+            # Check if API is running
+            sleep 2
+            if curl -f http://localhost:3000/api/health >/dev/null 2>&1; then
+              echo "API server is running and responding"
+            else
+              echo "WARNING: API server may not be running properly"
+            fi
 
       - name: Set correct permissions
         uses: appleboy/ssh-action@v1.0.3

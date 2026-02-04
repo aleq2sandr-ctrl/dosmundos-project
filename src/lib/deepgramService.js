@@ -4,6 +4,7 @@
  */
 
 import { supabase } from './supabaseClient';
+import smartSegmentationService from './smartSegmentationService';
 
 let DEEPGRAM_API_KEY = null;
 const DEEPGRAM_BASE_URL = 'https://api.deepgram.com/v1';
@@ -17,8 +18,14 @@ const initializeDeepgram = async () => {
   }
 
   // Try client-side env var first (for local dev)
-  if (import.meta.env.VITE_DEEPGRAM_API_KEY) {
+  if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_DEEPGRAM_API_KEY) {
     DEEPGRAM_API_KEY = import.meta.env.VITE_DEEPGRAM_API_KEY;
+    return DEEPGRAM_API_KEY;
+  }
+
+  // Try server-side env var
+  if (typeof process !== 'undefined' && process.env?.DEEPGRAM_API_KEY) {
+    DEEPGRAM_API_KEY = process.env.DEEPGRAM_API_KEY;
     return DEEPGRAM_API_KEY;
   }
 
@@ -153,6 +160,19 @@ export const submitTranscription = async (audioUrl, language, episodeSlug, curre
         updated_at: new Date().toISOString(),
       }, { onConflict: 'episode_slug,lang' });
 
+    // Smart Segmentation
+    try {
+      console.log('Starting smart segmentation...');
+      const segmentedUtterances = await smartSegmentationService.processTranscript(normalizedData.utterances);
+      normalizedData.utterances = segmentedUtterances;
+      console.log('Smart segmentation completed');
+    } catch (segError) {
+      console.error('Smart segmentation failed, using original:', segError);
+    }
+
+    // Save result
+    await saveTranscriptionResult(episodeSlug, lang, normalizedData);
+
     return normalizedData;
 
   } catch (error) {
@@ -193,87 +213,139 @@ export const getTranscriptionStatus = async (requestId) => {
 
 /**
  * Process completed transcription and save to database
+ * ИСПРАВЛЕНО: решаем проблему 413 Content Too Large
  */
 export const saveTranscriptionResult = async (episodeSlug, lang, transcriptionData) => {
   try {
+    console.log('💾 [DEEPGRAM-SAVE] Начало сохранения транскрипции');
+    console.log('📊 [DEEPGRAM-SAVE] Параметры:', { episodeSlug, lang });
+    
     // Transform Deepgram response to our format
     const utterances = transcriptionData.utterances || [];
     const words = transcriptionData.words || [];
 
-    const transcriptPayload = {
-      episode_slug: episodeSlug,
-      lang: lang,
-      edited_transcript_data: {
-        text: transcriptionData.transcript || '',
-        utterances: utterances.map(u => ({
-          id: u.id || u.start.toString(),
-          start: u.start,
-          end: u.end,
-          text: u.transcript,
-          speaker: u.speaker,
-          words: u.words || []
-        })),
-        words: words.map(w => ({
-          text: w.word || w.text,
-          start: w.start,
-          end: w.end,
-          confidence: w.confidence,
-          speaker: w.speaker
-        }))
-      },
-      status: 'completed',
-      provider: 'deepgram',
-      updated_at: new Date().toISOString()
-    };
+    // Check environment
+    const isBrowser = typeof window !== 'undefined';
 
-    // Upload raw transcription data to storage
-    const fileName = `${episodeSlug}-${lang}-deepgram-raw.json`;
-    const rawJson = JSON.stringify(transcriptionData);
-    const { error: uploadError } = await supabase.storage
-      .from('transcript')
-      .upload(fileName, rawJson, {
-        contentType: 'application/json',
-        upsert: true
-      });
+    if (isBrowser) {
+      console.log('🌐 [DEEPGRAM-SAVE] Клиентская среда: раздельное сохранение...');
+      
+      // Проверяем размер raw данных
+      const rawJson = JSON.stringify(transcriptionData);
+      const rawSize = rawJson.length;
+      console.log('📏 [DEEPGRAM-SAVE] Размер raw данных:', rawSize, 'bytes');
+      
+      // Загружаем raw данные в storage
+      let storageUrl = null;
+      try {
+        const fileName = `${episodeSlug}_${lang.toUpperCase()}_DEEPGRAM.json`;
+        console.log('📁 [DEEPGRAM-SAVE] Загрузка в storage:', fileName);
+        
+        const { error: uploadError } = await supabase.storage
+          .from('transcript')
+          .upload(fileName, rawJson, {
+            contentType: 'application/json',
+            upsert: true
+          });
 
-    if (!uploadError) {
-      const { data: { publicUrl } } = supabase.storage
-        .from('transcript')
-        .getPublicUrl(fileName);
-      transcriptPayload.storage_url = publicUrl;
+        if (!uploadError) {
+          const { data: { publicUrl } } = supabase.storage
+            .from('transcript')
+            .getPublicUrl(fileName);
+          storageUrl = publicUrl;
+          console.log('✅ [DEEPGRAM-SAVE] Raw данные загружены:', storageUrl);
+        } else {
+          console.warn('⚠️ [DEEPGRAM-SAVE] Ошибка загрузки raw данных:', uploadError.message);
+        }
+      } catch (storageError) {
+        console.error('❌ [DEEPGRAM-SAVE] Ошибка storage:', storageError);
+      }
+
+      // Для БД сохраняем только метаданные, чтобы избежать 413
+      const dbPayload = {
+        episode_slug: episodeSlug,
+        lang: lang,
+        status: 'completed',
+        provider: 'deepgram',
+        provider_id: transcriptionData.id,
+        storage_url: storageUrl,
+        // Сохраняем только базовые данные
+        edited_transcript_data: {
+          text: transcriptionData.transcript || transcriptionData.text || '',
+          utterance_count: utterances.length,
+          word_count: words.length,
+          provider_id: transcriptionData.id,
+          has_full_data: !!storageUrl
+        },
+        updated_at: new Date().toISOString()
+      };
+
+      console.log('💾 [DEEPGRAM-SAVE] Сохранение метаданных в БД...');
+      const { error } = await supabase
+        .from('transcripts')
+        .upsert(dbPayload, { onConflict: 'episode_slug,lang' });
+
+      if (error) {
+        console.error('❌ [DEEPGRAM-SAVE] Ошибка сохранения метаданных:', error);
+        throw error;
+      }
+      
+      console.log('✅ [DEEPGRAM-SAVE] Метаданные сохранены успешно');
+      return { success: true };
     } else {
-      console.warn(`Raw data upload failed for ${episodeSlug}-${lang}:`, uploadError.message);
+      // Server-side: use storage service directly
+      console.log('🖥️ [DEEPGRAM-SAVE] Серверная среда...');
+      const { saveFullTranscriptToStorage } = await import('./transcriptStorageService.js');
+      
+      const fullPayload = {
+        episode_slug: episodeSlug,
+        lang: lang,
+        edited_transcript_data: {
+          text: transcriptionData.transcript || transcriptionData.text || '',
+          utterances: utterances.map(u => ({
+            id: u.id || (u.start ? u.start.toString() : `u-${Math.random()}`),
+            start: u.start,
+            end: u.end,
+            text: u.transcript || u.text,
+            speaker: u.speaker,
+            words: u.words || []
+          })),
+          words: words.map(w => ({
+            text: w.word || w.text,
+            start: w.start,
+            end: w.end,
+            confidence: w.confidence,
+            speaker: w.speaker
+          }))
+        },
+        status: 'completed',
+        provider: 'deepgram',
+        updated_at: new Date().toISOString()
+      };
+      
+      const result = await saveFullTranscriptToStorage(episodeSlug, lang, transcriptionData, 'deepgram');
+      if (result.success && result.url) {
+         fullPayload.storage_url = result.url;
+      }
+      
+      const { error } = await supabase
+        .from('transcripts')
+        .upsert(fullPayload, { onConflict: 'episode_slug,lang' });
+      
+      if (error) {
+        console.error('❌ [DEEPGRAM-SAVE] Финальная ошибка сохранения:', error);
+        throw error;
+      }
     }
 
-    const { error } = await supabase
-      .from('transcripts')
-      .upsert(transcriptPayload, { onConflict: 'episode_slug,lang' });
-
-    if (error) {
-      console.error('Error saving Deepgram transcription:', error);
-      throw error;
-    }
-
-    // Generate AI summary using OpenAI
-    try {
-      // TODO: Integrate real OpenAI summary generation
-      // const summary = await openAIService.generateSummary(transcriptPayload.edited_transcript_data.text);
-      // if (summary) {
-      //   await supabase
-      //     .from('transcripts')
-      //     .update({ short_description: summary })
-      //     .eq('episode_slug', episodeSlug)
-      //     .eq('lang', lang);
-      // }
-      console.log('Summary generation TODO: implement with openAIService');
-    } catch (summaryError) {
-      console.warn('Summary generation failed:', summaryError);
-    }
-
+    console.log('✅ [DEEPGRAM-SAVE] Сохранение завершено успешно');
     return { success: true };
 
   } catch (error) {
-    console.error('Deepgram result saving error:', error);
+    console.error('💥 [DEEPGRAM-SAVE] === КРИТИЧЕСКАЯ ОШИБКА ===');
+    console.error('❌ [DEEPGRAM-SAVE] Тип ошибки:', error.constructor.name);
+    console.error('❌ [DEEPRAM-SAVE] Сообщение:', error.message);
+    console.error('❌ [DEEPGRAM-SAVE] Stack:', error.stack);
     throw error;
   }
 };

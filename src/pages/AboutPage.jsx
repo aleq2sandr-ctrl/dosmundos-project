@@ -1,6 +1,6 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
-import { Mail, Phone, Youtube } from 'lucide-react';
+import { Mail, Phone, Youtube, Instagram } from 'lucide-react';
 
 const AboutPage = () => {
   const { lang } = useParams();
@@ -55,7 +55,8 @@ const AboutPage = () => {
         email: "pepemariadosmundos@gmail.com",
         whatsapp: "+51959144314",
         whatsappName: "Хуан Карлос",
-        youtube: "DOSMUNDOSCDI"
+        youtube: "DOSMUNDOSCDI",
+        instagram: "https://www.instagram.com/dosmundos_peru/"
       }
     },
     es: {
@@ -111,7 +112,8 @@ const AboutPage = () => {
         email: "pepemariadosmundos@gmail.com",
         whatsapp: "+51959144314",
         whatsappName: "Juan Carlos",
-        youtube: "DOSMUNDOSCDI"
+        youtube: "DOSMUNDOSCDI",
+        instagram: "https://www.instagram.com/dosmundos_peru/"
       }
     }
   };
@@ -123,10 +125,10 @@ const AboutPage = () => {
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       {/* Main Title */}
       <div className="mb-12 text-center">
-        <h1 className="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-500 mb-6">
+        <h1 className="text-4xl md:text-5xl font-bold font-serif bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-500 mb-6">
           {data.title}
         </h1>
-        <div className="prose prose-lg prose-invert mx-auto text-slate-300">
+        <div className="prose prose-lg prose-invert font-serif mx-auto text-slate-300">
           {data.description.map((paragraph, idx) => (
             <p key={idx} className="mb-4 leading-relaxed text-justify">
               {paragraph}
@@ -137,11 +139,11 @@ const AboutPage = () => {
 
       {/* Biography Section */}
       <section className="mb-16 bg-slate-900/50 p-8 rounded-2xl border border-slate-800 backdrop-blur-sm">
-        <h2 className="text-3xl font-bold text-white mb-6 border-b border-slate-700 pb-4">
+        <h2 className="text-3xl font-bold font-serif text-white mb-6 border-b border-slate-700 pb-4">
           {data.biography.title}
         </h2>
         <div className="flex flex-col md:flex-row gap-8 items-start">
-          <div className="flex-1 prose prose-invert text-slate-300">
+          <div className="flex-1 prose prose-invert font-serif text-slate-300">
             {data.biography.text.map((paragraph, idx) => (
               <p key={idx} className="mb-4 leading-relaxed text-justify">
                 {paragraph}
@@ -150,7 +152,7 @@ const AboutPage = () => {
           </div>
           <div className="w-full md:w-1/3 shrink-0">
             <img 
-              src="https://static.wixstatic.com/media/nsplsh_696108e5cea1451b8b748e9fe11dd109~mv2.jpg/v1/fill/w_400,h_300,al_c,q_80,usm_0.66_1.00_0.01,blur_2,enc_avif,quality_auto/Pepe.jpg" 
+              src="https://static.wixstatic.com/media/7e97c8_c6a73b3412554d75946af5ddb942012a~mv2.jpg/v1/fill/w_800,h_1334,al_c,q_85,enc_avif,quality_auto/7e97c8_c6a73b3412554d75946af5ddb942012a~mv2.jpg" 
               alt="Pepe Ordoñez" 
               className="w-full rounded-xl shadow-lg object-cover aspect-[3/4]"
             />
@@ -160,11 +162,11 @@ const AboutPage = () => {
 
       {/* Method Section */}
       <section className="mb-16">
-        <h2 className="text-3xl font-bold text-white mb-6 border-b border-slate-800 pb-4">
+        <h2 className="text-3xl font-bold font-serif text-white mb-6 border-b border-slate-800 pb-4">
           {data.method.title}
         </h2>
         <div className="flex flex-col md:flex-row-reverse gap-8 items-start">
-          <div className="flex-1 prose prose-invert text-slate-300">
+          <div className="flex-1 prose prose-invert font-serif text-slate-300">
             {data.method.text.map((paragraph, idx) => (
               <p key={idx} className="mb-4 leading-relaxed text-justify">
                 {paragraph}
@@ -184,10 +186,10 @@ const AboutPage = () => {
       {/* Mission & Vision Grid */}
       <div className="grid md:grid-cols-2 gap-8 mb-16">
         <section className="bg-slate-900/30 p-8 rounded-2xl border border-slate-800">
-          <h2 className="text-2xl font-bold text-purple-400 mb-4">
+          <h2 className="text-2xl font-bold font-serif text-purple-400 mb-4">
             {data.mission.title}
           </h2>
-          <div className="prose prose-invert text-slate-300">
+          <div className="prose prose-invert font-serif text-slate-300">
             {data.mission.text.map((paragraph, idx) => (
               <p key={idx} className="mb-4">
                 {paragraph}
@@ -197,10 +199,10 @@ const AboutPage = () => {
         </section>
 
         <section className="bg-slate-900/30 p-8 rounded-2xl border border-slate-800">
-          <h2 className="text-2xl font-bold text-pink-400 mb-4">
+          <h2 className="text-2xl font-bold font-serif text-pink-400 mb-4">
             {data.vision.title}
           </h2>
-          <div className="prose prose-invert text-slate-300">
+          <div className="prose prose-invert font-serif text-slate-300">
             {data.vision.text.map((paragraph, idx) => (
               <p key={idx} className="mb-4">
                 {paragraph}
@@ -212,7 +214,7 @@ const AboutPage = () => {
 
       {/* Contacts Section */}
       <section className="bg-gradient-to-br from-slate-900 to-slate-800 p-8 rounded-2xl border border-slate-700 text-center">
-        <h2 className="text-3xl font-bold text-white mb-8">
+        <h2 className="text-3xl font-bold font-serif text-white mb-8">
           {data.contacts.title}
         </h2>
         <div className="flex flex-wrap justify-center gap-8 md:gap-16">
@@ -247,7 +249,7 @@ const AboutPage = () => {
             </div>
           </a>
 
-          <a 
+          <a
             href={`https://youtube.com/${data.contacts.youtube}`}
             target="_blank"
             rel="noopener noreferrer"
@@ -258,6 +260,20 @@ const AboutPage = () => {
             </div>
             <span className="text-slate-300 group-hover:text-white transition-colors">
               YouTube
+            </span>
+          </a>
+
+          <a
+            href={data.contacts.instagram}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex flex-col items-center gap-3 group"
+          >
+            <div className="p-4 bg-pink-500/20 rounded-full text-pink-400 group-hover:bg-pink-500 group-hover:text-white transition-all">
+              <Instagram className="w-8 h-8" />
+            </div>
+            <span className="text-slate-300 group-hover:text-white transition-colors">
+              Instagram
             </span>
           </a>
         </div>

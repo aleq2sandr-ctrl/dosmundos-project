@@ -5,7 +5,7 @@ import { getLocaleString } from '@/lib/locales';
 import { Link, useParams } from 'react-router-dom';
 
 const PlayerHeader = ({ episodeTitle, episodeDate, onNavigateBack, onNavigateHistory, currentLanguage, isReadingMode }) => {
-  const logoUrl = "https://silver-lemur-512881.hostingersite.com/wp-content/uploads/2025/02/logo-5-120x120.png";
+  const logoUrl = "/img/logo-5-120x120.png";
   const { lang } = useParams();
   const langPrefix = lang || currentLanguage || 'ru';
 

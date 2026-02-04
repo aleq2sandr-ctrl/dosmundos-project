@@ -70,6 +70,48 @@ export const validateTranscriptData = (transcript) => {
   return { isValid, errors, sanitizedData };
 };
 
+// Helper to fix utterance timings
+const fixUtterances = (utterances) => {
+  if (!Array.isArray(utterances)) return [];
+  
+  return utterances.map((u, index, arr) => {
+    if (!u || typeof u !== 'object') return null;
+    
+    // Ensure start is a non-negative number
+    let start = typeof u.start === 'number' && !isNaN(u.start) && u.start >= 0 ? u.start : 0;
+    
+    // If start is 0 and it's not the first utterance, try to use previous end
+    if (start === 0 && index > 0 && arr[index-1] && typeof arr[index-1].end === 'number') {
+        // Add a small gap (e.g. 100ms) if using previous end
+        start = arr[index-1].end + 100;
+    }
+
+    let end = typeof u.end === 'number' && !isNaN(u.end) ? u.end : 0;
+    
+    // Fix invalid end time (must be > start)
+    if (end <= start) {
+      // Try to use next utterance start
+      if (index < arr.length - 1 && arr[index+1] && typeof arr[index+1].start === 'number' && arr[index+1].start > start) {
+        // End at next start minus small gap
+        end = Math.max(start + 100, arr[index+1].start - 100);
+      } else {
+        // Estimate based on text length (approx 50ms per character) or default 2s
+        // AssemblyAI usually uses milliseconds
+        const textLen = u.text ? u.text.length : 0;
+        const duration = textLen > 0 ? Math.max(1000, textLen * 50) : 2000; // Min 1s
+        end = start + duration;
+      }
+    }
+    
+    return {
+      ...u,
+      start,
+      end,
+      text: u.text || ''
+    };
+  }).filter(u => u !== null);
+};
+
 // Функция для очистки данных транскрипта перед сохранением
 export const sanitizeTranscriptForSave = (transcript) => {
   // Если transcript отсутствует или некорректен, создаем базовую структуру
@@ -88,16 +130,24 @@ export const sanitizeTranscriptForSave = (transcript) => {
     };
   }
 
-  const { isValid, errors, sanitizedData } = validateTranscriptData(transcript);
+  // Attempt to fix utterances before validation
+  const fixedUtterances = fixUtterances(transcript.utterances);
+  
+  const transcriptToValidate = {
+    ...transcript,
+    utterances: fixedUtterances
+  };
+
+  const { isValid, errors, sanitizedData } = validateTranscriptData(transcriptToValidate);
   
   if (!isValid) {
-    console.warn('Transcript validation errors:', errors);
-    // Возвращаем базовые данные с исправленными ошибками
+    console.warn('Transcript validation errors (even after fix attempt):', errors);
+    // Возвращаем данные с исправленными utterances, даже если есть другие ошибки
     return {
       id: transcript.id !== undefined ? Number(transcript.id) || Date.now() : Date.now(),
       episode_slug: transcript.episode_slug || 'unknown',
       lang: transcript.lang || 'en',
-      utterances: Array.isArray(transcript.utterances) ? transcript.utterances : [],
+      utterances: fixedUtterances,
       words: Array.isArray(transcript.words) ? transcript.words : [],
       text: transcript.text || 'No text content',
       status: transcript.status || 'completed',

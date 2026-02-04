@@ -6,6 +6,7 @@ import { getLocaleString } from '@/lib/locales';
 import { getAudioUrl } from '@/lib/audioUrl';
 import { getFullTextFromUtterances } from '@/hooks/transcript/transcriptProcessingUtils';
 import { reconstructTranscriptFromChunks } from '@/lib/transcriptChunkingService';
+import r2Service from '@/lib/r2Service';
 
 // Utility function to check if a file exists on Archive.org
 export const checkEpisodeFileExists = async (episode) => {
@@ -255,7 +256,7 @@ const useEpisodeData = (episodeSlug, currentLanguage, toast) => {
     try {
       const { data, error: questionsError } = await supabase
         .from('timecodes')
-        .select('id, time, title, lang, created_at, episode_slug, is_intro, is_full_transcript')
+        .select('id, time, title, lang, created_at, episode_slug') // Removed is_intro, is_full_transcript as they don't exist in DB
         .eq('episode_slug', epSlug)
         .eq('lang', langForQuestions)
         .order('time', { ascending: true });

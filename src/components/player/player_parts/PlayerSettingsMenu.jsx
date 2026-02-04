@@ -11,7 +11,7 @@ import {
   DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu";
 import { Button } from '@/components/ui/button';
-import { Settings, ScrollText, Download, Gauge, FileText, Volume2, Mic, HelpCircle } from 'lucide-react';
+import { Settings, ScrollText, Download, Gauge, FileText, Volume2, HelpCircle } from 'lucide-react';
 import { getLocaleString } from '@/lib/locales';
 
 const PlayerSettingsMenu = ({
@@ -32,8 +32,10 @@ const PlayerSettingsMenu = ({
   hasQuestions = false,
   onRecognizeText,
   onRecognizeQuestions,
+  onSmartSegmentation,
   isRecognizingText = false,
-  isRecognizingQuestions = false
+  isRecognizingQuestions = false,
+  isSmartSegmenting = false
 }) => {
   // Normalize and dedupe audio variants (accept strings or objects), sort ru, es, mixed, then others
   const normalizeLang = (v) => {
@@ -142,21 +144,7 @@ const PlayerSettingsMenu = ({
 
         <DropdownMenuSeparator className="bg-slate-600" />
 
-        <DropdownMenuItem onClick={onRecognizeText} disabled={isRecognizingText} className="focus:bg-slate-600 text-slate-200">
-          <Mic className="mr-2 h-4 w-4 text-emerald-400" />
-          <span>{isRecognizingText ? getLocaleString('transcribing', currentLanguage) || 'Распознавание текста...' : getLocaleString('recognizeText', currentLanguage) || 'Распознать текст'}</span>
-        </DropdownMenuItem>
 
-        {!hasQuestions && (
-          <DropdownMenuItem onClick={onRecognizeQuestions} disabled={isRecognizingQuestions} className="focus:bg-slate-600 text-slate-200">
-            <HelpCircle className="mr-2 h-4 w-4 text-sky-400" />
-            <span>{isRecognizingQuestions ? getLocaleString('recognizing', currentLanguage) || 'Распознавание вопросов...' : getLocaleString('recognizeQuestions', currentLanguage) || 'Распознать вопросы'}</span>
-          </DropdownMenuItem>
-        )}
-
-        {(hasTranscript || hasQuestions) && (
-          <DropdownMenuSeparator className="bg-slate-700" />
-        )}
 
         <DropdownMenuItem onClick={onDownloadText} className="focus:bg-slate-600 text-slate-200">
           <FileText className="mr-2 h-4 w-4 text-slate-200" />

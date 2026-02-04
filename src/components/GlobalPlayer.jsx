@@ -2,6 +2,8 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { Play, Pause, X, Maximize2 } from 'lucide-react';
+import { getLocaleString } from '@/lib/locales';
+import { formatShortDate } from '@/lib/utils';
 
 const GlobalPlayer = ({ currentLanguage }) => {
   const { 
@@ -21,14 +23,33 @@ const GlobalPlayer = ({ currentLanguage }) => {
   const displayTitle = React.useMemo(() => {
     if (!currentEpisode) return '';
     
+    let title = null;
+
     // Try to find translation for current language
     if (currentEpisode.translations && Array.isArray(currentEpisode.translations)) {
       const translation = currentEpisode.translations.find(t => t.lang === currentLanguage);
-      if (translation && translation.title) return translation.title;
+      if (translation && translation.title) title = translation.title;
     }
     
-    // Fallback to the title in the object (which was set based on the language at the time of loading)
-    return currentEpisode.title || currentEpisode.slug;
+    // Fallback to the title in the object, but avoid generic titles in wrong language
+    if (!title && currentEpisode.title) {
+        const isGeneric = currentEpisode.title.match(/^(Meditación|Meditation|Медитация)\s+\d{2}\.\d{2}\.\d{4}/i);
+        if (!isGeneric) {
+            title = currentEpisode.title;
+        }
+    }
+
+    // Generate localized title if needed
+    if (!title) {
+        const prefix = getLocaleString('meditationTitlePrefix', currentLanguage);
+        let datePart = '';
+        if (currentEpisode.date) {
+            datePart = formatShortDate(currentEpisode.date, currentLanguage);
+        }
+        title = datePart ? `${prefix} ${datePart}` : prefix;
+    }
+    
+    return title || currentEpisode.slug;
   }, [currentEpisode, currentLanguage]);
 
   if (!isGlobalPlayerVisible || !currentEpisode) return null;

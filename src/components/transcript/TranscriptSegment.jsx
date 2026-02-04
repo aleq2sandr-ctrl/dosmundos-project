@@ -81,7 +81,8 @@ const TranscriptSegment = ({
   onOpenSpeakerAssignmentDialog,
   availableSpeakers = [],
   onSetSegmentSpeaker,
-  onInsertManualSegment
+  onInsertManualSegment,
+  isEditMode
 }) => {
   
   const [cursorPositionForSplit, setCursorPositionForSplit] = useState(null);
@@ -253,7 +254,7 @@ const TranscriptSegment = ({
                     </span>
                 )}
               </div>
-              {!isEditingThisSegment && (
+              {!isEditingThisSegment && isEditMode && (
                   <div className="flex items-center gap-0.5">
                       <TooltipProvider delayDuration={200}>
                           <Tooltip>

@@ -20,7 +20,8 @@ const QuestionBlockHeader = ({
   onEditQuestion, 
   currentLanguage,
   segmentsAvailable,
-  isReadingMode
+  isReadingMode,
+  isEditMode
 }) => (
   <div 
     className={`flex justify-between items-center p-1.5 rounded-t-md transition-colors
@@ -56,7 +57,7 @@ const QuestionBlockHeader = ({
                 {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
             </Button>
         )}
-        {!editingSegment && (
+        {!editingSegment && isEditMode && (
           <Button 
             variant="ghost" 
             size="icon_sm" 
@@ -102,7 +103,8 @@ const QuestionBlock = React.memo(({
   onOpenSpeakerAssignmentDialog,
   segmentToHighlight,
   transcriptLoading,
-  questionRangeEndMs
+  questionRangeEndMs,
+  isEditMode
 }) => {
   const [visibleSegmentsCount, setVisibleSegmentsCount] = useState(isReadingMode ? Infinity : 5);
   const { editor, isAuthenticated, openAuthModal } = useEditorAuth();
@@ -279,6 +281,7 @@ const QuestionBlock = React.memo(({
           currentLanguage={currentLanguage}
           segmentsAvailable={segmentsAvailableForHeader}
           isReadingMode={isReadingMode}
+          isEditMode={isEditMode}
         />
         {(isExpanded || editingSegment) && displaySegments && displaySegments.length > 0 && showTranscript && (
           <div className="animate-expand-collapse overflow-hidden">
@@ -313,6 +316,7 @@ const QuestionBlock = React.memo(({
                 onInsertManualSegment={insertSegmentManually}
                 availableSpeakers={availableSpeakers}
                 onSetSegmentSpeaker={handleSetSegmentSpeaker}
+                isEditMode={isEditMode}
              />
            </div>
         )}
