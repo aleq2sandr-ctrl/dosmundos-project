@@ -3,7 +3,10 @@ import React, { useMemo } from 'react';
 import EpisodeListItem from './EpisodeListItem';
 
 const EpisodesList = React.memo(({ episodes, currentLanguage, episodeQuestionsCount, allQuestions, updateTimestamp }) => {
+  console.log('[EpisodesList] Rendering, episodes count:', episodes.length);
+  
   if (episodes.length === 0) {
+    console.log('[EpisodesList] No episodes to show');
     return null; 
   }
 

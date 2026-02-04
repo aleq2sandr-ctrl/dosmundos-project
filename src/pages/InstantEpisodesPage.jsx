@@ -39,8 +39,9 @@ const InstantEpisodesPage = ({ currentLanguage }) => {
   const [selectedMonth, setSelectedMonth] = useState(null);
 
   const observerTarget = useRef(null);
-  const lastLoadedLanguage = useRef(null);
   const currentLangRef = useRef(currentLanguage);
+  const fetchLockRef = useRef(false);
+  const loadingRef = useRef(false); // Use ref for loading state to avoid stale closures
 
   const monthLabels = [
     "january", "february", "march", "april", "may", "june", 
@@ -54,19 +55,26 @@ const InstantEpisodesPage = ({ currentLanguage }) => {
   // Load available years (lightweight query)
   useEffect(() => {
     const loadYears = async () => {
-      const { data, error } = await supabase
-        .from('episodes')
-        .select('date')
-        .order('date', { ascending: false });
-      
-      if (!error && data) {
-        const years = new Set();
-        data.forEach(ep => {
-          if (ep.date) {
-            years.add(new Date(ep.date).getFullYear().toString());
-          }
-        });
-        setAvailableYears(Array.from(years).sort((a, b) => Number(b) - Number(a)));
+      try {
+        console.log('[Episodes] Loading years from Supabase...');
+        const { data, error } = await supabase
+          .from('episodes')
+          .select('date')
+          .order('date', { ascending: false });
+        
+        console.log('[Episodes] Years query result:', { data, error });
+        
+        if (!error && data) {
+          const years = new Set();
+          data.forEach(ep => {
+            if (ep.date) {
+              years.add(new Date(ep.date).getFullYear().toString());
+            }
+          });
+          setAvailableYears(Array.from(years).sort((a, b) => Number(b) - Number(a)));
+        }
+      } catch (err) {
+        console.error('[Episodes] Error loading years:', err);
       }
     };
     loadYears();
@@ -89,7 +97,7 @@ const InstantEpisodesPage = ({ currentLanguage }) => {
         slug: ep.slug,
         date: ep.date,
         created_at: ep.created_at,
-        title: titleObj?.title, // Don't fallback to other languages for title, let UI generate localized default
+        title: titleObj?.title,
         translations: translations,
         lang: 'all',
         audio_url: audioObj?.audio_url,
@@ -102,12 +110,23 @@ const InstantEpisodesPage = ({ currentLanguage }) => {
   // Fetch episodes with pagination and filters
   const fetchEpisodes = useCallback(async (pageToLoad, isReset = false, force = false) => {
     const fetchLang = currentLangRef.current;
-    if (loading && !force) return;
     
+    console.log('[Episodes] fetchEpisodes called:', { pageToLoad, isReset, force, loading: loadingRef.current, fetchLock: fetchLockRef.current });
+    
+    // Prevent double fetch with lock - ALWAYS check lock, even with force
+    if (fetchLockRef.current) {
+      console.log('[Episodes] Skipping fetch - lock active');
+      return;
+    }
+    
+    fetchLockRef.current = true;
+    loadingRef.current = true;
     setLoading(true);
     setError(null);
 
     try {
+      console.log('[Episodes] Fetching episodes, page:', pageToLoad, 'lang:', fetchLang);
+      
       let query = supabase
         .from('episodes')
         .select(`
@@ -144,12 +163,72 @@ const InstantEpisodesPage = ({ currentLanguage }) => {
       const to = from + ITEMS_PER_PAGE - 1;
       query = query.range(from, to);
 
+      console.log('[Episodes] Executing query, range:', from, '-', to);
+      
       const { data: rawEpisodes, error: episodesError } = await query;
+      
+      console.log('[Episodes] Query result:', { 
+        count: rawEpisodes?.length, 
+        error: episodesError 
+      });
 
-      if (episodesError) throw episodesError;
+      if (episodesError) {
+        console.error('[Episodes] Query error:', episodesError);
+        // Try fallback with simpler query
+        console.log('[Episodes] Trying fallback query without related tables...');
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('episodes')
+          .select('slug, date, created_at')
+          .order('date', { ascending: false })
+          .range(from, to);
+        
+        if (fallbackError) {
+          throw fallbackError;
+        }
+        
+        // Transform fallback data
+        const newEpisodes = (fallbackData || []).map(ep => ({
+          slug: ep.slug,
+          date: ep.date,
+          created_at: ep.created_at,
+          title: null,
+          translations: [],
+          lang: 'all',
+          audio_url: null,
+          duration: 0,
+          available_variants: []
+        }));
+        
+        console.log('[Episodes] Fallback result:', newEpisodes.length);
+        
+        if (fetchLang !== currentLangRef.current) return;
+        
+        if (newEpisodes.length === 0) {
+          if (isReset) {
+            setEpisodes([]);
+            setAllQuestions([]);
+            setEpisodeQuestionsCount({});
+          }
+          setHasMore(false);
+          setLoading(false);
+          return;
+        }
+        
+        setEpisodes(prev => isReset ? newEpisodes : [...prev, ...newEpisodes]);
+        setAllQuestions(prev => isReset ? [] : prev);
+        setEpisodeQuestionsCount({});
+        setHasMore(newEpisodes.length === ITEMS_PER_PAGE);
+        setPage(pageToLoad + 1);
+        fetchLockRef.current = false;
+        setLoading(false);
+        return;
+      }
 
       // Check if language changed during fetch
-      if (fetchLang !== currentLangRef.current) return;
+      if (fetchLang !== currentLangRef.current) {
+        fetchLockRef.current = false;
+        return;
+      }
 
       const newEpisodes = transformEpisodeData(rawEpisodes, fetchLang);
       
@@ -159,6 +238,7 @@ const InstantEpisodesPage = ({ currentLanguage }) => {
               setAllQuestions([]);
               setEpisodeQuestionsCount({});
           }
+          fetchLockRef.current = false;
           setHasMore(false);
           setLoading(false);
           return;
@@ -183,7 +263,10 @@ const InstantEpisodesPage = ({ currentLanguage }) => {
           }
       } catch (e) { console.error('Priority questions fetch error', e); }
 
-      if (fetchLang !== currentLangRef.current) return;
+      if (fetchLang !== currentLangRef.current) {
+        fetchLockRef.current = false;
+        return;
+      }
 
       // 2. Update state with ALL episodes but only PRIORITY questions
       setEpisodes(prev => {
@@ -222,9 +305,8 @@ const InstantEpisodesPage = ({ currentLanguage }) => {
 
       setHasMore(newEpisodes.length === ITEMS_PER_PAGE);
       setPage(pageToLoad + 1);
+      fetchLockRef.current = false;
       setLoading(false); // UI is now interactive and showing content
-
-      // 3. Fetch background questions
       if (backgroundEpisodes.length > 0) {
           try {
               const slugs = backgroundEpisodes.map(e => e.slug);
@@ -236,7 +318,10 @@ const InstantEpisodesPage = ({ currentLanguage }) => {
                 .order('time', { ascending: true });
               
               if (backgroundQuestions) {
-                  if (fetchLang !== currentLangRef.current) return;
+                  if (fetchLang !== currentLangRef.current) {
+                    fetchLockRef.current = false;
+                    return;
+                  }
 
                   // Update state with background questions
                   setAllQuestions(prev => {
@@ -269,24 +354,30 @@ const InstantEpisodesPage = ({ currentLanguage }) => {
 
     } catch (err) {
       console.error('Error fetching episodes:', err);
+      fetchLockRef.current = false;
       if (fetchLang === currentLangRef.current) {
         setError(err.message);
         setLoading(false);
       }
     }
-  }, [loading, selectedYear, selectedMonth, transformEpisodeData]);
+  }, [selectedYear, selectedMonth, transformEpisodeData]);
 
   // Initial load (Instant + Fresh)
   useEffect(() => {
-    if (lastLoadedLanguage.current === currentLanguage) return;
-    lastLoadedLanguage.current = currentLanguage;
-
+    console.log('[Episodes] useEffect triggered, currentLanguage:', currentLanguage);
+    
     const loadInitial = async () => {
+      console.log('[Episodes] loadInitial started');
+      // Always show loading state
+      setLoading(true);
+      
       // 1. Try to load from cache instantly
       const cached = localStorage.getItem(`${CACHE_KEY_PREFIX}${currentLanguage}`);
+      console.log('[Episodes] Cache found:', !!cached);
       if (cached && !selectedYear && !selectedMonth) {
         try {
           const { episodes: cachedEpisodes, questions: cachedQuestions } = JSON.parse(cached);
+          console.log('[Episodes] Cached episodes count:', cachedEpisodes?.length);
           if (cachedEpisodes && cachedEpisodes.length > 0) {
             setEpisodes(cachedEpisodes);
             setAllQuestions(cachedQuestions || []);
@@ -300,6 +391,7 @@ const InstantEpisodesPage = ({ currentLanguage }) => {
             });
             setEpisodeQuestionsCount(counts);
             setPage(1); // Assume we loaded page 0
+            console.log('[Episodes] Cache loaded, episodes:', cachedEpisodes.length);
           }
         } catch (e) {
           console.error('Error parsing cache', e);
@@ -307,27 +399,30 @@ const InstantEpisodesPage = ({ currentLanguage }) => {
       }
 
       // 2. Fetch fresh data for page 0
+      console.log('[Episodes] Fetching fresh data...');
       await fetchEpisodes(0, true, true);
+      console.log('[Episodes] fetchEpisodes completed');
     };
 
     loadInitial();
-  }, [currentLanguage, fetchEpisodes, selectedYear, selectedMonth]);
+  }, [currentLanguage, selectedYear, selectedMonth]);
 
   // Reset and reload when filters change
   useEffect(() => {
-    if (!lastLoadedLanguage.current) return; // Skip on initial mount as it's handled above
-    
-    setPage(0);
-    setHasMore(true);
-    setEpisodes([]);
-    fetchEpisodes(0, true, true);
-  }, [selectedYear, selectedMonth, fetchEpisodes]); 
+    if (selectedYear !== null || selectedMonth !== null) {
+      setPage(0);
+      setHasMore(true);
+      setEpisodes([]);
+      fetchEpisodes(0, true, true);
+    }
+  }, [selectedYear, selectedMonth]);
 
   // Intersection Observer for infinite scroll
   useEffect(() => {
     const observer = new IntersectionObserver(
       entries => {
-        if (entries[0].isIntersecting && hasMore && !loading) {
+        if (entries[0].isIntersecting && hasMore && !loadingRef.current && !fetchLockRef.current) {
+          console.log('[Episodes] Intersection observer triggered, loading page:', page);
           fetchEpisodes(page, false);
         }
       },
@@ -339,7 +434,7 @@ const InstantEpisodesPage = ({ currentLanguage }) => {
     }
 
     return () => observer.disconnect();
-  }, [hasMore, loading, page, fetchEpisodes]);
+  }, [hasMore, page]);
 
   // Available months for filter
   const availableMonths = useMemo(() => {

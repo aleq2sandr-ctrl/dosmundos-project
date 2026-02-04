@@ -99,3 +99,7 @@ AndroidStudioProjects/
 uploads/
 depcheck-result.json
 eslint-report.json
+
+# Deployment artifacts
+deploy.tar.gz
+deployment/
