@@ -1,6 +1,6 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
-import { Mail, Phone, Facebook } from 'lucide-react';
+import { Mail, Phone, Facebook, MapPin } from 'lucide-react';
 
 const FestivalPage = () => {
   const { lang } = useParams();
@@ -54,10 +54,11 @@ const FestivalPage = () => {
       },
       contacts: {
         title: "Informes y reservas a:",
-        email: "pepemariadosmundos@gmail.com",
         whatsapp1: "+51 959 144 314",
         whatsapp2: "+51 993 332 946",
-        facebook: "dosmundosperu"
+        facebook: "dosmundosperu",
+        location: "Yurimaguas",
+        locationUrl: "https://maps.app.goo.gl/Eybh4a3NFtGwp4A17"
       }
     },
     es: {
@@ -109,7 +110,9 @@ const FestivalPage = () => {
         title: "Informes y reservas a:",
         whatsapp1: "+51 959 144 314",
         whatsapp2: "+51 993 332 946",
-        facebook: "dosmundosperu"
+        facebook: "dosmundosperu",
+        location: "Yurimaguas",
+        locationUrl: "https://maps.app.goo.gl/Eybh4a3NFtGwp4A17"
       }
     }
   };
@@ -169,46 +172,72 @@ const FestivalPage = () => {
 
       {/* Contacts Section */}
       <section className="bg-gradient-to-br from-slate-900 to-slate-800 p-8 rounded-2xl border border-slate-700 text-center">
-        <h2 className="text-3xl font-bold text-white mb-8">
+        <h2 className="text-3xl font-bold text-white mb-12">
           {data.contacts.title}
         </h2>
-        <div className="flex flex-wrap justify-center gap-8 md:gap-16">
-          <div className="flex flex-col items-center gap-3">
-            <div className="p-4 bg-green-500/20 rounded-full text-green-400">
-              <Phone className="w-8 h-8" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto">
+          {/* WhatsApp 1 */}
+          <a 
+            href={`https://wa.me/${data.contacts.whatsapp1.replace(/\D/g, '')}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group flex flex-col items-center gap-3 p-4 rounded-lg bg-slate-800/50 border border-slate-700/50 hover:border-green-500/50 hover:bg-green-500/10 transition-all"
+          >
+            <div className="p-2 bg-green-500/20 rounded-lg text-green-400 group-hover:bg-green-500 group-hover:text-white transition-all group-hover:scale-110">
+              <Phone size={18} />
             </div>
-            <div className="flex flex-col items-center gap-2">
-              <a 
-                href={`https://wa.me/${data.contacts.whatsapp1.replace(/\D/g, '')}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-slate-300 hover:text-white transition-colors font-medium"
-              >
-                {data.contacts.whatsapp1}
-              </a>
-              <a 
-                href={`https://wa.me/${data.contacts.whatsapp2.replace(/\D/g, '')}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-slate-300 hover:text-white transition-colors font-medium"
-              >
-                {data.contacts.whatsapp2}
-              </a>
+            <div className="text-center">
+              <div className="text-xs uppercase tracking-wider text-slate-400 group-hover:text-green-400 transition-colors mb-1 font-medium">WhatsApp</div>
+              <div className="text-xs text-slate-300 group-hover:text-slate-200 font-mono">{data.contacts.whatsapp1}</div>
             </div>
-          </div>
+          </a>
 
+          {/* WhatsApp 2 */}
+          <a 
+            href={`https://wa.me/${data.contacts.whatsapp2.replace(/\D/g, '')}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group flex flex-col items-center gap-3 p-4 rounded-lg bg-slate-800/50 border border-slate-700/50 hover:border-green-500/50 hover:bg-green-500/10 transition-all"
+          >
+            <div className="p-2 bg-green-500/20 rounded-lg text-green-400 group-hover:bg-green-500 group-hover:text-white transition-all group-hover:scale-110">
+              <Phone size={18} />
+            </div>
+            <div className="text-center">
+              <div className="text-xs uppercase tracking-wider text-slate-400 group-hover:text-green-400 transition-colors mb-1 font-medium">WhatsApp</div>
+              <div className="text-xs text-slate-300 group-hover:text-slate-200 font-mono">{data.contacts.whatsapp2}</div>
+            </div>
+          </a>
+
+          {/* Location */}
+          <a
+            href={data.contacts.locationUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group flex flex-col items-center gap-3 p-4 rounded-lg bg-slate-800/50 border border-slate-700/50 hover:border-blue-500/50 hover:bg-blue-500/10 transition-all"
+          >
+            <div className="p-2 bg-blue-500/20 rounded-lg text-blue-400 group-hover:bg-blue-500 group-hover:text-white transition-all group-hover:scale-110">
+              <MapPin size={18} />
+            </div>
+            <div className="text-center">
+              <div className="text-xs uppercase tracking-wider text-slate-400 group-hover:text-blue-400 transition-colors mb-1 font-medium">Ubicación</div>
+              <div className="text-xs text-slate-300 group-hover:text-slate-200">{data.contacts.location}</div>
+            </div>
+          </a>
+
+          {/* Facebook */}
           <a 
             href={`https://facebook.com/${data.contacts.facebook}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex flex-col items-center gap-3 group"
+            className="group flex flex-col items-center gap-3 p-4 rounded-lg bg-slate-800/50 border border-slate-700/50 hover:border-blue-600/50 hover:bg-blue-600/10 transition-all"
           >
-            <div className="p-4 bg-blue-600/20 rounded-full text-blue-500 group-hover:bg-blue-600 group-hover:text-white transition-all">
-              <Facebook className="w-8 h-8" />
+            <div className="p-2 bg-blue-600/20 rounded-lg text-blue-500 group-hover:bg-blue-600 group-hover:text-white transition-all group-hover:scale-110">
+              <Facebook size={18} />
             </div>
-            <span className="text-slate-300 group-hover:text-white transition-colors">
-              Facebook
-            </span>
+            <div className="text-center">
+              <div className="text-xs uppercase tracking-wider text-slate-400 group-hover:text-blue-400 transition-colors mb-1 font-medium">Facebook</div>
+              <div className="text-xs text-slate-300 group-hover:text-slate-200">{data.contacts.facebook}</div>
+            </div>
           </a>
         </div>
       </section>

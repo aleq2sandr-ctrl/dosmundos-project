@@ -1,6 +1,6 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
-import { Mail, Phone, Youtube, Instagram } from 'lucide-react';
+import { Mail, Phone, Youtube, Instagram, MapPin } from 'lucide-react';
 
 const AboutPage = () => {
   const { lang } = useParams();
@@ -55,7 +55,9 @@ const AboutPage = () => {
         whatsapp: "+51993332946",
         whatsappName: "Мария",
         youtube: "DOSMUNDOSCDI",
-        instagram: "https://www.instagram.com/dosmundos_peru/"
+        instagram: "https://www.instagram.com/dosmundos_peru/",
+        location: "Yurimaguas",
+        locationUrl: "https://maps.app.goo.gl/Eybh4a3NFtGwp4A17"
       }
     },
     es: {
@@ -111,7 +113,9 @@ const AboutPage = () => {
         whatsapp: "+51993332946",
         whatsappName: "Maria",
         youtube: "DOSMUNDOSCDI",
-        instagram: "https://www.instagram.com/dosmundos_peru/"
+        instagram: "https://www.instagram.com/dosmundos_peru/",
+        location: "Yurimaguas",
+        locationUrl: "https://maps.app.goo.gl/Eybh4a3NFtGwp4A17"
       }
     }
   };
@@ -211,56 +215,101 @@ const AboutPage = () => {
       </div>
 
       {/* Contacts Section */}
-      <section className="bg-gradient-to-br from-slate-900 to-slate-800 p-8 rounded-2xl border border-slate-700 text-center">
-        <h2 className="text-3xl font-bold font-serif text-white mb-8">
+      <section className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-12 rounded-2xl border border-slate-700 text-center">
+        <h2 className="text-3xl font-bold font-serif text-white mb-12 text-4xl">
           {data.contacts.title}
         </h2>
-        <div className="flex flex-wrap justify-center gap-8 md:gap-16">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 max-w-5xl mx-auto">
+          {/* WhatsApp */}
           <a 
             href={`https://wa.me/${data.contacts.whatsapp.replace('+', '')}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex flex-col items-center gap-3 group"
+            className="group flex flex-col items-center gap-4 p-6 rounded-xl bg-slate-800/50 border border-slate-700/50 hover:border-green-500/50 hover:bg-green-500/10 transition-all duration-300 hover:shadow-lg hover:shadow-green-500/20"
           >
-            <div className="p-4 bg-green-500/20 rounded-full text-green-400 group-hover:bg-green-500 group-hover:text-white transition-all">
-              <Phone className="w-8 h-8" />
+            <div className="p-3 bg-green-500/20 rounded-full text-green-400 group-hover:bg-green-500 group-hover:text-white transition-all group-hover:scale-110">
+              <Phone className="w-6 h-6" />
             </div>
             <div className="flex flex-col items-center">
-              <span className="text-slate-300 group-hover:text-white transition-colors font-medium">
-                {data.contacts.whatsapp}
+              <span className="text-xs uppercase tracking-wider text-slate-400 group-hover:text-green-400 transition-colors mb-1 font-medium">
+                WhatsApp
               </span>
-              <span className="text-sm text-slate-500 group-hover:text-slate-300">
+              <span className="text-sm font-semibold text-white group-hover:text-green-300 transition-colors">
                 {data.contacts.whatsappName}
+              </span>
+              <span className="text-xs text-slate-500 group-hover:text-slate-300 mt-1 font-mono">
+                {data.contacts.whatsapp}
               </span>
             </div>
           </a>
 
+          {/* Location */}
+          <a
+            href={data.contacts.locationUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group flex flex-col items-center gap-4 p-6 rounded-xl bg-slate-800/50 border border-slate-700/50 hover:border-blue-500/50 hover:bg-blue-500/10 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/20"
+          >
+            <div className="p-3 bg-blue-500/20 rounded-full text-blue-400 group-hover:bg-blue-500 group-hover:text-white transition-all group-hover:scale-110">
+              <MapPin className="w-6 h-6" />
+            </div>
+            <div className="flex flex-col items-center">
+              <span className="text-xs uppercase tracking-wider text-slate-400 group-hover:text-blue-400 transition-colors mb-1 font-medium">
+                Ubicación
+              </span>
+              <span className="text-sm font-semibold text-white group-hover:text-blue-300 transition-colors">
+                {data.contacts.location}
+              </span>
+              <span className="text-xs text-slate-500 group-hover:text-slate-300 mt-1">
+                Ver en mapa
+              </span>
+            </div>
+          </a>
+
+          {/* YouTube */}
           <a
             href={`https://youtube.com/${data.contacts.youtube}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex flex-col items-center gap-3 group"
+            className="group flex flex-col items-center gap-4 p-6 rounded-xl bg-slate-800/50 border border-slate-700/50 hover:border-red-500/50 hover:bg-red-500/10 transition-all duration-300 hover:shadow-lg hover:shadow-red-500/20"
           >
-            <div className="p-4 bg-red-500/20 rounded-full text-red-400 group-hover:bg-red-500 group-hover:text-white transition-all">
-              <Youtube className="w-8 h-8" />
+            <div className="p-3 bg-red-500/20 rounded-full text-red-400 group-hover:bg-red-500 group-hover:text-white transition-all group-hover:scale-110">
+              <Youtube className="w-6 h-6" />
             </div>
-            <span className="text-slate-300 group-hover:text-white transition-colors">
-              YouTube
-            </span>
+            <div className="flex flex-col items-center">
+              <span className="text-xs uppercase tracking-wider text-slate-400 group-hover:text-red-400 transition-colors mb-1 font-medium">
+                Channel
+              </span>
+              <span className="text-sm font-semibold text-white group-hover:text-red-300 transition-colors">
+                YouTube
+              </span>
+              <span className="text-xs text-slate-500 group-hover:text-slate-300 mt-1">
+                {data.contacts.youtube}
+              </span>
+            </div>
           </a>
 
+          {/* Instagram */}
           <a
             href={data.contacts.instagram}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex flex-col items-center gap-3 group"
+            className="group flex flex-col items-center gap-4 p-6 rounded-xl bg-slate-800/50 border border-slate-700/50 hover:border-pink-500/50 hover:bg-pink-500/10 transition-all duration-300 hover:shadow-lg hover:shadow-pink-500/20"
           >
-            <div className="p-4 bg-pink-500/20 rounded-full text-pink-400 group-hover:bg-pink-500 group-hover:text-white transition-all">
-              <Instagram className="w-8 h-8" />
+            <div className="p-3 bg-pink-500/20 rounded-full text-pink-400 group-hover:bg-pink-500 group-hover:text-white transition-all group-hover:scale-110">
+              <Instagram className="w-6 h-6" />
             </div>
-            <span className="text-slate-300 group-hover:text-white transition-colors">
-              Instagram
-            </span>
+            <div className="flex flex-col items-center">
+              <span className="text-xs uppercase tracking-wider text-slate-400 group-hover:text-pink-400 transition-colors mb-1 font-medium">
+                Social
+              </span>
+              <span className="text-sm font-semibold text-white group-hover:text-pink-300 transition-colors">
+                Instagram
+              </span>
+              <span className="text-xs text-slate-500 group-hover:text-slate-300 mt-1 truncate">
+                @dosmundos_peru
+              </span>
+            </div>
           </a>
         </div>
       </section>

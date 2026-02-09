@@ -37,7 +37,9 @@ const NewYearPage = () => {
         title: "Бронирование и вопросы:",
         whatsapp1: "+51 959 144 314",
         whatsapp2: "+51 993 332 946",
-        facebook: "dosmundosperu"
+        facebook: "dosmundosperu",
+        location: "Yurimaguas",
+        locationUrl: "https://maps.app.goo.gl/Eybh4a3NFtGwp4A17"
       }
     },
     es: {
@@ -70,7 +72,9 @@ const NewYearPage = () => {
         title: "Reservas y consultas:",
         whatsapp1: "+51 959 144 314",
         whatsapp2: "+51 993 332 946",
-        facebook: "dosmundosperu"
+        facebook: "dosmundosperu",
+        location: "Yurimaguas",
+        locationUrl: "https://maps.app.goo.gl/Eybh4a3NFtGwp4A17"
       }
     },
     en: {
@@ -103,7 +107,9 @@ const NewYearPage = () => {
         title: "Booking and inquiries:",
         whatsapp1: "+51 959 144 314",
         whatsapp2: "+51 993 332 946",
-        facebook: "dosmundosperu"
+        facebook: "dosmundosperu",
+        location: "Yurimaguas",
+        locationUrl: "https://maps.app.goo.gl/Eybh4a3NFtGwp4A17"
       }
     }
   };
@@ -175,42 +181,62 @@ const NewYearPage = () => {
 
           {/* Contacts */}
           <div className="bg-gradient-to-br from-orange-900/20 to-slate-900 rounded-2xl p-8 border border-orange-500/20">
-            <h2 className="text-2xl font-bold text-white mb-6">{t.contacts.title}</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <h2 className="text-2xl font-bold text-white mb-8 text-center">{t.contacts.title}</h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {/* WhatsApp 1 */}
               <a 
                 href={`https://wa.me/${t.contacts.whatsapp1.replace(/\D/g, '')}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-3 text-slate-300 hover:text-orange-400 transition-colors"
+                className="group flex flex-col items-center gap-3 p-4 rounded-lg bg-slate-800/50 border border-slate-700/50 hover:border-green-500/50 hover:bg-green-500/10 transition-all"
               >
-                <div className="p-2 bg-slate-800 rounded-lg">
-                  <Phone size={20} />
+                <div className="p-2 bg-green-500/20 rounded-lg text-green-400 group-hover:bg-green-500 group-hover:text-white transition-all group-hover:scale-110">
+                  <Phone size={18} />
                 </div>
-                <span>{t.contacts.whatsapp1}</span>
+                <span className="text-xs uppercase tracking-wider text-slate-400 group-hover:text-green-400 transition-colors">WhatsApp</span>
+                <span className="text-xs text-slate-300 group-hover:text-slate-200 font-mono text-center">{t.contacts.whatsapp1}</span>
               </a>
 
+              {/* WhatsApp 2 */}
               <a 
                 href={`https://wa.me/${t.contacts.whatsapp2.replace(/\D/g, '')}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-3 text-slate-300 hover:text-orange-400 transition-colors"
+                className="group flex flex-col items-center gap-3 p-4 rounded-lg bg-slate-800/50 border border-slate-700/50 hover:border-green-500/50 hover:bg-green-500/10 transition-all"
               >
-                <div className="p-2 bg-slate-800 rounded-lg">
-                  <Phone size={20} />
+                <div className="p-2 bg-green-500/20 rounded-lg text-green-400 group-hover:bg-green-500 group-hover:text-white transition-all group-hover:scale-110">
+                  <Phone size={18} />
                 </div>
-                <span>{t.contacts.whatsapp2}</span>
+                <span className="text-xs uppercase tracking-wider text-slate-400 group-hover:text-green-400 transition-colors">WhatsApp</span>
+                <span className="text-xs text-slate-300 group-hover:text-slate-200 font-mono text-center">{t.contacts.whatsapp2}</span>
               </a>
 
+              {/* Location */}
+              <a
+                href={t.contacts.locationUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group flex flex-col items-center gap-3 p-4 rounded-lg bg-slate-800/50 border border-slate-700/50 hover:border-blue-500/50 hover:bg-blue-500/10 transition-all"
+              >
+                <div className="p-2 bg-blue-500/20 rounded-lg text-blue-400 group-hover:bg-blue-500 group-hover:text-white transition-all group-hover:scale-110">
+                  <MapPin size={18} />
+                </div>
+                <span className="text-xs uppercase tracking-wider text-slate-400 group-hover:text-blue-400 transition-colors">Ubicación</span>
+                <span className="text-xs text-slate-300 group-hover:text-slate-200">{t.contacts.location}</span>
+              </a>
+
+              {/* Facebook */}
               <a 
                 href={`https://facebook.com/${t.contacts.facebook}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-3 text-slate-300 hover:text-orange-400 transition-colors"
+                className="group flex flex-col items-center gap-3 p-4 rounded-lg bg-slate-800/50 border border-slate-700/50 hover:border-blue-600/50 hover:bg-blue-600/10 transition-all md:col-span-2"
               >
-                <div className="p-2 bg-slate-800 rounded-lg">
-                  <Facebook size={20} />
+                <div className="p-2 bg-blue-600/20 rounded-lg text-blue-400 group-hover:bg-blue-600 group-hover:text-white transition-all group-hover:scale-110">
+                  <Facebook size={18} />
                 </div>
-                <span>{t.contacts.facebook}</span>
+                <span className="text-xs uppercase tracking-wider text-slate-400 group-hover:text-blue-400 transition-colors">Facebook</span>
+                <span className="text-xs text-slate-300 group-hover:text-slate-200">{t.contacts.facebook}</span>
               </a>
             </div>
           </div>

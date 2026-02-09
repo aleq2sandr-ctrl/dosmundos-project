@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { User, ArrowRight, Youtube, BookOpen, Search, Loader2, Clock, Calendar } from 'lucide-react';
 import { calculateReadingTime, formatArticleDate } from '@/lib/utils';
+import ArticleCardSkeleton from '@/components/ArticleCardSkeleton';
 
 // Color palette for categories
 const categoryColors = {
@@ -26,19 +27,23 @@ const getCategoryColor = (category) => {
 const ArticlesPage = () => {
   const { lang } = useParams();
   const [rawArticles, setRawArticles] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [displayedArticles, setDisplayedArticles] = useState([]);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [visibleCount, setVisibleCount] = useState(6); // Start with 6 items for faster initial load
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
   
   // Infinite scroll observer with debounce
   const observer = useRef();
   const debounceTimer = useRef();
   const lastArticleElementRef = useCallback(node => {
-    if (loading) return;
+    if (isInitialLoading || loadingMore) return;
     if (observer.current) observer.current.disconnect();
     observer.current = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting) {
+      if (entries[0].isIntersecting && hasMore) {
         // Debounce to prevent multiple triggers
         if (debounceTimer.current) clearTimeout(debounceTimer.current);
         debounceTimer.current = setTimeout(() => {
@@ -47,15 +52,18 @@ const ArticlesPage = () => {
       }
     });
     if (node) observer.current.observe(node);
-  }, [loading]);
+  }, [isInitialLoading, loadingMore, hasMore]);
 
-  // Fetch raw data once
+  // Fetch raw data with progressive loading
   useEffect(() => {
     const fetchArticles = async () => {
-      setLoading(true);
+      setIsInitialLoading(true);
+      setLoadingMore(true);
       try {
-        // Try fetching from new schema first - EXCLUDE content field for performance
-        const { data, error } = await supabase
+        // Try fetching from new schema first - with pagination
+        const BATCH_SIZE = 12;
+        
+        const { data, error, count } = await supabase
           .from('articles_v2')
           .select(`
             id,
@@ -70,9 +78,9 @@ const ArticlesPage = () => {
                 category_translations(name, language_code)
               )
             )
-          `)
+          `, { count: 'est' })
           .order('published_at', { ascending: false })
-          .limit(50); // Limit initial fetch to 50 items for better performance
+          .range(offset, offset + BATCH_SIZE - 1);
 
         if (!error && data) {
           // Transform new schema to component format
@@ -99,25 +107,41 @@ const ArticlesPage = () => {
               published_at: a.published_at
             };
           });
-          setRawArticles(transformed);
-          setLoading(false);
+
+          // Update articles progressively
+          setRawArticles(prev => [...prev, ...transformed]);
+          
+          // Check if there are more articles to load
+          if (transformed.length < BATCH_SIZE || (count && offset + BATCH_SIZE >= count)) {
+            setHasMore(false);
+          } else {
+            setHasMore(true);
+          }
+
+          setIsInitialLoading(false);
           return;
         }
 
-        // Fallback to old schema if new one fails (e.g. tables not created yet)
+        // Fallback to old schema if new one fails
         console.warn('New schema fetch failed, falling back to old schema:', error);
         
-        const { data: oldData, error: oldError } = await supabase
+        const { data: oldData, error: oldError, count: oldCount } = await supabase
           .from('articles')
-          .select('id, slug, title, summary, categories, author, youtube_url, created_at')
+          .select('id, slug, title, summary, categories, author, youtube_url, created_at', { count: 'est' })
           .order('created_at', { ascending: false })
-          .limit(50);
+          .range(offset, offset + 11);
 
         if (oldError) throw oldError;
 
         if (oldData) {
-          setRawArticles(oldData);
+          setRawArticles(prev => [...prev, ...oldData]);
+          if (oldData.length < 12 || (oldCount && offset + 12 >= oldCount)) {
+            setHasMore(false);
+          } else {
+            setHasMore(true);
+          }
         }
+        setIsInitialLoading(false);
       } catch (error) {
         console.error('Error fetching articles:', error);
         // Fallback to local JSON
@@ -125,25 +149,36 @@ const ArticlesPage = () => {
           const response = await fetch('/articles/index.json');
           if (response.ok) {
             const data = await response.json();
-            setRawArticles(data.map(a => ({
+            const batch = data.slice(offset, offset + 12).map(a => ({
               slug: a.id,
               title: { [lang]: a.title, ru: a.title },
               summary: { [lang]: a.summary, ru: a.summary },
               categories: a.categories,
               author: a.author,
               youtube_url: a.youtubeUrl
-            })).slice(0, 50)); // Limit to 50 items
+            }));
+            setRawArticles(prev => [...prev, ...batch]);
+            setHasMore(offset + 12 < data.length);
           }
         } catch (e) {
           console.error('Fallback failed:', e);
         }
+        setIsInitialLoading(false);
       } finally {
-        setLoading(false);
+        setLoadingMore(false);
       }
     };
 
     fetchArticles();
-  }, [lang]); // Re-fetch when lang changes to get correct translations from DB (or optimize to fetch all langs)
+  }, [offset, lang]);
+
+  // Load more articles when reaching the end
+  useEffect(() => {
+    if (visibleCount >= rawArticles.length && hasMore && !loadingMore && !isInitialLoading) {
+      setLoadingMore(true);
+      setOffset(prev => prev + 12);
+    }
+  }, [visibleCount, rawArticles.length, hasMore, loadingMore, isInitialLoading]);
 
   // Derive localized articles from raw data
   const articles = useMemo(() => {
@@ -221,12 +256,15 @@ const ArticlesPage = () => {
         </div>
 
         {/* Category Navigation */}
-        {!loading && categories.length > 1 && (
+        {!isInitialLoading && categories.length > 1 && (
           <div className="flex flex-wrap justify-center gap-2 mb-12 font-sans">
             {categories.map(cat => (
               <button
                 key={cat}
-                onClick={() => setSelectedCategory(cat)}
+                onClick={() => {
+                  setSelectedCategory(cat);
+                  setVisibleCount(6); // Reset visible count
+                }}
                 className={`px-4 py-2 rounded-full text-sm transition-all duration-300 border ${
                   selectedCategory === cat
                     ? 'bg-slate-900 text-white border-slate-900 shadow-md scale-105'
@@ -239,9 +277,11 @@ const ArticlesPage = () => {
           </div>
         )}
 
-        {loading ? (
-          <div className="flex justify-center py-20">
-            <Loader2 className="h-12 w-12 animate-spin text-slate-900" />
+        {isInitialLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {[...Array(6)].map((_, i) => (
+              <ArticleCardSkeleton key={`skeleton-${i}`} />
+            ))}
           </div>
         ) : (
           <>
@@ -252,7 +292,7 @@ const ArticlesPage = () => {
                   <div 
                     key={article.id} 
                     ref={isLast ? lastArticleElementRef : null}
-                    className="h-full"
+                    className="h-full animate-in fade-in slide-in-from-bottom-2 duration-300"
                   >
                     <Link 
                       to={`/${lang}/articles/${article.id}`}
@@ -319,10 +359,19 @@ const ArticlesPage = () => {
                   </div>
                 );
               })}
+              
+              {/* Show loading skeletons while loading more */}
+              {loadingMore && visibleCount >= filteredArticles.length && (
+                <>
+                  {[...Array(3)].map((_, i) => (
+                    <ArticleCardSkeleton key={`loading-skeleton-${i}`} />
+                  ))}
+                </>
+              )}
             </div>
             
             {/* Loading indicator for infinite scroll */}
-            {visibleCount < filteredArticles.length && (
+            {visibleCount < filteredArticles.length && loadingMore && (
               <div className="flex justify-center py-8">
                 <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
               </div>
