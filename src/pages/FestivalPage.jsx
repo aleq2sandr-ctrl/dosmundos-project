@@ -107,7 +107,6 @@ const FestivalPage = () => {
       },
       contacts: {
         title: "Informes y reservas a:",
-        email: "pepemariadosmundos@gmail.com",
         whatsapp1: "+51 959 144 314",
         whatsapp2: "+51 993 332 946",
         facebook: "dosmundosperu"
@@ -174,18 +173,6 @@ const FestivalPage = () => {
           {data.contacts.title}
         </h2>
         <div className="flex flex-wrap justify-center gap-8 md:gap-16">
-          <a 
-            href={`mailto:${data.contacts.email}`}
-            className="flex flex-col items-center gap-3 group"
-          >
-            <div className="p-4 bg-blue-500/20 rounded-full text-blue-400 group-hover:bg-blue-500 group-hover:text-white transition-all">
-              <Mail className="w-8 h-8" />
-            </div>
-            <span className="text-slate-300 group-hover:text-white transition-colors">
-              {data.contacts.email}
-            </span>
-          </a>
-
           <div className="flex flex-col items-center gap-3">
             <div className="p-4 bg-green-500/20 rounded-full text-green-400">
               <Phone className="w-8 h-8" />

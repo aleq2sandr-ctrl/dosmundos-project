@@ -52,9 +52,8 @@ const AboutPage = () => {
       },
       contacts: {
         title: "Контакты",
-        email: "pepemariadosmundos@gmail.com",
-        whatsapp: "+51959144314",
-        whatsappName: "Хуан Карлос",
+        whatsapp: "+51993332946",
+        whatsappName: "Мария",
         youtube: "DOSMUNDOSCDI",
         instagram: "https://www.instagram.com/dosmundos_peru/"
       }
@@ -109,9 +108,8 @@ const AboutPage = () => {
       },
       contacts: {
         title: "Contactos",
-        email: "pepemariadosmundos@gmail.com",
-        whatsapp: "+51959144314",
-        whatsappName: "Juan Carlos",
+        whatsapp: "+51993332946",
+        whatsappName: "Maria",
         youtube: "DOSMUNDOSCDI",
         instagram: "https://www.instagram.com/dosmundos_peru/"
       }
@@ -218,18 +216,6 @@ const AboutPage = () => {
           {data.contacts.title}
         </h2>
         <div className="flex flex-wrap justify-center gap-8 md:gap-16">
-          <a 
-            href={`mailto:${data.contacts.email}`}
-            className="flex flex-col items-center gap-3 group"
-          >
-            <div className="p-4 bg-blue-500/20 rounded-full text-blue-400 group-hover:bg-blue-500 group-hover:text-white transition-all">
-              <Mail className="w-8 h-8" />
-            </div>
-            <span className="text-slate-300 group-hover:text-white transition-colors">
-              {data.contacts.email}
-            </span>
-          </a>
-
           <a 
             href={`https://wa.me/${data.contacts.whatsapp.replace('+', '')}`}
             target="_blank"

@@ -35,7 +35,6 @@ const NewYearPage = () => {
       },
       contacts: {
         title: "Бронирование и вопросы:",
-        email: "pepemariadosmundos@gmail.com",
         whatsapp1: "+51 959 144 314",
         whatsapp2: "+51 993 332 946",
         facebook: "dosmundosperu"
@@ -69,7 +68,6 @@ const NewYearPage = () => {
       },
       contacts: {
         title: "Reservas y consultas:",
-        email: "pepemariadosmundos@gmail.com",
         whatsapp1: "+51 959 144 314",
         whatsapp2: "+51 993 332 946",
         facebook: "dosmundosperu"
@@ -103,7 +101,6 @@ const NewYearPage = () => {
       },
       contacts: {
         title: "Booking and inquiries:",
-        email: "pepemariadosmundos@gmail.com",
         whatsapp1: "+51 959 144 314",
         whatsapp2: "+51 993 332 946",
         facebook: "dosmundosperu"
@@ -180,16 +177,6 @@ const NewYearPage = () => {
           <div className="bg-gradient-to-br from-orange-900/20 to-slate-900 rounded-2xl p-8 border border-orange-500/20">
             <h2 className="text-2xl font-bold text-white mb-6">{t.contacts.title}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <a 
-                href={`mailto:${t.contacts.email}`}
-                className="flex items-center gap-3 text-slate-300 hover:text-orange-400 transition-colors"
-              >
-                <div className="p-2 bg-slate-800 rounded-lg">
-                  <Mail size={20} />
-                </div>
-                <span>{t.contacts.email}</span>
-              </a>
-              
               <a 
                 href={`https://wa.me/${t.contacts.whatsapp1.replace(/\D/g, '')}`}
                 target="_blank"
