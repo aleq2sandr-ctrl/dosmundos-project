@@ -13,15 +13,6 @@ const EventsPage = () => {
       readMore: "Подробнее",
       events: [
         {
-          id: 'new-year',
-          title: "Новый Год в центре Дос Мундос",
-          date: "31 декабря - 3 января 2026",
-          location: "Dos Mundos, Yurimaguas",
-          description: "Встречайте Новый год в сердце Амазонии. Уникальная программа, церемонии и погружение в природу.",
-          image: "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?ixlib=rb-4.0.3&auto=format&fit=crop&w=1350&q=80", // Jungle photo
-          link: `/${currentLanguage}/new-year`
-        },
-        {
           id: 'festival',
           title: "VI Encuentro Universal de Ancianos",
           date: "20 - 24 июня 2022",
@@ -38,15 +29,6 @@ const EventsPage = () => {
       readMore: "Leer más",
       events: [
         {
-          id: 'new-year',
-          title: "Año Nuevo en el Centro Dos Mundos",
-          date: "31 de diciembre - 3 de enero del 2026",
-          location: "Dos Mundos, Yurimaguas",
-          description: "Celebra el Año Nuevo en el corazón de la Amazonía. Programa único, ceremonias e inmersión en la naturaleza.",
-          image: "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?ixlib=rb-4.0.3&auto=format&fit=crop&w=1350&q=80",
-          link: `/${currentLanguage}/new-year`
-        },
-        {
           id: 'festival',
           title: "VI Encuentro Universal de Ancianos",
           date: "20 - 24 de junio de 2022",
@@ -62,15 +44,6 @@ const EventsPage = () => {
       subtitle: "Events and meetings at Dos Mundos",
       readMore: "Read more",
       events: [
-        {
-          id: 'new-year',
-          title: "New Year at Dos Mundos Center",
-          date: "December 31 - January 3, 2026",
-          location: "Dos Mundos, Yurimaguas",
-          description: "Celebrate New Year in the heart of the Amazon. Unique program, ceremonies, and immersion in nature.",
-          image: "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?ixlib=rb-4.0.3&auto=format&fit=crop&w=1350&q=80",
-          link: `/${currentLanguage}/new-year`
-        },
         {
           id: 'festival',
           title: "VI Encuentro Universal de Ancianos",

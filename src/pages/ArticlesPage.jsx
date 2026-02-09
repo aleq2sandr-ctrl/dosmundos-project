@@ -1,33 +1,15 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { getLocaleString, getPluralizedLocaleString } from '@/lib/locales';
+import { useParams } from 'react-router-dom';
+import { getLocaleString } from '@/lib/locales';
 import { supabase } from '@/lib/supabaseClient';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { User, ArrowRight, Youtube, BookOpen, Search, Loader2, Clock, Calendar } from 'lucide-react';
-import { calculateReadingTime, formatArticleDate } from '@/lib/utils';
+import { Search, Loader2 } from 'lucide-react';
+import { calculateReadingTime } from '@/lib/utils';
 import ArticleCardSkeleton from '@/components/ArticleCardSkeleton';
-
-// Color palette for categories
-const categoryColors = {
-  'Растения Учителя и Процесс Диеты': 'bg-green-100 text-green-800 border-green-200',
-  'Целительство и Энергетические практики': 'bg-purple-100 text-purple-800 border-purple-200',
-  'Взаимоотношения и семья': 'bg-pink-100 text-pink-800 border-pink-200',
-  'Внутренние развитие': 'bg-indigo-100 text-indigo-800 border-indigo-200',
-  'Здоровье и Питание': 'bg-red-100 text-red-800 border-red-200',
-  'Энергетическая защита и очищение': 'bg-orange-100 text-orange-800 border-orange-200',
-  'Медитации': 'bg-blue-100 text-blue-800 border-blue-200',
-  'default': 'bg-slate-100 text-slate-600 border-slate-200'
-};
-
-const getCategoryColor = (category) => {
-  return categoryColors[category] || categoryColors.default;
-};
+import ArticleCard from '@/components/ArticleCard';
 
 const ArticlesPage = () => {
   const { lang } = useParams();
   const [rawArticles, setRawArticles] = useState([]);
-  const [displayedArticles, setDisplayedArticles] = useState([]);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -180,18 +162,22 @@ const ArticlesPage = () => {
     }
   }, [visibleCount, rawArticles.length, hasMore, loadingMore, isInitialLoading]);
 
-  // Derive localized articles from raw data
+  // Derive localized articles from raw data with pre-calculated reading time
   const articles = useMemo(() => {
-    return rawArticles.map(article => ({
-      id: article.slug,
-      title: article.title?.[lang] || article.title?.['ru'] || article.title?.['en'] || '',
-      summary: article.summary?.[lang] || article.summary?.['ru'] || article.summary?.['en'] || '',
-      content: article.content?.[lang] || article.content?.['ru'] || article.content?.['en'] || '',
-      categories: article.categories || [],
-      author: article.author,
-      youtubeUrl: article.youtube_url,
-      publishedAt: article.published_at
-    }));
+    return rawArticles.map(article => {
+      const content = article.content?.[lang] || article.content?.['ru'] || article.content?.['en'] || '';
+      return {
+        id: article.slug,
+        title: article.title?.[lang] || article.title?.['ru'] || article.title?.['en'] || '',
+        summary: article.summary?.[lang] || article.summary?.['ru'] || article.summary?.['en'] || '',
+        content: content,
+        categories: article.categories || [],
+        author: article.author,
+        youtubeUrl: article.youtube_url,
+        publishedAt: article.published_at,
+        readingTime: calculateReadingTime(content, lang) // Pre-calculate reading time
+      };
+    });
   }, [rawArticles, lang]);
 
   const categories = useMemo(() => {
@@ -289,74 +275,13 @@ const ArticlesPage = () => {
               {filteredArticles.slice(0, visibleCount).map((article, index) => {
                 const isLast = index === visibleCount - 1;
                 return (
-                  <div 
-                    key={article.id} 
-                    ref={isLast ? lastArticleElementRef : null}
-                    className="h-full animate-in fade-in slide-in-from-bottom-2 duration-300"
-                  >
-                    <Link 
-                      to={`/${lang}/articles/${article.id}`}
-                      className="group h-full block"
-                    >
-                      <Card className="h-full bg-white border-slate-200 text-slate-900 overflow-hidden transition-all duration-500 hover:shadow-xl hover:shadow-slate-200/50 hover:-translate-y-1 group-hover:border-slate-300 flex flex-col">
-                        <CardHeader className="pb-4">
-                          <div className="flex justify-between items-start mb-3">
-                            <div className="flex flex-wrap gap-1">
-                              {(Array.isArray(article.categories) ? article.categories : (article.category ? [article.category] : [])).map((cat, index) => (
-                                <span
-                                  key={index}
-                                  className={`px-2 py-1 rounded-full text-xs font-medium tracking-wide uppercase border font-sans ${getCategoryColor(cat)}`}
-                                >
-                                  {cat}
-                                </span>
-                              ))}
-                            </div>
-                            {article.youtubeUrl && (
-                              <Youtube className="w-5 h-5 text-red-600 opacity-80" />
-                            )}
-                          </div>
-                          <CardTitle className="text-2xl font-bold leading-tight group-hover:text-purple-700 transition-colors">
-                            {article.title}
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="flex-grow flex flex-col">
-                          <CardDescription className="text-slate-600 text-base leading-relaxed line-clamp-3 mb-6 flex-grow">
-                            {article.summary}
-                          </CardDescription>
-                          
-                          <div className="space-y-3 mt-auto">
-                            {/* Date and Reading Time */}
-                            <div className="flex items-center gap-4 text-xs text-slate-500 font-sans">
-                              {article.publishedAt && (
-                                <div className="flex items-center gap-1.5">
-                                  <Calendar className="w-3.5 h-3.5" />
-                                  <span>{formatArticleDate(article.publishedAt, lang)}</span>
-                                </div>
-                              )}
-                              {article.content && (
-                                <div className="flex items-center gap-1.5">
-                                  <Clock className="w-3.5 h-3.5" />
-                                  <span>{getPluralizedLocaleString('reading_time_minutes', lang, calculateReadingTime(article.content, lang), { count: calculateReadingTime(article.content, lang) })}</span>
-                                </div>
-                              )}
-                            </div>
-                            
-                            {/* Author and Read Link */}
-                            <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-                              <div className="flex items-center gap-2 text-xs text-slate-500 uppercase tracking-wider font-medium">
-                                <User className="w-3 h-3" />
-                                {article.author}
-                              </div>
-                              <span className="flex items-center gap-2 text-sm text-purple-700 font-medium group-hover:translate-x-1 transition-transform italic font-serif">
-                                {getLocaleString('read_article', lang)}
-                                <ArrowRight className="w-4 h-4" />
-                              </span>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </Link>
-                  </div>
+                  <ArticleCard
+                    key={article.id}
+                    article={article}
+                    lang={lang}
+                    isLast={isLast}
+                    lastArticleElementRef={lastArticleElementRef}
+                  />
                 );
               })}
               

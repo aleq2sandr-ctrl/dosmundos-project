@@ -1,11 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { getLocaleString, getPluralizedLocaleString } from '@/lib/locales';
 import { supabase } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, User, Youtube, Share2, Clock, Calendar } from 'lucide-react';
+import { ArrowLeft, User, Youtube, Clock, Calendar } from 'lucide-react';
 import { calculateReadingTime, formatArticleDate } from '@/lib/utils';
 import { updateMetaTags, resetMetaTags } from '@/lib/updateMetaTags';
+
+// Lazy load the article content component
+const LazyArticleContent = lazy(() => import('@/components/LazyArticleContent'));
 
 // Color palette for categories (same as ArticlesPage)
 const categoryColors = {
@@ -199,7 +202,7 @@ const ArticleDetailPage = () => {
 
       if (videoId) {
         // Clean up any trailing parameters or slashes
-        videoId = videoId.split(/[#?\/]/)[0];
+        videoId = videoId.split(/[#?/]/)[0];
         if (videoId.length === 11) {
           return `https://www.youtube.com/embed/${videoId}`;
         }
@@ -291,17 +294,24 @@ const ArticleDetailPage = () => {
             </div>
           </header>
 
-          <div 
-            className="prose prose-xl max-w-none text-justify
+          <Suspense fallback={
+            <div className="prose prose-xl max-w-none text-justify animate-pulse">
+              <div className="h-4 bg-slate-200 rounded w-3/4 mb-4"></div>
+              <div className="h-4 bg-slate-200 rounded w-full mb-4"></div>
+              <div className="h-4 bg-slate-200 rounded w-5/6 mb-4"></div>
+              <div className="h-4 bg-slate-200 rounded w-2/3 mb-4"></div>
+            </div>
+          }>
+            <div className="prose prose-xl max-w-none text-justify
               prose-headings:font-serif prose-headings:text-slate-900 prose-headings:font-bold
               prose-p:text-slate-800 prose-p:leading-loose prose-p:font-serif prose-p:indent-8 prose-p:mb-4
               prose-a:text-purple-700 prose-a:no-underline hover:prose-a:text-purple-900 hover:prose-a:underline
               prose-strong:text-slate-900 prose-strong:font-semibold
               prose-ul:text-slate-800 prose-ol:text-slate-800
-              prose-blockquote:border-l-slate-900 prose-blockquote:bg-slate-50 prose-blockquote:py-2 prose-blockquote:px-6 prose-blockquote:rounded-r-lg prose-blockquote:not-italic prose-blockquote:text-slate-700"
-            dangerouslySetInnerHTML={{ __html: content }}
-          />
-          
+              prose-blockquote:border-l-slate-900 prose-blockquote:bg-slate-50 prose-blockquote:py-2 prose-blockquote:px-6 prose-blockquote:rounded-r-lg prose-blockquote:not-italic prose-blockquote:text-slate-700">
+              <LazyArticleContent htmlContent={content} />
+            </div>
+          </Suspense>
 
         </article>
       </div>

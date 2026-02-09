@@ -17,7 +17,6 @@ import GenericPage from '@/pages/GenericPage';
 import AboutPage from '@/pages/AboutPage';
 import FestivalPage from '@/pages/FestivalPage';
 import EventsPage from '@/pages/EventsPage';
-import NewYearPage from '@/pages/NewYearPage';
 import VolunteersPage from '@/pages/VolunteersPage';
 import { supabase } from '@/lib/supabaseClient.js';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -180,11 +179,6 @@ const AppLayout = ({ user }) => {
           <Route path="/:lang/events" element={
             <LanguageRouteWrapper>
               <EventsPage />
-            </LanguageRouteWrapper>
-          } />
-          <Route path="/:lang/new-year" element={
-            <LanguageRouteWrapper>
-              <NewYearPage />
             </LanguageRouteWrapper>
           } />
           <Route path="/:lang/volunteers" element={
