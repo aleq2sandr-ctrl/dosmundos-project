@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, User, Youtube, Share2, Clock, Calendar } from 'lucide-react';
 import { calculateReadingTime, formatArticleDate } from '@/lib/utils';
+import { updateMetaTags, resetMetaTags } from '@/lib/updateMetaTags';
 
 // Color palette for categories (same as ArticlesPage)
 const categoryColors = {
@@ -71,6 +72,14 @@ const ArticleDetailPage = () => {
             publishedAt: newArticleData.published_at
           });
 
+          // Update meta tags for social media preview
+          updateMetaTags({
+            id: newArticleData.slug,
+            title: translation.title,
+            summary: translation.summary,
+            lang: lang
+          });
+
           const rawContent = translation.content || '';
           if (rawContent.includes('<html') || rawContent.includes('<body')) {
             const parser = new DOMParser();
@@ -130,6 +139,14 @@ const ArticleDetailPage = () => {
         };
 
         setArticle(transformedArticle);
+
+        // Update meta tags for social media preview
+        updateMetaTags({
+          id: articleData.slug,
+          title: transformedArticle.title,
+          summary: transformedArticle.summary,
+          lang: lang
+        });
         
         // Get content
         const rawContent = articleData.content[lang] || articleData.content['ru'] || articleData.content['en'] || '';
@@ -153,6 +170,13 @@ const ArticleDetailPage = () => {
 
     fetchArticleData();
   }, [lang, articleId, navigate]);
+
+  // Reset meta tags when component unmounts
+  useEffect(() => {
+    return () => {
+      resetMetaTags();
+    };
+  }, []);
 
 
   const getYoutubeEmbedUrl = (url) => {

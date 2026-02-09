@@ -29,16 +29,21 @@ const ArticlesPage = () => {
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
-  const [visibleCount, setVisibleCount] = useState(12);
+  const [visibleCount, setVisibleCount] = useState(6); // Start with 6 items for faster initial load
   
-  // Infinite scroll observer
+  // Infinite scroll observer with debounce
   const observer = useRef();
+  const debounceTimer = useRef();
   const lastArticleElementRef = useCallback(node => {
     if (loading) return;
     if (observer.current) observer.current.disconnect();
     observer.current = new IntersectionObserver(entries => {
       if (entries[0].isIntersecting) {
-        setVisibleCount(prev => prev + 12);
+        // Debounce to prevent multiple triggers
+        if (debounceTimer.current) clearTimeout(debounceTimer.current);
+        debounceTimer.current = setTimeout(() => {
+          setVisibleCount(prev => prev + 6); // Load 6 more items at a time
+        }, 300);
       }
     });
     if (node) observer.current.observe(node);
@@ -49,12 +54,16 @@ const ArticlesPage = () => {
     const fetchArticles = async () => {
       setLoading(true);
       try {
-                // Try fetching from new schema first
+        // Try fetching from new schema first - EXCLUDE content field for performance
         const { data, error } = await supabase
           .from('articles_v2')
           .select(`
-            *,
-            article_translations(title, summary, content, language_code),
+            id,
+            slug,
+            author,
+            youtube_url,
+            published_at,
+            article_translations(title, summary, language_code),
             article_categories(
               categories(
                 slug,
@@ -62,7 +71,8 @@ const ArticlesPage = () => {
               )
             )
           `)
-          .order('published_at', { ascending: false });
+          .order('published_at', { ascending: false })
+          .limit(50); // Limit initial fetch to 50 items for better performance
 
         if (!error && data) {
           // Transform new schema to component format
@@ -83,7 +93,6 @@ const ArticlesPage = () => {
               slug: a.slug,
               title: { [lang]: translation.title },
               summary: { [lang]: translation.summary },
-              content: { [lang]: translation.content },
               categories: categories,
               author: a.author,
               youtube_url: a.youtube_url,
@@ -100,8 +109,9 @@ const ArticlesPage = () => {
         
         const { data: oldData, error: oldError } = await supabase
           .from('articles')
-          .select('*')
-          .order('created_at', { ascending: false });
+          .select('id, slug, title, summary, categories, author, youtube_url, created_at')
+          .order('created_at', { ascending: false })
+          .limit(50);
 
         if (oldError) throw oldError;
 
@@ -122,7 +132,7 @@ const ArticlesPage = () => {
               categories: a.categories,
               author: a.author,
               youtube_url: a.youtubeUrl
-            })));
+            })).slice(0, 50)); // Limit to 50 items
           }
         } catch (e) {
           console.error('Fallback failed:', e);
