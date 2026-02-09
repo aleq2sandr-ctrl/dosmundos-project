@@ -75,12 +75,16 @@ const ArticleDetailPage = () => {
             publishedAt: newArticleData.published_at
           });
 
-          // Update meta tags for social media preview
+          // Update meta tags for SEO and social media preview
           updateMetaTags({
             id: newArticleData.slug,
             title: translation.title,
             summary: translation.summary,
-            lang: lang
+            lang: lang,
+            author: newArticleData.author,
+            publishedAt: newArticleData.published_at,
+            categories: categories,
+            image: newArticleData.image_url || `${window.location.origin}/og-default.jpg`
           });
 
           const rawContent = translation.content || '';

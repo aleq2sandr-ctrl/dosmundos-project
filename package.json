@@ -6,10 +6,11 @@
   "scripts": {
     "dev": "vite",
     "server": "node server.js",
-    "build": "vite build",
+    "build": "npm run generate-sitemap && vite build",
     "preview": "vite preview",
     "lint": "eslint . --ext .js,.jsx",
-    "test": "vitest"
+    "test": "vitest",
+    "generate-sitemap": "node generate-sitemap.js"
   },
   "dependencies": {
     "@emotion/is-prop-valid": "^1.2.1",
