@@ -1,7 +1,7 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Heart, Users, Home, Fish, Utensils, Sprout } from 'lucide-react';
+import { Heart, Users, Home, Fish, Utensils, Sprout, Sparkles, ArrowRight, Leaf, Star } from 'lucide-react';
 
 const content = {
   ru: {
@@ -11,15 +11,31 @@ const content = {
     sections: [
       {
         title: "Наше Приглашение",
-        text: "Если вы чувствуете зов к внутреннему развитию, мы приглашаем вас присоединиться к нашему сообществу, расположенному в Перу, в сердце амазонских джунглей. Это возможность для тех, кто готов к глубокой внутренней трансформации и желает пройти путь исцеления через служение, а также работу с традиционными растениями под руководством Мастера и целителя Пепе Ордоньеса."
+        icon: Sparkles,
+        description: "Если вы чувствуете зов к внутреннему развитию, мы приглашаем вас присоединиться к нашему сообществу, расположенному в Перу, в сердце амазонских джунглей. Это возможность для тех, кто готов к глубокой внутренней трансформации и желает пройти путь исцеления через служение, а также работу с традиционными растениями под руководством Мастера и целителя Пепе Ордоньеса.",
+        highlight: true
       },
       {
         title: "Что Мы Предлагаем",
-        text: "• Пространство любви, в котором мирно сосуществуют люди, животные и растения\n• Возможность глубокой внутренней работы и исцеления при помощи растений-энтеогенов (аяуаска, Сан Педро, тоэ и другие)\n• Традиционные диеты с растениями-учителями в исконных традициях амазонских мастеров\n• Здоровую среду и жильё, позволяющие отключиться от суеты современного мира, соединиться с собой и восстановить связь с природой\n• Здоровое органическое питание из продуктов нашей собственной фермы"
+        icon: Leaf,
+        description: "Мы создаём пространство для глубокой внутренней работы и исцеления в гармонии с природой",
+        bulletPoints: [
+          "Пространство любви, где мирно сосуществуют люди, животные и растения",
+          "Возможность глубокой внутренней работы и исцеления при помощи растений-энтеогенов (аяуаска, Сан Педро, тоэ и другие)",
+          "Традиционные диеты с растениями-учителями в исконных традициях амазонских мастеров",
+          "Здоровая среда и жильё, позволяющие отключиться от суеты современного мира",
+          "Здоровое органическое питание из продуктов нашей собственной фермы"
+        ]
       },
       {
         title: "Кого Мы Ищем",
-        text: "Мы ищем волонтёров, которые хотят совместить свой собственный путь исцеления со служением. Это не просто ретрит — это глубокий трансформационный опыт, где рост происходит через проявленное служение."
+        icon: Star,
+        description: "Мы ищем волонтёров, готовых к глубокой трансформации через служение",
+        bulletPoints: [
+          "Людей, желающих совместить свой путь исцеления со служением",
+          "Тех, кто готов к глубокому трансформационному опыту",
+          "Участников, понимающих что рост происходит через проявленное служение"
+        ]
       }
     ],
     waysToServe: {
@@ -49,15 +65,31 @@ const content = {
     sections: [
       {
         title: "Our Invitation",
-        text: "If you feel a call to inner development, we invite you to join our community located in Peru, in the heart of the Amazon jungle. This is an opportunity for those ready for deep inner transformation and wishing to walk the path of healing through service, as well as work with traditional plants under the guidance of Master and healer Pepe Ordoñez."
+        icon: Sparkles,
+        description: "If you feel a call to inner development, we invite you to join our community located in Peru, in the heart of the Amazon jungle. This is an opportunity for those ready for deep inner transformation and wishing to walk the path of healing through service, as well as work with traditional plants under the guidance of Master and healer Pepe Ordoñez.",
+        highlight: true
       },
       {
         title: "What We Offer",
-        text: "• A space of love where people, animals, and plants coexist peacefully\n• Opportunity for deep inner work and healing with the help of entheogenic plants (ayahuasca, San Pedro, toe, and others)\n• Traditional diets with teacher plants in the authentic traditions of Amazonian masters\n• Healthy environment and housing that allow you to disconnect from the hustle and bustle of the modern world, connect with yourself, and restore your connection with nature\n• Healthy organic nutrition from the products of our own farm"
+        icon: Leaf,
+        description: "We create a space for deep inner work and healing in harmony with nature",
+        bulletPoints: [
+          "A space of love where people, animals, and plants coexist peacefully",
+          "Opportunity for deep inner work and healing with entheogenic plants (ayahuasca, San Pedro, toe, and others)",
+          "Traditional diets with teacher plants in the authentic traditions of Amazonian masters",
+          "Healthy environment and housing to disconnect from the modern world's hustle",
+          "Healthy organic nutrition from the products of our own farm"
+        ]
       },
       {
         title: "Who We Are Looking For",
-        text: "We are looking for volunteers who want to combine their own healing journey with service. This is not just a retreat — it is a deep transformational experience where growth happens through manifested service."
+        icon: Star,
+        description: "We are looking for volunteers ready for deep transformation through service",
+        bulletPoints: [
+          "People who want to combine their healing journey with service",
+          "Those ready for a deep transformational experience",
+          "Participants who understand that growth happens through manifested service"
+        ]
       }
     ],
     waysToServe: {
@@ -87,15 +119,31 @@ const content = {
     sections: [
       {
         title: "Nuestra Invitación",
-        text: "Si sientes un llamado al desarrollo interior, te invitamos a unirte a nuestra comunidad ubicada en Perú, en el corazón de la selva amazónica. Esta es una oportunidad para aquellos que están listos para una profunda transformación interior y desean recorrer el camino de sanación a través del servicio, así como trabajar con plantas tradicionales bajo la guía del Maestro y sanador Pepe Ordoñez."
+        icon: Sparkles,
+        description: "Si sientes un llamado al desarrollo interior, te invitamos a unirte a nuestra comunidad ubicada en Perú, en el corazón de la selva amazónica. Esta es una oportunidad para aquellos que están listos para una profunda transformación interior y desean recorrer el camino de sanación a través del servicio, así como trabajar con plantas tradicionales bajo la guía del Maestro y sanador Pepe Ordoñez.",
+        highlight: true
       },
       {
         title: "Lo Que Ofrecemos",
-        text: "• Un espacio de amor donde personas, animales y plantas coexisten pacíficamente\n• Oportunidad para un trabajo interior profundo y sanación con la ayuda de plantas enteógenas (ayahuasca, San Pedro, toe y otras)\n• Dietas tradicionales con plantas maestras en las tradiciones auténticas de los maestros amazónicos\n• Ambiente saludable y vivienda que te permiten desconectarte del ajetreo del mundo moderno, conectarte contigo mismo y restaurar tu conexión con la naturaleza\n• Nutrición orgánica saludable de los productos de nuestra propia granja"
+        icon: Leaf,
+        description: "Creamos un espacio para un trabajo interior profundo y sanación en armonía con la naturaleza",
+        bulletPoints: [
+          "Un espacio de amor donde personas, animales y plantas coexisten pacíficamente",
+          "Oportunidad para un trabajo interior profundo y sanación con plantas enteógenas",
+          "Dietas tradicionales con plantas maestras en las tradiciones amazónicas auténticas",
+          "Ambiente saludable y vivienda para desconectarte del ajetreo moderno",
+          "Nutrición orgánica saludable de los productos de nuestra propia granja"
+        ]
       },
       {
         title: "A Quién Buscamos",
-        text: "Buscamos voluntarios que quieran combinar su propio camino de sanación con el servicio. Esto no es solo un retiro, es una experiencia de transformación profunda donde el crecimiento ocurre a través del servicio manifestado."
+        icon: Star,
+        description: "Buscamos voluntarios listos para una profunda transformación a través del servicio",
+        bulletPoints: [
+          "Personas que quieran combinar su camino de sanación con el servicio",
+          "Aquellos listos para una experiencia de transformación profunda",
+          "Participantes que entienden que el crecimiento ocurre a través del servicio manifestado"
+        ]
       }
     ],
     waysToServe: {
@@ -125,15 +173,31 @@ const content = {
     sections: [
       {
         title: "Unsere Einladung",
-        text: "Wenn Sie den Ruf zur inneren Entwicklung spüren, laden wir Sie ein, sich unserer Gemeinschaft in Peru, im Herzen des Amazonas-Dschungels, anzuschließen. Dies ist eine Gelegenheit für diejenigen, die bereit sind für eine tiefe innere Transformation und den Weg der Heilung durch Dienst gehen möchten, sowie für die Arbeit mit traditionellen Pflanzen unter der Leitung von Meister und Heiler Pepe Ordoñez."
+        icon: Sparkles,
+        description: "Wenn Sie den Ruf zur inneren Entwicklung spüren, laden wir Sie ein, sich unserer Gemeinschaft in Peru, im Herzen des Amazonas-Dschungels, anzuschließen. Dies ist eine Gelegenheit für diejenigen, die bereit sind für eine tiefe innere Transformation und den Weg der Heilung durch Dienst gehen möchten, sowie für die Arbeit mit traditionellen Pflanzen unter der Leitung von Meister und Heiler Pepe Ordoñez.",
+        highlight: true
       },
       {
         title: "Was Wir Bieten",
-        text: "• Einen Raum der Liebe, in dem Menschen, Tiere und Pflanzen friedlich zusammenleben\n• Möglichkeit für tiefe innere Arbeit und Heilung mit Hilfe entheogener Pflanzen (Ayahuasca, San Pedro, Toe und andere)\n• Traditionelle Diäten mit Lehrerpflanzen in den authentischen Traditionen amazonischer Meister\n• Gesunde Umgebung und Unterkunft, die es Ihnen ermöglichen, sich vom Trubel der modernen Welt zu lösen, mit sich selbst in Verbindung zu treten und Ihre Verbindung zur Natur wiederherzustellen\n• Gesunde biologische Ernährung aus den Produkten unserer eigenen Farm"
+        icon: Leaf,
+        description: "Wir schaffen einen Raum für tiefe innere Arbeit und Heilung in Harmonie mit der Natur",
+        bulletPoints: [
+          "Einen Raum der Liebe, in dem Menschen, Tiere und Pflanzen friedlich zusammenleben",
+          "Möglichkeit für tiefe innere Arbeit und Heilung mit entheogenen Pflanzen",
+          "Traditionelle Diäten mit Lehrerpflanzen in authentischen amazonischen Traditionen",
+          "Gesunde Umgebung und Unterkunft, um sich vom Trubel der modernen Welt zu lösen",
+          "Gesunde biologische Ernährung aus den Produkten unserer eigenen Farm"
+        ]
       },
       {
         title: "Wen Wir Suchen",
-        text: "Wir suchen Freiwillige, die ihren eigenen Heilungsweg mit dem Dienst verbinden möchten. Dies ist nicht nur ein Retreat – es ist eine tiefe transformative Erfahrung, bei der Wachstum durch gelebten Dienst geschieht."
+        icon: Star,
+        description: "Wir suchen Freiwillige, die bereit sind für tiefe Transformation durch Dienst",
+        bulletPoints: [
+          "Menschen, die ihren eigenen Heilungsweg mit dem Dienst verbinden möchten",
+          "Diejenigen, die bereit sind für eine tiefe transformative Erfahrung",
+          "Teilnehmer, die verstehen, dass Wachstum durch gelebten Dienst geschieht"
+        ]
       }
     ],
     waysToServe: {
@@ -163,15 +227,31 @@ const content = {
     sections: [
       {
         title: "Notre Invitation",
-        text: "Si vous ressentez un appel au développement intérieur, nous vous invitons à rejoindre notre communauté située au Pérou, au cœur de la jungle amazonienne. C'est une opportunité pour ceux qui sont prêts pour une profonde transformation intérieure et souhaitent parcourir le chemin de la guérison par le service, ainsi que travailler avec des plantes traditionnelles sous la direction du Maître et guérisseur Pepe Ordoñez."
+        icon: Sparkles,
+        description: "Si vous ressentez un appel au développement intérieur, nous vous invitons à rejoindre notre communauté située au Pérou, au cœur de la jungle amazonienne. C'est une opportunité pour ceux qui sont prêts pour une profonde transformation intérieure et souhaitent parcourir le chemin de la guérison par le service, ainsi que travailler avec des plantes traditionnelles sous la direction du Maître et guérisseur Pepe Ordoñez.",
+        highlight: true
       },
       {
         title: "Ce Que Nous Offrons",
-        text: "• Un espace d'amour où les personnes, les animaux et les plantes coexistent pacifiquement\n• Opportunité pour un travail intérieur profond et la guérison avec l'aide de plantes enthéogènes (ayahuasca, San Pedro, toe et autres)\n• Régimes traditionnels avec des plantes enseignantes dans les traditions authentiques des maîtres amazoniens\n• Environnement sain et logement qui vous permettent de vous déconnecter de l'agitation du monde moderne, de vous connecter avec vous-même et de restaurer votre lien avec la nature\n• Nutrition biologique saine à partir des produits de notre propre ferme"
+        icon: Leaf,
+        description: "Nous créons un espace pour un travail intérieur profond et une guérison en harmonie avec la nature",
+        bulletPoints: [
+          "Un espace d'amour où les personnes, les animaux et les plantes coexistent pacifiquement",
+          "Opportunité pour un travail intérieur profond et la guérison avec des plantes enthéogènes",
+          "Régimes traditionnels avec des plantes enseignantes dans les traditions amazoniennes authentiques",
+          "Environnement sain et logement pour se déconnecter de l'agitation du monde moderne",
+          "Nutrition biologique saine à partir des produits de notre propre ferme"
+        ]
       },
       {
         title: "Qui Nous Recherchons",
-        text: "Nous recherchons des bénévoles qui souhaitent combiner leur propre chemin de guérison avec le service. Ce n'est pas simplement une retraite — c'est une expérience transformationnelle profonde où la croissance se produit à travers le service manifesté."
+        icon: Star,
+        description: "Nous recherchons des bénévoles prêts pour une profonde transformation par le service",
+        bulletPoints: [
+          "Les personnes qui souhaitent combiner leur chemin de guérison avec le service",
+          "Ceux qui sont prêts pour une expérience de transformation profonde",
+          "Les participants comprennent que la croissance se produit à travers le service manifesté"
+        ]
       }
     ],
     waysToServe: {
@@ -201,15 +281,31 @@ const content = {
     sections: [
       {
         title: "Nasze Zaproszenie",
-        text: "Jeśli czujesz powołanie do rozwoju wewnętrznego, zapraszamy Cię do dołączenia do naszej społeczności położonej w Peru, w sercu amazońskiej dżungli. To szansa dla tych, którzy są gotowi na głęboką wewnętrzną transformację i pragną przejść drogę uzdrowienia poprzez służbę, a także pracę z tradycyjnymi roślinami pod przewodnictwem Mistrza i uzdrowiciela Pepe Ordoñez."
+        icon: Sparkles,
+        description: "Jeśli czujesz powołanie do rozwoju wewnętrznego, zapraszamy Cię do dołączenia do naszej społeczności położonej w Peru, w sercu amazońskiej dżungli. To szansa dla tych, którzy są gotowi na głęboką wewnętrzną transformację i pragną przejść drogę uzdrowienia poprzez służbę, a także pracę z tradycyjnymi roślinami pod przewodnictwem Mistrza i uzdrowiciela Pepe Ordoñez.",
+        highlight: true
       },
       {
         title: "Co Oferujemy",
-        text: "• Przestrzeń miłości, w której ludzie, zwierzęta i rośliny pokojowo współistnieją\n• Możliwość głębokiej pracy wewnętrznej i uzdrowienia z pomocą roślin enteogenicznych (ayahuasca, San Pedro, toe i inne)\n• Tradycyjne diety z roślinami nauczycielami w autentycznych tradycjach amazońskich mistrzów\n• Zdrowe środowisko i zakwaterowanie, które pozwalają odłączyć się od zgiełku współczesnego świata, połączyć się ze sobą i przywrócić więź z naturą\n• Zdrowe organiczne odżywianie z produktów naszej własnej farmy"
+        icon: Leaf,
+        description: "Tworzymy przestrzeń do głębokiej pracy wewnętrznej i uzdrowienia w harmonii z naturą",
+        bulletPoints: [
+          "Przestrzeń miłości, w której ludzie, zwierzęta i rośliny pokojowo współistnieją",
+          "Możliwość głębokiej pracy wewnętrznej i uzdrowienia z pomocą roślin enteogenicznych",
+          "Tradycyjne diety z roślinami nauczycielami w autentycznych tradycjach amazońskich",
+          "Zdrowe środowisko i zakwaterowanie, aby odłączyć się od zgiełku współczesnego świata",
+          "Zdrowe organiczne odżywianie z produktów naszej własnej farmy"
+        ]
       },
       {
         title: "Kogo Szukamy",
-        text: "Szukamy wolontariuszy, którzy chcą połączyć własną drogę uzdrowienia ze służbą. To nie jest zwykły warsztat — to głębokie doświadczenie transformacyjne, gdzie wzrost następuje poprzez jawną służbę."
+        icon: Star,
+        description: "Szukamy wolontariuszy gotowych do głębokiej transformacji poprzez służbę",
+        bulletPoints: [
+          "Osób, które chcą połączyć własną drogę uzdrowienia ze służbą",
+          "Tych, którzy są gotowi na głębokie doświadczenie transformacyjne",
+          "Uczestników, którzy rozumieją, że wzrost następuje poprzez jawną służbę"
+        ]
       }
     ],
     waysToServe: {
@@ -283,17 +379,49 @@ const VolunteersPage = () => {
         </motion.div>
 
         {/* Main Sections */}
-        <div className="grid md:grid-cols-2 gap-8">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {t.sections.map((section, index) => (
             <motion.div
               key={index}
-              initial={{ opacity: 0, x: index % 2 === 0 ? -20 : 20 }}
-              whileInView={{ opacity: 1, x: 0 }}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              className="bg-white/5 rounded-2xl p-8 border border-white/10 hover:bg-white/10 transition-colors"
+              transition={{ delay: index * 0.1 }}
+              className={`rounded-2xl p-8 border transition-all hover:scale-[1.02] ${
+                section.highlight
+                  ? 'bg-gradient-to-br from-purple-600/20 to-blue-600/20 border-purple-500/30 hover:border-purple-400/50'
+                  : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
+              }`}
             >
-              <h3 className="text-2xl font-bold text-white mb-4">{section.title}</h3>
-              <p className="text-slate-300 leading-relaxed">{section.text}</p>
+              <div className="flex items-center gap-3 mb-4">
+                <div className={`p-3 rounded-xl ${
+                  section.highlight
+                    ? 'bg-purple-500/30'
+                    : 'bg-emerald-500/20'
+                }`}>
+                  <section.icon className={`w-6 h-6 ${
+                    section.highlight ? 'text-purple-300' : 'text-emerald-400'
+                  }`} />
+                </div>
+                <h3 className="text-xl font-bold text-white">{section.title}</h3>
+              </div>
+              
+              {section.description && (
+                <p className="text-slate-300 leading-relaxed mb-4">
+                  {section.description}
+                </p>
+              )}
+              
+              {section.bulletPoints && (
+                <ul className="space-y-3">
+                  {section.bulletPoints.map((point, pointIndex) => (
+                    <li key={pointIndex} className="flex items-start gap-3 text-slate-300">
+                      <ArrowRight className="w-5 h-5 text-purple-400 shrink-0 mt-0.5" />
+                      <span className="leading-relaxed">{point}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </motion.div>
           ))}
         </div>
@@ -332,7 +460,7 @@ const VolunteersPage = () => {
               <img 
                 src="/images/volunteers/volunteer1.png" 
                 alt="Центр Дос Мундос" 
-                className="w-full h-64 object-cover hover:scale-105 transition-transform duration-300"
+                className="w-full h-auto rounded-2xl hover:scale-105 transition-transform duration-300"
               />
             </motion.div>
             <motion.div
@@ -345,7 +473,7 @@ const VolunteersPage = () => {
               <img 
                 src="/images/volunteers/volunteer2.jpg" 
                 alt="Ферма и животные" 
-                className="w-full h-64 object-cover hover:scale-105 transition-transform duration-300"
+                className="w-full h-auto rounded-2xl hover:scale-105 transition-transform duration-300"
               />
             </motion.div>
             <motion.div
@@ -358,7 +486,7 @@ const VolunteersPage = () => {
               <img 
                 src="/images/volunteers/volunteer3.jpg" 
                 alt="Природа Амазонии" 
-                className="w-full h-64 object-cover hover:scale-105 transition-transform duration-300"
+                className="w-full h-auto rounded-2xl hover:scale-105 transition-transform duration-300"
               />
             </motion.div>
             <motion.div
@@ -371,7 +499,7 @@ const VolunteersPage = () => {
               <img 
                 src="/images/volunteers/volunteer4.jpg" 
                 alt="Сообщество волонтеров" 
-                className="w-full h-64 object-cover hover:scale-105 transition-transform duration-300"
+                className="w-full h-auto rounded-2xl hover:scale-105 transition-transform duration-300"
               />
             </motion.div>
           </div>
