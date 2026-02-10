@@ -9,84 +9,90 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL;
 const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
 const baseUrl = 'https://dosmundos.pe';
 
-if (!supabaseUrl || !supabaseKey) {
-  console.error('Missing Supabase environment variables');
-  process.exit(1);
-}
-
-const supabase = createClient(supabaseUrl, supabaseKey);
-
 const generateSitemap = async () => {
-  try {
+  let uniqueArticles = [];
+  
+  if (supabaseUrl && supabaseKey) {
     console.log('Fetching articles from Supabase...');
-    
-    // Fetch articles from new schema
-    const { data: articlesV2, error: errorV2 } = await supabase
-      .from('articles_v2')
-      .select('slug, published_at, article_translations(title, language_code)');
+    try {
+      const supabase = createClient(supabaseUrl, supabaseKey);
+      
+      // Fetch articles from new schema
+      const { data: articlesV2, error: errorV2 } = await supabase
+        .from('articles_v2')
+        .select('slug, published_at, article_translations(title, language_code)');
 
-    if (errorV2) {
-      console.error('Error fetching from articles_v2:', errorV2);
-    }
+      if (errorV2) {
+        console.error('Error fetching from articles_v2:', errorV2);
+      }
 
-    // Fetch articles from old schema as fallback
-    const { data: articlesV1, error: errorV1 } = await supabase
-      .from('articles')
-      .select('id, published_at');
+      // Fetch articles from old schema as fallback
+      const { data: articlesV1, error: errorV1 } = await supabase
+        .from('articles')
+        .select('id, published_at');
 
-    if (errorV1) {
-      console.error('Error fetching from articles:', errorV1);
-    }
+      if (errorV1) {
+        console.error('Error fetching from articles:', errorV1);
+      }
 
-    // Combine and deduplicate articles
-    const allArticles = [];
-    
-    if (articlesV2) {
-      articlesV2.forEach(article => {
-        const translations = article.article_translations || [];
-        const languages = [...new Set(translations.map(t => t.language_code))];
-        
-        // At minimum, include Russian version
-        if (languages.length === 0) {
-          languages.push('ru');
-        }
+      // Combine and deduplicate articles
+      const allArticles = [];
+      
+      if (articlesV2) {
+        articlesV2.forEach(article => {
+          const translations = article.article_translations || [];
+          const languages = [...new Set(translations.map(t => t.language_code))];
+          
+          // At minimum, include Russian version
+          if (languages.length === 0) {
+            languages.push('ru');
+          }
 
-        languages.forEach(lang => {
+          languages.forEach(lang => {
+            allArticles.push({
+              id: article.slug,
+              lang,
+              publishedAt: article.published_at
+            });
+          });
+        });
+      }
+
+      if (articlesV1) {
+        articlesV1.forEach(article => {
+          // Add Russian version for old articles
           allArticles.push({
-            id: article.slug,
-            lang,
+            id: article.id,
+            lang: 'ru',
             publishedAt: article.published_at
           });
         });
-      });
-    }
-
-    if (articlesV1) {
-      articlesV1.forEach(article => {
-        // Add Russian version for old articles
-        allArticles.push({
-          id: article.id,
-          lang: 'ru',
-          publishedAt: article.published_at
-        });
-      });
-    }
-
-    // Deduplicate articles
-    const uniqueArticles = [];
-    const seen = new Set();
-    allArticles.forEach(article => {
-      const key = `${article.lang}/${article.id}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        uniqueArticles.push(article);
       }
-    });
 
-    console.log(`Found ${uniqueArticles.length} unique article pages`);
+      // Deduplicate articles
+      const seen = new Set();
+      uniqueArticles = allArticles.filter(article => {
+        const key = `${article.lang}/${article.id}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          return true;
+        }
+        return false;
+      });
 
-    // Generate sitemap
-    const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
+      console.log(`Found ${uniqueArticles.length} unique article pages`);
+    } catch (error) {
+      console.error('Error fetching articles from Supabase:', error);
+      console.log('Continuing with basic sitemap without articles...');
+      uniqueArticles = [];
+    }
+  } else {
+    console.log('Supabase environment variables not available. Generating basic sitemap...');
+    uniqueArticles = [];
+  }
+
+  // Generate sitemap
+  const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <!-- Homepage -->
   <url>
@@ -135,14 +141,13 @@ const generateSitemap = async () => {
   `).join('')}
 </urlset>`;
 
-    // Save to public directory
-    const outputPath = path.join(process.cwd(), 'public', 'sitemap.xml');
-    fs.writeFileSync(outputPath, sitemap, 'utf-8');
-    console.log(`Sitemap generated successfully at ${outputPath}`);
-    
-  } catch (error) {
-    console.error('Error generating sitemap:', error);
-  }
+  // Save to public directory
+  const outputPath = path.join(process.cwd(), 'public', 'sitemap.xml');
+  fs.writeFileSync(outputPath, sitemap, 'utf-8');
+  console.log(`Sitemap generated successfully at ${outputPath}`);
 };
 
-generateSitemap();
+generateSitemap().catch(error => {
+  console.error('Error generating sitemap:', error);
+  process.exit(1);
+});

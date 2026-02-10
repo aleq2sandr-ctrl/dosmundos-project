@@ -219,7 +219,7 @@ const AboutPage = () => {
         <h2 className="text-3xl font-bold font-serif text-white mb-12 text-4xl">
           {data.contacts.title}
         </h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 max-w-5xl mx-auto">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-5xl mx-auto">
           {/* WhatsApp */}
           <a 
             href={`https://wa.me/${data.contacts.whatsapp.replace('+', '')}`}

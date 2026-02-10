@@ -379,7 +379,7 @@ const VolunteersPage = () => {
         </motion.div>
 
         {/* Main Sections */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="flex flex-col gap-6">
           {t.sections.map((section, index) => (
             <motion.div
               key={index}
@@ -429,7 +429,7 @@ const VolunteersPage = () => {
         {/* Ways to Serve */}
         <div className="space-y-8">
           <h2 className="text-3xl font-bold text-white text-center">{t.waysToServe.title}</h2>
-          <div className="grid md:grid-cols-2 gap-4">
+          <div className="flex flex-col gap-4">
             {t.waysToServe.items.map((item, index) => (
               <motion.div
                 key={index}
@@ -450,7 +450,7 @@ const VolunteersPage = () => {
 
         {/* Photo Gallery */}
         <div className="space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="flex flex-col gap-6">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
