@@ -80,12 +80,16 @@ const SearchResultItem = ({ item, searchTerm, type, episodeTitle, langPrefix }) 
   )
 }
 
-const DeepSearchPage = ({ currentLanguage }) => {
+const DeepSearchPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { lang } = useParams();
-  const langPrefix = lang || currentLanguage || 'ru';
+  const SUPPORTED_LANGUAGES = ['ru', 'es', 'en', 'de', 'fr', 'pl'];
+  const effectiveLanguage = SUPPORTED_LANGUAGES.includes(lang) ? lang : 'ru';
+  const langPrefix = effectiveLanguage;
   const initialQuery = searchParams.get('query') || '';
+  
+  console.log('[DeepSearchPage] Effective language:', effectiveLanguage);
   
   const [searchTerm, setSearchTerm] = useState(initialQuery);
   const [inputTerm, setInputTerm] = useState(initialQuery);
@@ -116,7 +120,7 @@ const DeepSearchPage = ({ currentLanguage }) => {
   const fetchDeepSearchResults = useCallback(async (query) => {
     if (!query || query.trim().length < 2) {
       setAllResults([]);
-      setError(getLocaleString('deepSearchMinChars', currentLanguage));
+      setError(getLocaleString('deepSearchMinChars', effectiveLanguage));
       setLoading(false);
       setSearched(true);
       return;
@@ -143,13 +147,13 @@ const DeepSearchPage = ({ currentLanguage }) => {
         // Try to find translation for current language
         let displayTitle = null;
         if (ep.transcripts && Array.isArray(ep.transcripts)) {
-            const translation = ep.transcripts.find(t => t.lang === currentLanguage);
+            const translation = ep.transcripts.find(t => t.lang === effectiveLanguage);
             if (translation && translation.title) {
                 displayTitle = translation.title;
             }
         }
         
-        acc[ep.slug] = formatEpisodeTitleForDisplay(displayTitle, ep.date, 'all', currentLanguage);
+        acc[ep.slug] = formatEpisodeTitleForDisplay(displayTitle, ep.date, 'all', effectiveLanguage);
         return acc;
       }, {});
       setEpisodeTitlesMap(tempEpisodeTitlesMap);
@@ -157,7 +161,7 @@ const DeepSearchPage = ({ currentLanguage }) => {
       const { data: dbQuestions, error: questionsError } = await supabase
         .from('timecodes')
         .select('id, episode_slug, title, lang, time')
-        .or(`lang.eq.${currentLanguage},lang.eq.all`);
+        .or(`lang.eq.${effectiveLanguage},lang.eq.all`);
       if (questionsError) throw questionsError;
 
       // Optimized transcript search using server-side Full Text Search
@@ -177,10 +181,10 @@ const DeepSearchPage = ({ currentLanguage }) => {
         const { data, error } = await supabase
           .from('transcripts')
           .select('episode_slug, lang, edited_transcript_data')
-          .or(`lang.eq.${currentLanguage},lang.eq.all`)
+          .or(`lang.eq.${effectiveLanguage},lang.eq.all`)
           .textSearch('search_vector', query, {
             type: 'websearch',
-            config: getTsConfig(currentLanguage)
+            config: getTsConfig(effectiveLanguage)
           })
           .limit(20); // Limit results to prevent large payload
         
@@ -200,7 +204,7 @@ const DeepSearchPage = ({ currentLanguage }) => {
       const fuseQuestions = new Fuse(dbQuestions.filter(q => {
           const episode = dbEpisodes.find(ep => ep.slug === q.episode_slug);
           return episode && 
-                 (q.lang === currentLanguage) &&
+                 (q.lang === effectiveLanguage) &&
                  (q.is_intro || q.is_full_transcript || q.id === 'intro-virtual' || (q.title && q.title.trim() !== ''));
       }), fuseOptionsQuestions);
       
@@ -218,7 +222,7 @@ const DeepSearchPage = ({ currentLanguage }) => {
           questionId: question.id,
           questionTitle: question.title,
           segmentStart: question.time * 1000,
-          currentLanguage: currentLanguage,
+          currentLanguage: effectiveLanguage,
           score: result.score 
         });
       });
@@ -256,10 +260,10 @@ const DeepSearchPage = ({ currentLanguage }) => {
         
         const questionContext = dbQuestions.find(q => 
             q.episode_slug === segment.episodeSlug &&
-            (q.lang === currentLanguage) &&
+            (q.lang === effectiveLanguage) &&
             (q.is_intro || q.is_full_transcript || q.id === 'intro-virtual' || (q.title && q.title.trim() !== '')) &&
             segment.start >= (q.time * 1000) &&
-            (dbQuestions.filter(nq => nq.episode_slug === segment.episodeSlug && (nq.lang === currentLanguage) && nq.time > q.time).sort((a,b) => a.time - b.time)[0]?.time * 1000 || Infinity) > segment.start
+            (dbQuestions.filter(nq => nq.episode_slug === segment.episodeSlug && (nq.lang === effectiveLanguage) && nq.time > q.time).sort((a,b) => a.time - b.time)[0]?.time * 1000 || Infinity) > segment.start
         )?.title;
 
         combinedResults.push({
@@ -269,7 +273,7 @@ const DeepSearchPage = ({ currentLanguage }) => {
           segmentText: segment.text,
           id: segment.id,
           questionContext: questionContext,
-          currentLanguage: currentLanguage,
+          currentLanguage: effectiveLanguage,
           score: result.score
         });
       });
@@ -279,22 +283,23 @@ const DeepSearchPage = ({ currentLanguage }) => {
 
     } catch (err) {
       console.error("Deep search error:", err);
-      setError(getLocaleString('errorPerformingSearch', currentLanguage, { errorMessage: err.message }));
+      setError(getLocaleString('errorPerformingSearch', effectiveLanguage, { errorMessage: err.message }));
       setAllResults([]);
     } finally {
       setLoading(false);
     }
-  }, [currentLanguage]);
+  }, [effectiveLanguage]);
 
   useEffect(() => {
     if (initialQuery) {
       fetchDeepSearchResults(initialQuery);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); 
+  }, []);
 
   const handleSearch = (e) => {
     e.preventDefault();
+    console.log('[DeepSearch] Search initiated with query:', inputTerm);
     setSearchParams({ query: inputTerm });
     setSearchTerm(inputTerm); 
     fetchDeepSearchResults(inputTerm);
@@ -309,24 +314,28 @@ const DeepSearchPage = ({ currentLanguage }) => {
         onClick={() => navigate(`/${langPrefix}/episodes`)} 
         className="mb-6 bg-slate-700 hover:bg-slate-600 border-slate-600 text-slate-300"
       >
-        <ArrowLeft className="mr-2 h-4 w-4" /> {getLocaleString('backToEpisodes', currentLanguage)}
+        <ArrowLeft className="mr-2 h-4 w-4" /> {getLocaleString('backToEpisodes', effectiveLanguage)}
       </Button>
       <div className="flex items-center mb-6">
-        <h1 className="text-3xl font-bold text-purple-300">{getLocaleString('search', currentLanguage)}</h1>
+        <h1 className="text-3xl font-bold text-purple-300">{getLocaleString('search', effectiveLanguage)}</h1>
       </div>
       <form onSubmit={handleSearch} className="mb-8">
         <div className="relative flex items-center gap-2">
-          <Input
+           <Input
             type="search"
             value={inputTerm}
-            onChange={(e) => setInputTerm(e.target.value)}
-            placeholder={getLocaleString('deepSearchPlaceholder', currentLanguage)}
+            onChange={(e) => {
+              const newValue = e.target.value;
+              console.log('[DeepSearchPage] Input changed to:', newValue);
+              setInputTerm(newValue);
+            }}
+            placeholder={getLocaleString('deepSearchPlaceholder', effectiveLanguage)}
             className="pl-10 flex-grow bg-slate-800/70 border-slate-700 focus:border-purple-500 text-white placeholder-slate-400 h-11"
           />
           <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-400" />
           <Button type="submit" className="bg-purple-600 hover:bg-purple-700 h-11" disabled={loading}>
             {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <SearchIcon className="h-5 w-5" />}
-            <span className="ml-2 hidden sm:inline">{getLocaleString('search', currentLanguage)}</span>
+            <span className="ml-2 hidden sm:inline">{getLocaleString('search', effectiveLanguage)}</span>
           </Button>
         </div>
       </form>
@@ -334,7 +343,7 @@ const DeepSearchPage = ({ currentLanguage }) => {
       {loading && (
         <div className="flex justify-center items-center py-10">
           <Loader2 className="h-12 w-12 animate-spin text-purple-400" />
-          <p className="ml-4 text-lg">{getLocaleString('searching', currentLanguage)}...</p>
+          <p className="ml-4 text-lg">{getLocaleString('searching', effectiveLanguage)}...</p>
         </div>
       )}
 
@@ -348,7 +357,7 @@ const DeepSearchPage = ({ currentLanguage }) => {
          <div className="text-center py-10">
             <SearchIcon className="mx-auto h-16 w-16 text-gray-500" />
             <p className="mt-4 text-lg text-gray-400">
-                {getLocaleString('noResultsFoundForQuery', currentLanguage, { query: searchTerm })}
+                {getLocaleString('noResultsFoundForQuery', effectiveLanguage, { query: searchTerm })}
             </p>
          </div>
       )}
@@ -356,7 +365,7 @@ const DeepSearchPage = ({ currentLanguage }) => {
       {!loading && !error && totalResultCount > 0 && (
         <div>
           <h2 className="text-xl font-semibold text-slate-200 mb-6">
-            {getPluralizedLocaleString('searchResultsCount', currentLanguage, totalResultCount, { count: totalResultCount, query: searchTerm })}
+            {getPluralizedLocaleString('searchResultsCount', effectiveLanguage, totalResultCount, { count: totalResultCount, query: searchTerm })}
           </h2>
           
           <motion.ul

@@ -157,6 +157,13 @@ const ArticlesPage = () => {
 
   // Load more articles when reaching the end
   useEffect(() => {
+    console.log('[ArticlesPage] Load more check:', {
+      visibleCount,
+      rawArticlesLength: rawArticles.length,
+      hasMore,
+      loadingMore,
+      isInitialLoading
+    });
     if (visibleCount >= rawArticles.length && hasMore && !loadingMore && !isInitialLoading) {
       setLoadingMore(true);
       setOffset(prev => prev + 12);

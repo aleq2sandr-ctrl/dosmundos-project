@@ -39,10 +39,12 @@ const ArticleCard = memo(({
     readingTime
   } = article;
 
+  console.log(`[ArticleCard] Rendering: ${title}`);
+
   return (
     <div 
       ref={isLast ? lastArticleElementRef : null}
-      className="h-full animate-in fade-in slide-in-from-bottom-2 duration-300"
+      className="h-full"
     >
       <Link 
         to={`/${lang}/articles/${id}`}

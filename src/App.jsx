@@ -207,11 +207,9 @@ const AppLayout = ({ user }) => {
           <Route path="/:lang/episode/:episodeSlug" element={
             <LegacyEpisodeRedirect />
           } />
-          <Route path="/:lang/deep-search" element={
-            <LanguageRouteWrapper>
-              <DeepSearchPage />
-            </LanguageRouteWrapper>
-          } />
+           <Route path="/:lang/deep-search" element={
+             <DeepSearchPage />
+           } />
           <Route path="/:lang/edit" element={
             <LanguageRouteWrapper>
               <EditHistoryAdminPage />
