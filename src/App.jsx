@@ -45,13 +45,18 @@ const LanguageRedirect = () => {
     const savedLang = localStorage.getItem('podcastLang') || 'ru';
     const path = location.pathname;
     
+    console.log('[LanguageRedirect] Current path:', path);
+    console.log('[LanguageRedirect] Saved language:', savedLang);
+    
     // Если путь уже начинается с языкового префикса, ничего не делаем
     if (SUPPORTED_LANGUAGES.some(lang => path.startsWith(`/${lang}/`))) {
+      console.log('[LanguageRedirect] Path already has valid language prefix, no redirect');
       return;
     }
     
     // Редиректим на путь с языковым префиксом
     const newPath = path === '/' ? `/${savedLang}/episodes` : `/${savedLang}${path}`;
+    console.log('[LanguageRedirect] Redirecting to:', newPath);
     navigate(newPath, { replace: true });
   }, [location, navigate]);
   
@@ -92,6 +97,8 @@ const LanguageRouteWrapper = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
   
+  console.log('[LanguageRouteWrapper] Current lang param:', lang);
+  
   // Проверяем, что язык валидный
   const validLang = SUPPORTED_LANGUAGES.includes(lang) ? lang : 'ru';
   
@@ -99,18 +106,24 @@ const LanguageRouteWrapper = ({ children }) => {
   useEffect(() => {
     if (lang && !SUPPORTED_LANGUAGES.includes(lang)) {
       const pathWithoutLang = location.pathname.replace(/^\/[^/]+/, '') || '/episodes';
+      console.log('[LanguageRouteWrapper] Invalid lang, redirecting to:', `/ru${pathWithoutLang}`);
       navigate(`/ru${pathWithoutLang}`, { replace: true });
     }
   }, [lang, location, navigate]);
   
-  // Сохраняем язык в localStorage
+  // Сохраняем язык в localStorage - только при первом рендере
   useEffect(() => {
     if (validLang) {
-      localStorage.setItem('podcastLang', validLang);
+      const currentStoredLang = localStorage.getItem('podcastLang');
+      if (currentStoredLang !== validLang) {
+        console.log('[LanguageRouteWrapper] Saving valid lang to localStorage:', validLang);
+        localStorage.setItem('podcastLang', validLang);
+      }
     }
   }, [validLang]);
   
-  return React.cloneElement(children, { currentLanguage: validLang });
+  // Просто рендерим дочерние элементы вместо клонирования
+  return <>{children}</>;
 };
 
 const AppLayout = ({ user }) => {
@@ -213,6 +226,7 @@ const AppLayout = ({ user }) => {
             </LanguageRouteWrapper>
           } />
 
+          {/* Articles routes - need to be placed before catch-all episode route */}
           <Route path="/:lang/articles" element={
             <LanguageRouteWrapper>
               <ArticlesPage />

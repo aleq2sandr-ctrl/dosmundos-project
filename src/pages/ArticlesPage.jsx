@@ -9,6 +9,7 @@ import ArticleCard from '@/components/ArticleCard';
 
 const ArticlesPage = () => {
   const { lang } = useParams();
+  console.log('[ArticlesPage] Component rendered, lang:', lang);
   const [rawArticles, setRawArticles] = useState([]);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
