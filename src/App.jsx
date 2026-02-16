@@ -199,11 +199,11 @@ const AppLayout = ({ user }) => {
               <VolunteersPage />
             </LanguageRouteWrapper>
           } />
-          <Route path="/:lang/episodes" element={
-            <LanguageRouteWrapper>
-              <InstantEpisodesPage />
-            </LanguageRouteWrapper>
-          } />
+           <Route path="/:lang/episodes" element={
+             <LanguageRouteWrapper>
+               <InstantEpisodesPage currentLanguage={currentLanguage} />
+             </LanguageRouteWrapper>
+           } />
           <Route path="/:lang/episode/:episodeSlug" element={
             <LegacyEpisodeRedirect />
           } />

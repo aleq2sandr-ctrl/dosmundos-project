@@ -39,7 +39,7 @@ const InstantEpisodesPage = ({ currentLanguage }) => {
   const [selectedMonth, setSelectedMonth] = useState(null);
 
   const observerTarget = useRef(null);
-  const currentLangRef = useRef(currentLanguage);
+  const currentLangRef = useRef(currentLanguage || 'ru');
   const fetchLockRef = useRef(false);
   const loadingRef = useRef(false); // Use ref for loading state to avoid stale closures
 
@@ -49,7 +49,7 @@ const InstantEpisodesPage = ({ currentLanguage }) => {
   ];
 
   useEffect(() => {
-    currentLangRef.current = currentLanguage;
+    currentLangRef.current = currentLanguage || 'ru';
   }, [currentLanguage]);
 
   // Load available years (lightweight query)
@@ -109,9 +109,9 @@ const InstantEpisodesPage = ({ currentLanguage }) => {
 
   // Fetch episodes with pagination and filters
   const fetchEpisodes = useCallback(async (pageToLoad, isReset = false, force = false) => {
-    const fetchLang = currentLangRef.current;
+    const fetchLang = currentLangRef.current || 'ru'; // Default to Russian if language is undefined
     
-    console.log('[Episodes] fetchEpisodes called:', { pageToLoad, isReset, force, loading: loadingRef.current, fetchLock: fetchLockRef.current });
+    console.log('[Episodes] fetchEpisodes called:', { pageToLoad, isReset, force, loading: loadingRef.current, fetchLock: fetchLockRef.current, fetchLang });
     
     // Prevent double fetch with lock - ALWAYS check lock, even with force
     if (fetchLockRef.current) {
