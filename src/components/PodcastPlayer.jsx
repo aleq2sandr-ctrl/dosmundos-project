@@ -14,7 +14,7 @@ import useSpeakerAssignment from '@/hooks/player/useSpeakerAssignment';
 import { getLocaleString } from '@/lib/locales';
 import textExportService from '@/lib/textExportService';
 import { useEditorAuth } from '@/contexts/EditorAuthContext';
-import { getAudioUrl } from '@/lib/audioUrl';
+import { getAudioUrl, getAvailableAudioVariants, getCurrentAudioLang } from '@/lib/audioUrl';
 import { usePlayer } from '@/contexts/PlayerContext';
 
 const DEFAULT_PLAYBACK_RATE_OPTIONS = [
@@ -63,7 +63,8 @@ const PodcastPlayer = ({
   isSmartSegmenting,
   shouldPreserveState = false,
   isEditMode,
-  setIsEditMode
+  setIsEditMode,
+  availableAudioVariants = []
 }) => {
   
   const { toast } = useToast();
@@ -102,12 +103,21 @@ const PodcastPlayer = ({
   const primaryAudioRef = contextAudioRef || audioRef;
 
   // Audio Track State
-  const [selectedAudioLang, setSelectedAudioLang] = useState(episodeLang || 'mixed');
+  const [selectedAudioLang, setSelectedAudioLang] = useState(() => {
+    // Initialize with episode lang or default based on requirements
+    const initialLang = episodeLang || 'mixed';
+    return String(initialLang).toLowerCase();
+  });
   
   // Keep selected audio selection in sync with incoming episode data
   useEffect(() => {
     if (episodeData?.lang) {
       setSelectedAudioLang(String(episodeData.lang).toLowerCase());
+    }
+    
+    // Debug: Log available audio variants
+    if (episodeData) {
+      console.log('🎵 [PodcastPlayer] Available audio variants:', getAvailableAudioVariants(episodeData));
     }
   }, [episodeData?.lang, episodeData?.slug]);
 
@@ -116,14 +126,8 @@ const PodcastPlayer = ({
     console.log('🎵 [PodcastPlayer] Audio track changed to:', lang);
     setSelectedAudioLang(lang);
 
-    // Collect variants from either audio_variants or available_variants
-    const rawVariants = episodeData?.audio_variants || episodeData?.available_variants || [];
-    const normalizeVariant = (v) => {
-      if (!v) return null;
-      if (typeof v === 'string') return { lang: String(v).toLowerCase(), audio_url: null };
-      return { lang: String(v.lang || '').toLowerCase(), audio_url: v.audio_url || v.audioUrl || null };
-    };
-    const variants = rawVariants.map(normalizeVariant).filter(Boolean);
+    // Get all available audio variants using utility function
+    const variants = getAvailableAudioVariants(episodeData);
     const selectedVariant = variants.find(v => v.lang === lang);
 
     const selectedUrl = selectedVariant?.audio_url || null;

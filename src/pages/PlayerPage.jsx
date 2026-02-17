@@ -20,7 +20,7 @@ import AddQuestionDialog from '@/components/transcript/AddQuestionDialog';
 import { useEditorAuth } from '@/contexts/EditorAuthContext';
 import { saveEditToHistory } from '@/services/editHistoryService';
 import useAudioPrefetch from '@/hooks/player/useAudioPrefetch';
-import { getAudioUrl } from '@/lib/audioUrl';
+import { getAudioUrl, getAvailableAudioVariants, getCurrentAudioLang } from '@/lib/audioUrl';
 import { usePlayer } from '@/contexts/PlayerContext';
 import deepgramService from '@/lib/deepgramService';
 import smartSegmentationService from '@/lib/smartSegmentationService';
@@ -908,6 +908,7 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
                 isRecognizingText={isRecognizingText}
                 isRecognizingQuestions={isRecognizingQuestions}
                 isSmartSegmenting={isSmartSegmenting}
+                availableAudioVariants={getAvailableAudioVariants(playerEpisodeDataMemo)}
             />
           )}
         </div>

@@ -47,18 +47,29 @@ const PlayerSettingsMenu = ({
     if (['mix', 'mx'].includes(l)) return 'mixed';
     return l;
   };
-  const variantMap = new Map();
+  
+  // Process and normalize audio variants
+  const processedVariants = [];
+  const seenLanguages = new Set();
+  
   (availableAudioVariants || []).forEach(v => {
-    const l = normalizeLang(v);
-    if (!l) return;
-    if (!variantMap.has(l)) variantMap.set(l, { lang: l });
+    const lang = normalizeLang(v);
+    if (!lang || lang === 'en' || seenLanguages.has(lang)) return;
+    
+    seenLanguages.add(lang);
+    processedVariants.push({ 
+      lang: lang, 
+      audio_url: (typeof v === 'object' && (v.audio_url || v.audioUrl)) || null 
+    });
   });
+
+  // Sort variants: ru first, es second, mixed third, then others alphabetically
   const order = { ru: 0, es: 1, mixed: 2 };
-  const normalizedVariants = Array.from(variantMap.values()).sort((a, b) => {
+  const normalizedVariants = processedVariants.sort((a, b) => {
     const ao = order[a.lang] ?? 100;
     const bo = order[b.lang] ?? 100;
     return ao - bo || a.lang.localeCompare(b.lang);
-  }).filter(v => v.lang !== 'en');
+  });
 
   const hasMultipleVariants = normalizedVariants.length > 1;
   const hasMixed = normalizedVariants.some(v => v.lang === 'mixed');

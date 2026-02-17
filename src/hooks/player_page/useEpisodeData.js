@@ -384,7 +384,9 @@ const useEpisodeData = (episodeSlug, currentLanguage, toast) => {
         audio_url: activeAudio?.audio_url,
         duration: 0, // Duration removed from V3 for now
         // Store all variants for the player to allow switching
-        available_variants: audios.filter(v => String(v.lang || '').toLowerCase() !== 'en')
+        available_variants: audios.filter(v => String(v.lang || '').toLowerCase() !== 'en'),
+        audio_variants: audios.filter(v => String(v.lang || '').toLowerCase() !== 'en'), // Alias for compatibility
+        episode_audios: audios.filter(v => String(v.lang || '').toLowerCase() !== 'en') // Full episode_audios structure
       };
       
       // Сразу устанавливаем данные эпизода и снимаем основной лоадер

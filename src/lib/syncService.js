@@ -375,12 +375,29 @@ class SyncService {
                         || translations.find(t => t.lang === 'es') 
                         || translations[0];
           
-          const audioObj = audios.find(a => a.lang === targetLang)
-                        || audios.find(a => a.lang === 'es')
-                        || audios.find(a => a.lang === 'mixed')
-                        || audios[0];
+           // According to requirements: default to ru for Russian, es for Spanish, mixed for other languages
+           let audioObj;
+           
+           if (targetLang === 'ru') {
+             audioObj = audios.find(a => a.lang === 'ru');
+           } else if (targetLang === 'es') {
+             audioObj = audios.find(a => a.lang === 'es');
+           } else {
+             // For other languages, default to mixed
+             audioObj = audios.find(a => a.lang === 'mixed');
+           }
+           
+           // If not found, fallback logic
+           if (!audioObj) {
+             // Try mixed as fallback
+             audioObj = audios.find(a => a.lang === 'mixed');
+           }
+           // If still no mixed, try any available
+           if (!audioObj && audios.length > 0) {
+             audioObj = audios[0];
+           }
 
-          const episodeData = {
+           const episodeData = {
             slug: rawEpisode.slug,
             date: rawEpisode.date,
             created_at: rawEpisode.created_at,
@@ -389,8 +406,9 @@ class SyncService {
             lang: audioObj?.lang || 'mixed',
             audio_url: audioObj?.audio_url,
             duration: audioObj?.duration || 0,
-            available_variants: audios.map(a => a.lang).filter(Boolean),
-            audio_variants: audios // Include full audio objects for switching
+            available_variants: audios.filter(v => String(v.lang || '').toLowerCase() !== 'en').map(a => a.lang).filter(Boolean),
+            audio_variants: audios.filter(v => String(v.lang || '').toLowerCase() !== 'en'), // Include full audio objects for switching
+            episode_audios: audios.filter(v => String(v.lang || '').toLowerCase() !== 'en') // Full episode_audios structure
           };
           
           // Проверяем, что данные эпизода корректны
