@@ -460,7 +460,7 @@ const VolunteersPage = () => {
               <img 
                 src="/images/volunteers/volunteer1.png" 
                 alt="Центр Дос Мундос" 
-                className="w-full h-auto rounded-2xl hover:scale-105 transition-transform duration-300"
+                className="w-full h-auto max-h-[500px] object-contain rounded-2xl hover:scale-105 transition-transform duration-300"
               />
             </motion.div>
             <motion.div
@@ -473,7 +473,7 @@ const VolunteersPage = () => {
               <img 
                 src="/images/volunteers/volunteer2.jpg" 
                 alt="Ферма и животные" 
-                className="w-full h-auto rounded-2xl hover:scale-105 transition-transform duration-300"
+                className="w-full h-auto max-h-[500px] object-contain rounded-2xl hover:scale-105 transition-transform duration-300"
               />
             </motion.div>
             <motion.div
@@ -486,7 +486,7 @@ const VolunteersPage = () => {
               <img 
                 src="/images/volunteers/volunteer3.jpg" 
                 alt="Природа Амазонии" 
-                className="w-full h-auto rounded-2xl hover:scale-105 transition-transform duration-300"
+                className="w-full h-auto max-h-[500px] object-contain rounded-2xl hover:scale-105 transition-transform duration-300"
               />
             </motion.div>
             <motion.div
@@ -499,7 +499,7 @@ const VolunteersPage = () => {
               <img 
                 src="/images/volunteers/volunteer4.jpg" 
                 alt="Сообщество волонтеров" 
-                className="w-full h-auto rounded-2xl hover:scale-105 transition-transform duration-300"
+                className="w-full h-auto max-h-[500px] object-contain rounded-2xl hover:scale-105 transition-transform duration-300"
               />
             </motion.div>
           </div>

@@ -652,7 +652,7 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
     // Check for existing transcript record
     const { data: existingTranscript } = await supabase
       .from('transcripts')
-      .select('*')
+      .select('id, episode_slug, lang, edited_transcript_data')
       .eq('episode_slug', episodeData.slug)
       .eq('lang', langForTranscription)
       .maybeSingle();

@@ -188,7 +188,7 @@ const useEpisodeData = (episodeSlug, currentLanguage, toast) => {
       
       const { data, error: transcriptError } = await supabase
         .from('transcripts')
-        .select('id, edited_transcript_data, status')
+        .select('id, edited_transcript_data')
         .eq('episode_slug', epSlug)
         .eq('lang', langForTranscript)
         .maybeSingle();
@@ -211,7 +211,8 @@ const useEpisodeData = (episodeSlug, currentLanguage, toast) => {
 
         const freshPayload = {
           id: data.id,
-          status: data.status,
+          // Assume completed if we have utterances
+          status: data.edited_transcript_data?.utterances?.length > 0 ? 'completed' : null,
           data: {
             utterances: ensuredUtterances,
             // Используем только edited_transcript_data

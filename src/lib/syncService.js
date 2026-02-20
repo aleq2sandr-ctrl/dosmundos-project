@@ -427,7 +427,7 @@ class SyncService {
         const fetchTranscript = async () => {
           const { data: transcriptData, error: transcriptError } = await supabase
             .from('transcripts')
-            .select('id, episode_slug, lang, status, created_at, updated_at, edited_transcript_data')
+            .select('id, episode_slug, lang, created_at, updated_at, edited_transcript_data')
             .eq('episode_slug', params.episodeSlug)
             .eq('lang', params.lang)
             .order('created_at', { ascending: false })
@@ -440,6 +440,7 @@ class SyncService {
           if (transcriptData && typeof transcriptData === 'object') {
             // Извлекаем данные из edited_transcript_data
             const editedData = transcriptData.edited_transcript_data || {};
+            const hasUtterances = Array.isArray(editedData.utterances) && editedData.utterances.length > 0;
             
             return {
               id: transcriptData.id,
@@ -448,7 +449,8 @@ class SyncService {
               utterances: Array.isArray(editedData.utterances) ? editedData.utterances : [],
               words: Array.isArray(editedData.words) ? editedData.words : [],
               text: editedData.text || '',
-              status: transcriptData.status || 'completed',
+              // Assume completed if we have utterances
+              status: hasUtterances ? 'completed' : null,
               created_at: transcriptData.created_at || new Date().toISOString(),
               updated_at: transcriptData.updated_at || new Date().toISOString(),
               edited_transcript_data: transcriptData.edited_transcript_data

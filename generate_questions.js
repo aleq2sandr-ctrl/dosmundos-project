@@ -82,6 +82,9 @@ async function generateQuestions(transcriptData, episodeLang) {
     }).join('\n');
   }
 
+  // Determine language for titles
+  const languageForTitles = episodeLang === 'es' ? 'Spanish' : 'Russian';
+  
   const systemPrompt = `You are an expert content analyst specializing in multilingual podcast analysis. Your task is to identify key questions, topics, and discussions from healing/healer podcasts where people ask questions about health, wellness, and life advice.
 
 IMPORTANT CONTEXT:
@@ -119,7 +122,7 @@ Example:
   { "time": 890, "title": "Guided Meditation" }
 ]
 
-Language for titles: Russian (since the episode is in Russian).
+Language for titles: ${languageForTitles}.
 `;
 
   const response = await openai.chat.completions.create({
@@ -139,92 +142,101 @@ Language for titles: Russian (since the episode is in Russian).
 }
 
 async function processEpisodes() {
-  console.log('Fetching ES transcripts...');
+  // Process both ES and RU transcripts
+  const languages = ['es', 'ru'];
   
-  // Fetch transcripts where lang is 'es' - fetch only lightweight columns first
-  const { data: transcripts, error } = await supabase
-    .from('transcripts')
-    .select('id, episode_slug')
-    .eq('lang', 'es');
-
-  if (error) {
-    console.error('Error fetching transcripts:', error);
-    return;
-  }
-
-  // Process all transcripts since we are checking timecodes table now, not short_description
-  const targetTranscripts = transcripts;
-
-  console.log(`Found ${targetTranscripts.length} transcripts to process out of ${transcripts.length} total ES transcripts.`);
-
-  for (const transcriptSummary of targetTranscripts) {
-    // Check if timecodes already exist for this episode
-    const { count, error: countError } = await supabase
-      .from('timecodes')
-      .select('*', { count: 'exact', head: true })
-      .eq('episode_slug', transcriptSummary.episode_slug)
-      .eq('lang', 'es');
+  for (const lang of languages) {
+    console.log(`\n${'='.repeat(60)}`);
+    console.log(`Fetching ${lang.toUpperCase()} transcripts...`);
+    console.log('='.repeat(60));
     
-    if (count > 0) {
-      console.log(`Skipping ${transcriptSummary.episode_slug}: Timecodes already exist.`);
+    // Fetch transcripts where lang matches - fetch only lightweight columns first
+    const { data: transcripts, error } = await supabase
+      .from('transcripts')
+      .select('id, episode_slug')
+      .eq('lang', lang);
+
+    if (error) {
+      console.error(`Error fetching ${lang} transcripts:`, error);
       continue;
     }
 
-    console.log(`Processing episode ${transcriptSummary.episode_slug}...`);
-    
-    // Fetch full data for this transcript
-    const { data: transcript, error: detailError } = await supabase
-        .from('transcripts')
-        .select('id, episode_slug, edited_transcript_data')
-        .eq('id', transcriptSummary.id)
-        .single();
-    
-    if (detailError) {
-        console.error(`Error fetching details for ${transcriptSummary.episode_slug}:`, detailError);
-        continue;
-    }
+    // Process all transcripts since we are checking timecodes table now
+    const targetTranscripts = transcripts;
 
-    if (!transcript.edited_transcript_data || !transcript.edited_transcript_data.utterances) {
-      console.log(`Skipping ${transcript.episode_slug}: No utterances found.`);
-      continue;
-    }
+    console.log(`Found ${targetTranscripts.length} ${lang.toUpperCase()} transcripts to process.`);
 
-    try {
-      // Generate questions
-      console.log(`Generating questions for ${transcript.episode_slug}...`);
-      const questions = await generateQuestions(transcript.edited_transcript_data, 'es');
-      
-      if (!questions || questions.length === 0) {
-        console.log(`No questions generated for ${transcript.episode_slug}.`);
-        continue;
-      }
-
-      console.log(`Generated ${questions.length} questions.`);
-
-      // Insert into timecodes table
-      const timecodesToInsert = questions.map(q => ({
-        episode_slug: transcript.episode_slug,
-        lang: 'es',
-        time: q.time,
-        title: q.title
-      }));
-
-      const { error: insertError } = await supabase
+    for (const transcriptSummary of targetTranscripts) {
+      // Check if timecodes already exist for this episode and language
+      const { count, error: countError } = await supabase
         .from('timecodes')
-        .insert(timecodesToInsert);
-
-      if (insertError) {
-        console.error(`Error inserting timecodes for ${transcript.episode_slug}:`, insertError);
-      } else {
-        console.log(`Successfully inserted timecodes for ${transcript.episode_slug}`);
+        .select('*', { count: 'exact', head: true })
+        .eq('episode_slug', transcriptSummary.episode_slug)
+        .eq('lang', lang);
+      
+      if (count > 0) {
+        console.log(`Skipping ${transcriptSummary.episode_slug} (${lang}): Timecodes already exist.`);
+        continue;
       }
 
-    } catch (err) {
-      console.error(`Error processing ${transcript.episode_slug}:`, err);
+      console.log(`\nProcessing episode ${transcriptSummary.episode_slug} (${lang})...`);
+      
+      // Fetch full data for this transcript
+      const { data: transcript, error: detailError } = await supabase
+          .from('transcripts')
+          .select('id, episode_slug, edited_transcript_data')
+          .eq('id', transcriptSummary.id)
+          .single();
+      
+      if (detailError) {
+          console.error(`Error fetching details for ${transcriptSummary.episode_slug}:`, detailError);
+          continue;
+      }
+
+      if (!transcript.edited_transcript_data || !transcript.edited_transcript_data.utterances) {
+        console.log(`Skipping ${transcript.episode_slug}: No utterances found.`);
+        continue;
+      }
+
+      try {
+        // Generate questions
+        console.log(`Generating questions for ${transcript.episode_slug} (${lang})...`);
+        const questions = await generateQuestions(transcript.edited_transcript_data, lang);
+        
+        if (!questions || questions.length === 0) {
+          console.log(`No questions generated for ${transcript.episode_slug} (${lang}).`);
+          continue;
+        }
+
+        console.log(`Generated ${questions.length} questions.`);
+
+        // Insert into timecodes table
+        const timecodesToInsert = questions.map(q => ({
+          episode_slug: transcript.episode_slug,
+          lang: lang,
+          time: q.time,
+          title: q.title
+        }));
+
+        const { error: insertError } = await supabase
+          .from('timecodes')
+          .insert(timecodesToInsert);
+
+        if (insertError) {
+          console.error(`Error inserting timecodes for ${transcript.episode_slug} (${lang}):`, insertError);
+        } else {
+          console.log(`✅ Successfully inserted ${questions.length} timecodes for ${transcript.episode_slug} (${lang})`);
+        }
+
+      } catch (err) {
+        console.error(`Error processing ${transcript.episode_slug} (${lang}):`, err);
+      }
     }
   }
   
-  console.log('Processing completed.');
+  console.log('\n' + '='.repeat(60));
+  console.log('All processing completed.');
+  console.log('='.repeat(60));
 }
 
 processEpisodes();

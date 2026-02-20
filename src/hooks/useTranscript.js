@@ -65,7 +65,7 @@ const useTranscript = (episodeSlug, episodeAudioUrl, episodeLang, currentLanguag
       
       const { data, error: fetchError } = await supabase
         .from('transcripts')
-        .select('id, episode_slug, lang, provider_id, status, edited_transcript_data')
+        .select('id, episode_slug, lang, provider_id, edited_transcript_data')
         .eq('episode_slug', episodeSlug)
         .eq('lang', transcriptLangForQuery)
         .order('created_at', { ascending: false })
@@ -75,7 +75,7 @@ const useTranscript = (episodeSlug, episodeAudioUrl, episodeLang, currentLanguag
       if (fetchError && fetchError.code !== 'PGRST116') throw fetchError;
       
       if (data) {
-        logger.debug('[useTranscript] Transcript row found', { id: data.id, status: data.status, hasEdited: !!data.edited_transcript_data });
+        logger.debug('[useTranscript] Transcript row found', { id: data.id, hasEdited: !!data.edited_transcript_data });
         setTranscriptDbId(data.id);
         setTranscriptionJobId(data.provider_id);
         
@@ -83,7 +83,10 @@ const useTranscript = (episodeSlug, episodeAudioUrl, episodeLang, currentLanguag
         const displayData = data.edited_transcript_data;
         const hasCompact = displayData && Array.isArray(displayData.utterances);
 
-        if (data.status === 'completed') {
+        // Assume completed if we have utterances, otherwise check for other status indicators
+        const hasUtterances = hasCompact && displayData.utterances.length > 0;
+        
+        if (hasUtterances) {
           if (hasCompact) {
             setTranscript(displayData);
             // Clear any pending finalize retries
