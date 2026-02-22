@@ -43,8 +43,22 @@ const isBot = (userAgent) => {
   return botUserAgents.some(bot => userAgent.includes(bot));
 };
 
-// Telegram Instant View Preview Route
+// Telegram Instant View Preview Route (direct /preview/ access for testing)
 app.get('/preview/:lang/:episodeSlug', handleTelegramPreview);
+
+// Telegram Instant View - serve article content when TelegramBot hits /:lang/:slug
+// This route is triggered by nginx proxying TelegramBot requests to Node.js
+app.get('/:lang/:episodeSlug', (req, res, next) => {
+  const { lang, episodeSlug } = req.params;
+  // Only handle 2-letter lang codes, skip assets/api/preview
+  if (!lang || lang.length !== 2 || ['as', 'ap'].includes(lang)) return next();
+  const userAgent = req.headers['user-agent'] || '';
+  if (isBot(userAgent) || req.query.bot === 'true') {
+    console.log(`🤖 Bot detected: ${userAgent.substring(0, 50)} → /${lang}/${episodeSlug}`);
+    return handleTelegramPreview(req, res);
+  }
+  next();
+});
 
 // API routes
 app.post('/api/save-transcript', async (req, res) => {
@@ -70,24 +84,8 @@ app.head('/ping', (req, res) => {
 // Serve static files from dist
 app.use(express.static(path.join(__dirname, 'dist')));
 
-// Handle SPA routing and Bot detection
-app.get(/(.*)/, (req, res, next) => {
-  // Check if it's a bot requesting an episode page
-  // Pattern: /:lang/:episodeSlug (where lang is 2 chars)
-  const match = req.path.match(/^\/([a-z]{2})\/([^/]+)$/);
-  
-  if (match && isBot(req.headers['user-agent'])) {
-    const [_, lang, episodeSlug] = match;
-    // Exclude static assets or other routes if necessary
-    if (!['assets', 'api', 'preview'].includes(lang)) {
-      console.log(`🤖 Bot detected (${req.headers['user-agent']}) for ${req.path}, serving preview...`);
-      req.params.lang = lang;
-      req.params.episodeSlug = episodeSlug;
-      return handleTelegramPreview(req, res);
-    }
-  }
-
-  // Otherwise serve index.html for SPA
+// Handle SPA routing
+app.get(/(.*)/, (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 

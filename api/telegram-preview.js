@@ -1,16 +1,23 @@
 import { createClient } from '@supabase/supabase-js';
-import dotenv from 'dotenv';
 
-dotenv.config();
+let supabase = null;
 
-const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SERVICE_ROLE_KEY;
-
-if (!supabaseUrl || !supabaseServiceKey) {
-  console.error('Missing Supabase credentials for Telegram Preview');
+function getSupabase() {
+  if (!supabase) {
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SERVICE_ROLE_KEY;
+    
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error('Missing Supabase credentials for Telegram Preview');
+      console.error('SUPABASE_URL:', supabaseUrl ? 'set' : 'not set');
+      console.error('SERVICE_ROLE_KEY:', supabaseServiceKey ? 'set' : 'not set');
+      return null;
+    }
+    
+    supabase = createClient(supabaseUrl, supabaseServiceKey);
+  }
+  return supabase;
 }
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 function formatTime(seconds) {
   const m = Math.floor(seconds / 60);
@@ -18,31 +25,57 @@ function formatTime(seconds) {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-export default async function handleTelegramPreview(req, res) {
-  const { lang, episodeSlug } = req.params;
-  const userAgent = req.headers['user-agent'] || '';
-  
-  // Only serve this special HTML to TelegramBot (and maybe others like WhatsApp/Facebook if needed)
-  // But for now, let's just serve it if the route is hit, assuming Nginx handles the routing based on UA.
-  // OR, if we mount this on the main server, we should check UA here.
-  // Since the user asked for "links sent to Telegram", checking UA is safer if this runs on the main domain.
-  // However, if this is a separate "bot server", we can just serve it.
-  
-  // Let's assume we want to be helpful and serve it if it looks like a bot OR if explicitly requested via query param ?bot=true (for testing)
-  const isBot = /TelegramBot|Twitterbot|facebookexternalhit|WhatsApp/i.test(userAgent) || req.query.bot === 'true';
-  
-  if (!isBot) {
-    // If not a bot, we might want to redirect to the actual SPA or just return 404 if this is a dedicated bot route.
-    // If this handler is mounted on the main server path, we should call next() to let the SPA handler take over.
-    // But here we are in a specific handler function.
-    // Let's assume this is mounted as a specific route.
-    // If the user integrates this into server.js, they should probably put it before the static file serving.
-    // But wait, server.js DOES NOT serve static files currently. It's just an API server.
-    // So if the user points Nginx to this server for bots, we just serve the HTML.
-    // If they point normal users here, they will get this HTML too, which is fine (it's readable), but not the App.
-    // Ideally, Nginx splits the traffic.
+function escapeHtml(text) {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/**
+ * Build article body HTML from transcript utterances
+ */
+function buildArticleBody(utterances, questions) {
+  if (!utterances || utterances.length === 0) return '';
+
+  let html = '';
+  let currentQuestionIdx = 0;
+
+  for (const utt of utterances) {
+    const text = (utt.text || '').trim();
+    if (!text) continue;
+
+    // Check if we should insert a question header (based on time)
+    if (questions && questions.length > 0) {
+      while (currentQuestionIdx < questions.length && 
+             utt.start !== undefined && 
+             questions[currentQuestionIdx].time * 1000 <= utt.start) {
+        html += `<h2>${escapeHtml(questions[currentQuestionIdx].title)}</h2>\n`;
+        currentQuestionIdx++;
+      }
+    }
+
+    // Determine if this is a question (italic) or answer
+    const isQuestion = utt.speaker === 1 || utt.speaker === 'B';
+    if (isQuestion) {
+      html += `<blockquote><p><em>${escapeHtml(text)}</em></p></blockquote>\n`;
+    } else {
+      html += `<p>${escapeHtml(text)}</p>\n`;
+    }
   }
 
+  return html;
+}
+
+export default async function handleTelegramPreview(req, res) {
+  const { lang, episodeSlug } = req.params;
+  
+  const supabase = getSupabase();
+  if (!supabase) {
+    return res.status(500).send('Server configuration error: Supabase not configured');
+  }
+  
   try {
     // 1. Get Episode Basic Info
     const { data: episode, error: epError } = await supabase
@@ -55,27 +88,19 @@ export default async function handleTelegramPreview(req, res) {
       return res.status(404).send('Episode not found');
     }
 
-    // 2. Get Title (from transcripts)
+    // 2. Get Transcript with full data
     const { data: transcript, error: trError } = await supabase
       .from('transcripts')
-      .select('title')
+      .select('title, edited_transcript_data')
       .eq('episode_slug', episodeSlug)
       .eq('lang', lang)
       .single();
+    
+    console.log(`[IV] Transcript for ${episodeSlug}/${lang}: title="${transcript?.title}", error=${trError?.message || 'none'}, utterances=${transcript?.edited_transcript_data?.utterances?.length || 0}`);
       
     const title = transcript?.title || `Episode ${episode.date}`;
 
     // 3. Get Audio URL
-    const { data: audio, error: auError } = await supabase
-      .from('episode_audios')
-      .select('audio_url')
-      .eq('episode_slug', episodeSlug)
-      .or(`lang.eq.${lang},lang.eq.es,lang.eq.mixed`) // Fallback logic
-      .limit(1);
-      
-    // Better fallback logic for audio: try specific lang, then ES, then mixed.
-    // Since .or() with limit(1) is not guaranteed order, let's fetch all and sort in JS or use specific queries.
-    // Let's just fetch all for this episode and pick best.
     const { data: audios } = await supabase
       .from('episode_audios')
       .select('lang, audio_url')
@@ -96,60 +121,161 @@ export default async function handleTelegramPreview(req, res) {
       .eq('lang', lang)
       .order('time', { ascending: true });
 
+    // 5. Build description from questions
     const description = questions && questions.length > 0 
-      ? `Topics: ${questions.slice(0, 3).map(q => q.title).join(', ')}...`
-      : 'Listen to this meditation on Dos Mundos Radio.';
+      ? questions.slice(0, 3).map(q => q.title).join(' • ')
+      : 'Dos Mundos Radio';
 
-    const html = `
-<!DOCTYPE html>
+    // 6. Build article body from transcript
+    const utterances = transcript?.edited_transcript_data?.utterances || [];
+    const articleBody = buildArticleBody(utterances, questions);
+
+    // 7. Format date
+    const pubDate = episode.date ? new Date(episode.date).toISOString() : new Date().toISOString();
+
+    const siteUrl = 'https://dosmundos.pe';
+    const articleUrl = `${siteUrl}/${lang}/${episodeSlug}`;
+    const imageUrl = `${siteUrl}/og-default.jpg`;
+
+    const html = `<!DOCTYPE html>
 <html lang="${lang}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta property="og:title" content="${title}">
-  <meta property="og:description" content="${description}">
-  <meta property="og:url" content="https://dosmundos.pe/${lang}/${episodeSlug}">
+  
+  <!-- Essential OG tags for Telegram -->
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="${escapeHtml(title)}">
+  <meta property="og:description" content="${escapeHtml(description)}">
+  <meta property="og:url" content="${articleUrl}">
   <meta property="og:site_name" content="Dos Mundos Radio">
+  <meta property="og:image" content="${imageUrl}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  
+  <!-- Article metadata -->
+  <meta property="article:published_time" content="${pubDate}">
+  <meta property="article:author" content="Dos Mundos">
+  <meta property="article:section" content="Meditation">
+  
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="${escapeHtml(title)}">
+  <meta name="twitter:description" content="${escapeHtml(description)}">
+  <meta name="twitter:image" content="${imageUrl}">
+  
   ${audioUrl ? `<meta property="og:audio" content="${audioUrl}">` : ''}
   ${audioUrl ? `<meta property="og:audio:type" content="audio/mpeg">` : ''}
-  <meta property="twitter:card" content="summary_large_image">
-  <title>${title}</title>
+  
+  <title>${escapeHtml(title)}</title>
+  
   <style>
-    body { font-family: system-ui, -apple-system, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; color: #333; }
-    h1 { color: #2c3e50; }
-    ul { list-style-type: none; padding: 0; }
-    li { margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
-    a { text-decoration: none; color: #3498db; font-weight: bold; }
-    .timestamp { color: #7f8c8d; font-family: monospace; margin-right: 10px; }
-    audio { width: 100%; margin: 20px 0; }
+    body {
+      font-family: Georgia, 'Times New Roman', serif;
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 24px 16px;
+      line-height: 1.8;
+      color: #1a1a1a;
+      background: #fff;
+    }
+    article { margin-bottom: 40px; }
+    h1 { 
+      font-size: 2em; 
+      line-height: 1.3; 
+      margin-bottom: 8px; 
+      color: #111; 
+    }
+    .meta {
+      color: #666;
+      font-size: 0.9em;
+      margin-bottom: 24px;
+      font-style: italic;
+    }
+    .description {
+      font-size: 1.1em;
+      color: #444;
+      border-left: 3px solid #ddd;
+      padding-left: 16px;
+      margin-bottom: 24px;
+    }
+    h2 { 
+      font-size: 1.4em; 
+      margin-top: 32px; 
+      margin-bottom: 12px; 
+      color: #222; 
+    }
+    p { margin-bottom: 16px; }
+    blockquote { 
+      margin: 16px 0; 
+      padding: 8px 16px; 
+      border-left: 3px solid #4a90d9; 
+      background: #f8f9fa;
+      color: #333;
+    }
+    blockquote p { margin: 0; }
+    audio { width: 100%; margin: 16px 0; }
+    .timecodes { margin: 24px 0; }
+    .timecodes h3 { font-size: 1.2em; margin-bottom: 12px; }
+    .timecodes ul { list-style: none; padding: 0; }
+    .timecodes li { 
+      margin-bottom: 8px; 
+      padding: 8px 0;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .timestamp { 
+      color: #4a90d9; 
+      font-family: monospace; 
+      margin-right: 8px;
+      font-weight: bold;
+    }
+    .footer-link {
+      display: inline-block;
+      margin-top: 24px;
+      padding: 12px 24px;
+      background: #4a90d9;
+      color: #fff;
+      text-decoration: none;
+      border-radius: 6px;
+    }
   </style>
 </head>
 <body>
   <article>
-    <h1>${title}</h1>
+    <h1>${escapeHtml(title)}</h1>
+    <address class="meta">
+      <span>Dos Mundos Radio</span>
+      <time datetime="${pubDate}"> • ${episode.date || ''}</time>
+    </address>
+    
+    ${description !== 'Dos Mundos Radio' ? `<p class="description">${escapeHtml(description)}</p>` : ''}
+    
     ${audioUrl ? `<audio controls src="${audioUrl}"></audio>` : ''}
-    <p>${description}</p>
     
     ${questions && questions.length > 0 ? `
-      <h2>Questions & Timestamps</h2>
-      <ul>
-        ${questions.map(q => `
-          <li>
-            <span class="timestamp">[${formatTime(q.time)}]</span>
-            <a href="https://dosmundos.pe/${lang}/${episodeSlug}#${Math.floor(q.time)}">${q.title}</a>
-          </li>
-        `).join('')}
-      </ul>
+      <div class="timecodes">
+        <h3>Темы</h3>
+        <ul>
+          ${questions.map(q => `
+            <li>
+              <span class="timestamp">[${formatTime(q.time)}]</span>
+              <a href="${articleUrl}#${Math.floor(q.time)}">${escapeHtml(q.title)}</a>
+            </li>
+          `).join('')}
+        </ul>
+      </div>
     ` : ''}
     
+    ${articleBody ? `<hr>\n${articleBody}` : ''}
+    
     <footer>
-      <p><a href="https://dosmundos.pe/${lang}/${episodeSlug}">Open in Dos Mundos App</a></p>
+      <p><a class="footer-link" href="${articleUrl}">Открыть в приложении Dos Mundos</a></p>
     </footer>
   </article>
 </body>
-</html>
-    `;
+</html>`;
 
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(html);
 
   } catch (err) {
