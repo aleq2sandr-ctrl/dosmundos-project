@@ -31,9 +31,6 @@ const PlayerUIControls = React.memo(({
   onOpenAddQuestionDialog,
   episodeDate,
   isOfflineMode = false,
-  availableAudioVariants = [],
-  selectedAudioLang,
-  onAudioTrackChange,
   hasTranscript = false,
   hasQuestions = false,
   onRecognizeText,
@@ -79,9 +76,6 @@ const PlayerUIControls = React.memo(({
             onSetPlaybackRate={onSetPlaybackRate}
             isCompact={false}
             isOfflineMode={isOfflineMode}
-            availableAudioVariants={availableAudioVariants}
-            selectedAudioLang={selectedAudioLang}
-            onAudioTrackChange={onAudioTrackChange}
             hasTranscript={hasTranscript}
             hasQuestions={hasQuestions}
             onRecognizeText={onRecognizeText}

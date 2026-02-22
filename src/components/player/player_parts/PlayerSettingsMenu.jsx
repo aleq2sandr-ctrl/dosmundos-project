@@ -11,7 +11,7 @@ import {
   DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu";
 import { Button } from '@/components/ui/button';
-import { Settings, ScrollText, Download, Gauge, FileText, Volume2, HelpCircle } from 'lucide-react';
+import { Settings, ScrollText, Download, Gauge, FileText, HelpCircle } from 'lucide-react';
 import { getLocaleString } from '@/lib/locales';
 
 const PlayerSettingsMenu = ({
@@ -25,9 +25,6 @@ const PlayerSettingsMenu = ({
   currentPlaybackRateValue,
   onSetPlaybackRate,
   isOfflineMode = false,
-  availableAudioVariants = [],
-  selectedAudioLang,
-  onAudioTrackChange,
   hasTranscript = false,
   hasQuestions = false,
   onRecognizeText,
@@ -37,45 +34,6 @@ const PlayerSettingsMenu = ({
   isRecognizingQuestions = false,
   isSmartSegmenting = false
 }) => {
-  // Normalize and dedupe audio variants (accept strings or objects), sort ru, es, mixed, then others
-  const normalizeLang = (v) => {
-    const raw = (typeof v === 'string' ? v : v?.lang) || '';
-    const l = String(raw).toLowerCase();
-    // Map common synonyms to canonical codes
-    if (['spanish', 'es-es', 'spa'].includes(l)) return 'es';
-    if (['russian', 'ru-ru', 'rus'].includes(l)) return 'ru';
-    if (['mix', 'mx'].includes(l)) return 'mixed';
-    return l;
-  };
-  
-  // Process and normalize audio variants
-  const processedVariants = [];
-  const seenLanguages = new Set();
-  
-  (availableAudioVariants || []).forEach(v => {
-    const lang = normalizeLang(v);
-    if (!lang || lang === 'en' || seenLanguages.has(lang)) return;
-    
-    seenLanguages.add(lang);
-    processedVariants.push({ 
-      lang: lang, 
-      audio_url: (typeof v === 'object' && (v.audio_url || v.audioUrl)) || null 
-    });
-  });
-
-  // Sort variants: ru first, es second, mixed third, then others alphabetically
-  const order = { ru: 0, es: 1, mixed: 2 };
-  const normalizedVariants = processedVariants.sort((a, b) => {
-    const ao = order[a.lang] ?? 100;
-    const bo = order[b.lang] ?? 100;
-    return ao - bo || a.lang.localeCompare(b.lang);
-  });
-
-  const hasMultipleVariants = normalizedVariants.length > 1;
-  const hasMixed = normalizedVariants.some(v => v.lang === 'mixed');
-  const hasSpecificLanguages = normalizedVariants.some(v => v.lang === 'ru' || v.lang === 'es');
-  const showAudioTracks = hasMultipleVariants || (hasMixed && hasSpecificLanguages);
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -102,40 +60,6 @@ const PlayerSettingsMenu = ({
         </DropdownMenuCheckboxItem>
         
         <DropdownMenuSeparator className="bg-slate-700" />
-
-        {showAudioTracks && (
-          <>
-            <DropdownMenuLabel className="text-white font-medium flex items-center">
-                <Volume2 className="mr-2 h-4 w-4 text-slate-200" />
-                {getLocaleString('audioTrack', currentLanguage) || 'Audio Track'}
-            </DropdownMenuLabel>
-            <DropdownMenuRadioGroup value={(selectedAudioLang || '').toLowerCase()} onValueChange={(val) => onAudioTrackChange(String(val).toLowerCase())}>
-                {normalizedVariants.map(({ lang }) => {
-                    if (!lang) return null;
-                    let trackName;
-                    if (lang === 'ru') {
-                        trackName = getLocaleString('audioTrackRussian', currentLanguage) || 'Мария';
-                    } else if (lang === 'es') {
-                        trackName = getLocaleString('audioTrackSpanish', currentLanguage) || 'Пепе';
-                    } else if (lang === 'mixed') {
-                        trackName = getLocaleString('audioTrackMixed', currentLanguage) || 'Вместе';
-                    } else {
-                        trackName = lang.toUpperCase();
-                    }
-                    return (
-                        <DropdownMenuRadioItem 
-                            key={lang} 
-                            value={lang}
-                            className="focus:bg-slate-600 data-[state=checked]:bg-slate-600 data-[state=checked]:text-white text-slate-200 focus:text-slate-100 data-[state=checked]:text-white"
-                        >
-                            {trackName}
-                        </DropdownMenuRadioItem>
-                    );
-                })}
-            </DropdownMenuRadioGroup>
-            <DropdownMenuSeparator className="bg-slate-700" />
-          </>
-        )}
 
         <DropdownMenuLabel className="text-white font-medium flex items-center">
             <Gauge className="mr-2 h-4 w-4 text-slate-200" />

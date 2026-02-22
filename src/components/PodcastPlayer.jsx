@@ -538,10 +538,7 @@ const PodcastPlayer = ({
           setIsEditMode={setIsEditMode}
           isAuthenticated={isAuthenticated}
           openAuthModal={openAuthModal}
-          // Audio Track Props
-          availableAudioVariants={episodeData?.available_variants || []}
-          selectedAudioLang={selectedAudioLang}
-          onAudioTrackChange={handleAudioTrackChange}
+
           // Recognition Props
           hasTranscript={hasTranscript}
           hasQuestions={hasQuestions}
