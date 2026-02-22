@@ -18,7 +18,8 @@ const usePlayerInteractions = (audioRef, playerControlsContainerRef, episodeSlug
 
   const didDefaultAutoplayRef = useRef(false);
   // Track last hash we set ourselves to avoid re-processing our own navigation
-  const lastSetHashRef = useRef('');
+  // Initialized to null so it doesn't match empty hash on first render
+  const lastSetHashRef = useRef(null);
   // Debounce timer for hash changes
   const hashDebounceRef = useRef(null);
 

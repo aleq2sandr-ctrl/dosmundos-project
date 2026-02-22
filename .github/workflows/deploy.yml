@@ -30,31 +30,6 @@ jobs:
           echo "Git commit: ${{ github.sha }}" >> dist/.deployment-info
           echo "Git branch: ${{ github.ref_name }}" >> dist/.deployment-info
 
-      - name: Create target directory on VPS (if missing)
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT }}
-          script: |
-            mkdir -p ${{ secrets.VPS_PATH }}
-
-      - name: Backup current deployment (optional)
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT }}
-          script: |
-            if [ -d "${{ secrets.VPS_PATH }}" ]; then
-              BACKUP_DIR="${{ secrets.VPS_PATH }}/backup-$(date +%Y%m%d-%H%M%S)"
-              mkdir -p "$BACKUP_DIR"
-              cp -r "${{ secrets.VPS_PATH }}"/* "$BACKUP_DIR/" 2>/dev/null || true
-              echo "Backup created at $BACKUP_DIR"
-            fi
-
       - name: Verify build output
         run: |
           echo "Checking build output..."
@@ -78,203 +53,126 @@ jobs:
           cp package.json deployment/
           cp -r api deployment/
           
-          # Create archive
+          # Create tar archive
           cd deployment && tar -czf ../deploy.tar.gz .
           cd ..
           ls -lh deploy.tar.gz
           echo "Archive created successfully"
 
-      - name: Upload archive to VPS
-        uses: appleboy/scp-action@v0.1.7
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.0.3
+        timeout-minutes: 10
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT }}
+          port: 22
+          timeout: 60s
+          command_timeout: 600s
+          debug: true
+          script_stop: true
+          script: |
+            set -e
+            DEPLOY_PATH="${{ secrets.VPS_PATH }}"
+            echo "=== Starting deployment to $DEPLOY_PATH ==="
+            
+            # Create directories
+            mkdir -p $DEPLOY_PATH
+            mkdir -p /tmp/deployment
+            
+            # Clean any existing old archive
+            rm -f /tmp/deploy.tar.gz
+            rm -f /tmp/deploy.zip
+            
+            echo "=== Deployment environment prepared ==="
+
+      - name: Upload archive to VPS
+        uses: appleboy/scp-action@v0.1.7
+        timeout-minutes: 10
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          timeout: 60s
+          debug: true
           source: "deploy.tar.gz"
           target: "/tmp/"
 
-      - name: Deploy to VPS
+      - name: Extract and finalize deployment
         uses: appleboy/ssh-action@v1.0.3
+        timeout-minutes: 10
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT }}
+          port: 22
+          timeout: 60s
+          command_timeout: 600s
+          debug: true
+          script_stop: true
           script: |
             set -e
-            echo "=== Starting deployment ==="
             DEPLOY_PATH="${{ secrets.VPS_PATH }}"
-            mkdir -p "$DEPLOY_PATH"
-
-            # Backup current deployment
-            if [ -d "$DEPLOY_PATH" ] && [ "$(ls -A $DEPLOY_PATH)" ]; then
-              BACKUP_DIR="$DEPLOY_PATH/backup-$(date +%Y%m%d-%H%M%S)"
-              mkdir -p "$BACKUP_DIR"
-              cp -r "$DEPLOY_PATH"/* "$BACKUP_DIR/" 2>/dev/null || true
-              echo "Backup created at $BACKUP_DIR"
-            fi
-
+            
             # Verify archive exists
             if [ ! -f "/tmp/deploy.tar.gz" ]; then
               echo "ERROR: Archive /tmp/deploy.tar.gz not found!"
               exit 1
             fi
 
-            # Extract new files directly to deployment path
+            # Backup current deployment
+            if [ -d "$DEPLOY_PATH" ] && [ "$(ls -A $DEPLOY_PATH)" ]; then
+              BACKUP_DIR="$DEPLOY_PATH/backup-$(date +%Y%m%d-%H%M%S)"
+              mkdir -p $BACKUP_DIR
+              cp -r $DEPLOY_PATH/* $BACKUP_DIR/ 2>/dev/null || true
+              echo "Backup created at $BACKUP_DIR"
+            fi
+
+            # Extract new files
             echo "Extracting new files to $DEPLOY_PATH..."
-            cd "$DEPLOY_PATH"
-            # Clean current directory first
+            cd $DEPLOY_PATH
             rm -rf ./*
             tar -xzf /tmp/deploy.tar.gz
 
-            # Clean up archive
+            # Cleanup
             rm -f /tmp/deploy.tar.gz
 
-            # Verify extraction
+            # Verify deployment
             if [ ! -f "$DEPLOY_PATH/index.html" ]; then
               echo "ERROR: index.html not found after extraction!"
               exit 1
             fi
 
-            # List deployed files
-            echo "=== Deployed files ==="
-            ls -lah "$DEPLOY_PATH" | head -20
-            echo ""
-            echo "=== Deployment info ==="
-            cat "$DEPLOY_PATH/.deployment-info" 2>/dev/null || echo "No deployment info file"
-            echo ""
-            echo "Frontend deployment completed successfully!"
-
-      - name: Update API server code
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT }}
-          script: |
-            set -e
-            echo "=== Updating API server code ==="
-            API_PATH="${{ secrets.VPS_PATH }}"
-
-            # Check if it's a git repository
-            if [ -d "$API_PATH/.git" ]; then
-              echo "Pulling latest changes from git..."
-              cd "$API_PATH"
-              git pull origin main || git pull origin master || echo "Git pull failed, but continuing..."
-            else
-              echo "Not a git repository, skipping git pull"
+            # Install dependencies
+            if [ -f "$DEPLOY_PATH/package.json" ]; then
+              npm ci --prefix $DEPLOY_PATH
             fi
 
-            # Install/update dependencies if package.json exists
-            if [ -f "$API_PATH/package.json" ]; then
-              echo "Installing/updating npm dependencies..."
-              cd "$API_PATH"
-              npm ci || npm install || echo "npm install failed, but continuing..."
-            fi
-
-      - name: Restart API server
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT }}
-          script: |
-            set -e
-            echo "=== Restarting API server ==="
-            API_PATH="${{ secrets.VPS_PATH }}"
-
-            # Try to restart with PM2 first
+            # Restart API server
             if command -v pm2 >/dev/null 2>&1; then
-              echo "Restarting with PM2..."
-              cd "$API_PATH"
-              pm2 restart dosmundos-api || pm2 start server.js --name dosmundos-api || echo "PM2 restart failed"
-            elif [ -f "$API_PATH/package.json" ] && grep -q '"start"' "$API_PATH/package.json"; then
-              # Try with systemd
-              echo "Trying to restart systemd service..."
-              sudo systemctl restart dosmundos-api || sudo service dosmundos-api restart || echo "Systemd restart failed"
+              cd $DEPLOY_PATH
+              pm2 restart dosmundos-api || pm2 start server.js --name dosmundos-api
+            fi
+
+            # Set permissions
+            chmod -R 755 $DEPLOY_PATH
+            chown -R www-data:www-data $DEPLOY_PATH || chown -R nginx:nginx $DEPLOY_PATH || true
+
+            # Reload nginx
+            sudo nginx -t && sudo systemctl reload nginx
+
+            # Verify running processes
+            if curl -s http://localhost:3000 >/dev/null; then
+              echo "✅ Server is running"
             else
-              echo "Could not determine how to restart API server"
+              echo "⚠️  Server might not be running. Check PM2 logs."
             fi
 
-            # Check if API is running
-            sleep 2
-            if curl -f http://localhost:3000/api/health >/dev/null 2>&1; then
-              echo "API server is running and responding"
-            else
-              echo "WARNING: API server may not be running properly"
-            fi
+            echo "=== Deployment completed successfully! ==="
 
-      - name: Set correct permissions
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT }}
-          script: |
-            chmod -R 755 ${{ secrets.VPS_PATH }}
-            chown -R www-data:www-data ${{ secrets.VPS_PATH }} || chown -R nginx:nginx ${{ secrets.VPS_PATH }} || true
-
-      - name: Verify deployment
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT }}
-          script: |
-            if [ ! -f "${{ secrets.VPS_PATH }}/index.html" ]; then
-              echo "ERROR: index.html not found after deployment!"
-              exit 1
-            fi
-            echo "Deployment verified: index.html exists"
-            ls -lah ${{ secrets.VPS_PATH }} | head -10
-
-      - name: Clear Nginx cache and reload
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT }}
-          script: |
-            echo "Clearing Nginx cache..."
-            sudo rm -rf /var/cache/nginx/* 2>/dev/null || true
-            sudo find /var/cache/nginx -type f -delete 2>/dev/null || true
-            
-            echo "Testing Nginx configuration..."
-            sudo nginx -t
-            
-            echo "Reloading Nginx..."
-            sudo systemctl reload nginx || sudo service nginx reload || sudo nginx -s reload || true
-            
-            echo "Checking Nginx status..."
-            sudo systemctl status nginx --no-pager -l || sudo service nginx status || true
-            echo "Nginx reloaded successfully"
-            
-      - name: Test deployment info file
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT }}
-          script: |
-            echo "Testing .deployment-info file access..."
-            if [ -f "${{ secrets.VPS_PATH }}/.deployment-info" ]; then
-              echo "File exists on server:"
-              cat "${{ secrets.VPS_PATH }}/.deployment-info"
-              echo ""
-              echo "Testing HTTP access (should work if Nginx is configured correctly):"
-              curl -s http://localhost/.deployment-info || echo "HTTP test failed (this is OK if HTTPS is required)"
-            else
-              echo "WARNING: .deployment-info file not found!"
-            fi
-            
-      - name: Cleanup archive from runner
+      - name: Cleanup
         if: always()
         run: |
           rm -f deploy.tar.gz
+          rm -rf deployment
