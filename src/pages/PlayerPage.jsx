@@ -25,6 +25,7 @@ import { usePlayer } from '@/contexts/PlayerContext';
 import deepgramService from '@/lib/deepgramService';
 import smartSegmentationService from '@/lib/smartSegmentationService';
 import { generateQuestionsOpenAI } from '@/lib/openAIService';
+import { updateEpisodeMetaTags, resetMetaTags } from '@/lib/updateMetaTags';
 
 
 const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
@@ -136,6 +137,14 @@ const PlayerPage = ({ currentLanguage: appCurrentLanguage, user }) => {
     fetchQuestionsForEpisode,
     setTranscript,
   } = useOfflineEpisodeData(episodeSlug, langPrefix, toast);
+
+  // SEO: Update meta tags when episode data or questions change
+  useEffect(() => {
+    if (episodeData && episodeData.slug) {
+      updateEpisodeMetaTags(episodeData, questions, langPrefix);
+    }
+    return () => resetMetaTags();
+  }, [episodeData?.slug, episodeData?.title, questions?.length, langPrefix]);
 
   // Sync with Global Player Context
   useEffect(() => {

@@ -6,6 +6,7 @@ import { getLocaleString } from '@/lib/locales';
 import EpisodesList from '@/components/episodes/EpisodesList';
 import FilterAndSearchControls from '@/components/episodes/FilterAndSearchControls';
 import EmptyState from '@/components/episodes/EmptyState';
+import { updateEpisodesListMetaTags, resetMetaTags } from '@/lib/updateMetaTags';
 
 const ITEMS_PER_PAGE = 20;
 const CACHE_KEY_PREFIX = 'dosmundos_episodes_cache_';
@@ -41,7 +42,13 @@ const InstantEpisodesPage = ({ currentLanguage }) => {
   const observerTarget = useRef(null);
   const currentLangRef = useRef(currentLanguage || 'ru');
   const fetchLockRef = useRef(false);
-  const loadingRef = useRef(false); // Use ref for loading state to avoid stale closures
+  const loadingRef = useRef(false);
+
+  // SEO: Update meta tags for episodes list page
+  useEffect(() => {
+    updateEpisodesListMetaTags(currentLanguage || 'ru');
+    return () => resetMetaTags();
+  }, [currentLanguage]);
 
   const monthLabels = [
     "january", "february", "march", "april", "may", "june", 

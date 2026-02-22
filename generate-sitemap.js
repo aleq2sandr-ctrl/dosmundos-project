@@ -8,15 +8,63 @@ dotenv.config();
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
 const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
 const baseUrl = 'https://dosmundos.pe';
+const SUPPORTED_LANGUAGES = ['ru', 'es', 'en', 'de', 'fr', 'pl'];
 
 const generateSitemap = async () => {
   let uniqueArticles = [];
+  let episodeEntries = [];
   
   if (supabaseUrl && supabaseKey) {
-    console.log('Fetching articles from Supabase...');
+    console.log('Fetching data from Supabase...');
     try {
       const supabase = createClient(supabaseUrl, supabaseKey);
       
+      // ===== EPISODES =====
+      console.log('Fetching episodes...');
+      const { data: episodes, error: epError } = await supabase
+        .from('episodes')
+        .select('slug, date')
+        .order('date', { ascending: false });
+
+      if (epError) {
+        console.error('Error fetching episodes:', epError);
+      }
+
+      if (episodes && episodes.length > 0) {
+        // Get all transcripts to know which languages each episode has
+        const { data: transcripts } = await supabase
+          .from('transcripts')
+          .select('episode_slug, lang');
+
+        const episodeLangs = {};
+        if (transcripts) {
+          transcripts.forEach(t => {
+            if (!episodeLangs[t.episode_slug]) episodeLangs[t.episode_slug] = new Set();
+            episodeLangs[t.episode_slug].add(t.lang);
+          });
+        }
+
+        episodes.forEach(ep => {
+          const langs = episodeLangs[ep.slug] || new Set(['ru']);
+          // Always include Russian version
+          langs.add('ru');
+          
+          langs.forEach(lang => {
+            episodeEntries.push({
+              slug: ep.slug,
+              lang,
+              date: ep.date,
+              // More recent episodes have higher priority
+              priority: lang === 'ru' ? '0.8' : '0.7'
+            });
+          });
+        });
+
+        console.log(`Found ${episodes.length} episodes → ${episodeEntries.length} episode URLs`);
+      }
+
+      // ===== ARTICLES =====
+      console.log('Fetching articles...');
       // Fetch articles from new schema
       const { data: articlesV2, error: errorV2 } = await supabase
         .from('articles_v2')
@@ -43,7 +91,6 @@ const generateSitemap = async () => {
           const translations = article.article_translations || [];
           const languages = [...new Set(translations.map(t => t.language_code))];
           
-          // At minimum, include Russian version
           if (languages.length === 0) {
             languages.push('ru');
           }
@@ -60,7 +107,6 @@ const generateSitemap = async () => {
 
       if (articlesV1) {
         articlesV1.forEach(article => {
-          // Add Russian version for old articles
           allArticles.push({
             id: article.id,
             lang: 'ru',
@@ -82,69 +128,89 @@ const generateSitemap = async () => {
 
       console.log(`Found ${uniqueArticles.length} unique article pages`);
     } catch (error) {
-      console.error('Error fetching articles from Supabase:', error);
-      console.log('Continuing with basic sitemap without articles...');
-      uniqueArticles = [];
+      console.error('Error fetching from Supabase:', error);
+      console.log('Continuing with basic sitemap...');
     }
   } else {
     console.log('Supabase environment variables not available. Generating basic sitemap...');
-    uniqueArticles = [];
   }
+
+  const today = new Date().toISOString().split('T')[0];
 
   // Generate sitemap
   const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <!-- Homepage -->
   <url>
     <loc>${baseUrl}</loc>
-    <lastmod>${new Date().toISOString().split('T')[0]}</lastmod>
+    <lastmod>${today}</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
+    ${SUPPORTED_LANGUAGES.map(l => `<xhtml:link rel="alternate" hreflang="${l}" href="${baseUrl}/${l}" />`).join('\n    ')}
+    <xhtml:link rel="alternate" hreflang="x-default" href="${baseUrl}" />
   </url>
   
   <!-- Language versions of homepage -->
-  ${['es', 'en', 'de', 'fr', 'pl'].map(lang => `
+  ${SUPPORTED_LANGUAGES.map(lang => `
   <url>
     <loc>${baseUrl}/${lang}</loc>
-    <lastmod>${new Date().toISOString().split('T')[0]}</lastmod>
+    <lastmod>${today}</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
-  </url>
-  `).join('')}
+    ${SUPPORTED_LANGUAGES.map(l => `<xhtml:link rel="alternate" hreflang="${l}" href="${baseUrl}/${l}" />`).join('\n    ')}
+    <xhtml:link rel="alternate" hreflang="x-default" href="${baseUrl}" />
+  </url>`).join('')}
+  
+  <!-- Episodes List Pages -->
+  ${SUPPORTED_LANGUAGES.map(lang => `
+  <url>
+    <loc>${baseUrl}/${lang}/episodes</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+    ${SUPPORTED_LANGUAGES.map(l => `<xhtml:link rel="alternate" hreflang="${l}" href="${baseUrl}/${l}/episodes" />`).join('\n    ')}
+  </url>`).join('')}
+  
+  <!-- Individual Episodes -->
+  ${episodeEntries.map(ep => `
+  <url>
+    <loc>${baseUrl}/${ep.lang}/${ep.slug}</loc>
+    <lastmod>${ep.date ? new Date(ep.date).toISOString().split('T')[0] : today}</lastmod>
+    <changefreq>${ep.lang === 'ru' ? 'weekly' : 'monthly'}</changefreq>
+    <priority>${ep.priority}</priority>
+  </url>`).join('')}
   
   <!-- Articles -->
   ${uniqueArticles.map(article => `
   <url>
     <loc>${baseUrl}/${article.lang}/articles/${article.id}</loc>
-    <lastmod>${article.publishedAt ? new Date(article.publishedAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}</lastmod>
+    <lastmod>${article.publishedAt ? new Date(article.publishedAt).toISOString().split('T')[0] : today}</lastmod>
     <changefreq>${article.lang === 'ru' ? 'weekly' : 'monthly'}</changefreq>
     <priority>${article.lang === 'ru' ? '0.8' : '0.7'}</priority>
-  </url>
-  `).join('')}
+  </url>`).join('')}
   
   <!-- Other important pages -->
-  ${['about', 'events', 'volunteers', 'player', 'articles'].map(page => `
-  <url>
-    <loc>${baseUrl}/ru/${page}</loc>
-    <lastmod>${new Date().toISOString().split('T')[0]}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  ${['es', 'en', 'de', 'fr', 'pl'].map(lang => `
+  ${['about', 'events', 'volunteers', 'articles', 'deep-search'].map(page => `
+  ${SUPPORTED_LANGUAGES.map(lang => `
   <url>
     <loc>${baseUrl}/${lang}/${page}</loc>
-    <lastmod>${new Date().toISOString().split('T')[0]}</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
-  `).join('')}
-  `).join('')}
+    <lastmod>${today}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>${lang === 'ru' ? '0.7' : '0.6'}</priority>
+    ${SUPPORTED_LANGUAGES.map(l => `<xhtml:link rel="alternate" hreflang="${l}" href="${baseUrl}/${l}/${page}" />`).join('\n    ')}
+  </url>`).join('')}`).join('')}
 </urlset>`;
 
   // Save to public directory
   const outputPath = path.join(process.cwd(), 'public', 'sitemap.xml');
   fs.writeFileSync(outputPath, sitemap, 'utf-8');
-  console.log(`Sitemap generated successfully at ${outputPath}`);
+  
+  const totalUrls = 1 + SUPPORTED_LANGUAGES.length + SUPPORTED_LANGUAGES.length + episodeEntries.length + uniqueArticles.length + 5 * SUPPORTED_LANGUAGES.length;
+  console.log(`\n✅ Sitemap generated: ${totalUrls} URLs`);
+  console.log(`   - ${episodeEntries.length} episode pages`);
+  console.log(`   - ${uniqueArticles.length} article pages`);
+  console.log(`   → ${outputPath}`);
 };
 
 generateSitemap().catch(error => {

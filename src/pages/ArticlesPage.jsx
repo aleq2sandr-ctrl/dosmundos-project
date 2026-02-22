@@ -22,10 +22,10 @@ const ArticlesPage = () => {
   const observer = useRef();
   const debounceTimer = useRef();
   const lastArticleElementRef = useCallback(node => {
-    if (isInitialLoading || loadingMore) return;
+    if (isInitialLoading) return;
     if (observer.current) observer.current.disconnect();
     observer.current = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting && hasMore) {
+      if (entries[0].isIntersecting && hasMore && !loadingMore) {
         // Debounce to prevent multiple triggers
         if (debounceTimer.current) clearTimeout(debounceTimer.current);
         debounceTimer.current = setTimeout(() => {
@@ -36,10 +36,22 @@ const ArticlesPage = () => {
     if (node) observer.current.observe(node);
   }, [isInitialLoading, loadingMore, hasMore]);
 
+  // Reset state when language changes
+  useEffect(() => {
+    setRawArticles([]);
+    setOffset(0);
+    setHasMore(true);
+    setVisibleCount(6);
+    setIsInitialLoading(true);
+  }, [lang]);
+
   // Fetch raw data with progressive loading
   useEffect(() => {
     const fetchArticles = async () => {
-      setIsInitialLoading(true);
+      // Only show full-page skeletons on first load, not on pagination
+      if (offset === 0) {
+        setIsInitialLoading(true);
+      }
       setLoadingMore(true);
       try {
         // Try fetching from new schema first - with pagination

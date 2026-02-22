@@ -49,6 +49,18 @@
     <meta name="twitter:site" content="@DosMundosPe" />
     <meta name="twitter:creator" content="@DosMundosPe" />
     
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://dosmundos.pe" />
+    
+    <!-- Hreflang for multilingual SEO -->
+    <link rel="alternate" hreflang="ru" href="https://dosmundos.pe/ru" />
+    <link rel="alternate" hreflang="es" href="https://dosmundos.pe/es" />
+    <link rel="alternate" hreflang="en" href="https://dosmundos.pe/en" />
+    <link rel="alternate" hreflang="de" href="https://dosmundos.pe/de" />
+    <link rel="alternate" hreflang="fr" href="https://dosmundos.pe/fr" />
+    <link rel="alternate" hreflang="pl" href="https://dosmundos.pe/pl" />
+    <link rel="alternate" hreflang="x-default" href="https://dosmundos.pe" />
+    
     <!-- Schema.org JSON-LD for Organization -->
     <script type="application/ld+json">
     {
@@ -68,6 +80,41 @@
         "contactType": "customer service",
         "email": "info@dosmundos.pe"
       }
+    }
+    </script>
+
+    <!-- Schema.org JSON-LD for WebSite with SearchAction -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Dos Mundos",
+      "url": "https://dosmundos.pe",
+      "description": "Центр интегрального развития Dos Mundos — подкаст, статьи, семинары о духовном развитии",
+      "inLanguage": ["ru", "es", "en", "de", "fr", "pl"],
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://dosmundos.pe/ru/deep-search?q={search_term_string}",
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
+
+    <!-- Schema.org JSON-LD for PodcastSeries -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "PodcastSeries",
+      "name": "Dos Mundos Radio",
+      "url": "https://dosmundos.pe/ru/episodes",
+      "description": "Подкаст центра интегрального развития Dos Mundos о духовном развитии, аяуаска, медитации, энергетические практики, шаманизм",
+      "inLanguage": ["ru", "es", "en"],
+      "author": {
+        "@type": "Organization",
+        "name": "Dos Mundos"
+      },
+      "image": "https://dosmundos.pe/og-default.jpg",
+      "genre": ["Spirituality", "Personal Development", "Meditation"]
     }
     </script>
     
@@ -92,6 +139,24 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- SEO: content for crawlers that don't execute JavaScript -->
+    <noscript>
+      <div style="max-width:800px;margin:0 auto;padding:20px;font-family:system-ui,sans-serif">
+        <h1>Dos Mundos — Центр интегрального развития</h1>
+        <p>Центр интегрального развития Dos Mundos — исцеление тела и ума для гармонии с душой. Подкаст о духовном развитии, аяуаска, медитации, энергетические практики, семинары и ретриты в Перу.</p>
+        <nav>
+          <ul>
+            <li><a href="https://dosmundos.pe/ru/episodes">Все эпизоды подкаста</a></li>
+            <li><a href="https://dosmundos.pe/ru/articles">Статьи</a></li>
+            <li><a href="https://dosmundos.pe/ru/about">О центре</a></li>
+            <li><a href="https://dosmundos.pe/ru/events">Мероприятия</a></li>
+            <li><a href="https://dosmundos.pe/ru/volunteers">Волонтёры</a></li>
+          </ul>
+          <p>Языки: <a href="https://dosmundos.pe/ru">Русский</a> | <a href="https://dosmundos.pe/es">Español</a> | <a href="https://dosmundos.pe/en">English</a> | <a href="https://dosmundos.pe/de">Deutsch</a> | <a href="https://dosmundos.pe/fr">Français</a> | <a href="https://dosmundos.pe/pl">Polski</a></p>
+        </nav>
+        <p>Для полноценной работы сайта необходимо включить JavaScript.</p>
+      </div>
+    </noscript>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
