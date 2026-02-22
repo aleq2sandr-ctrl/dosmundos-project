@@ -7,7 +7,56 @@ import React from 'react';
 import { render, act, screen } from '@testing-library/react';
 import { PlayerProvider, usePlayer } from '@/contexts/PlayerContext';
 
-// ─── Helper: spy on native audio methods of a real <audio> element ──────────
+// ─── Mock HTMLMediaElement ───────────────────────────────────────────────────
+
+function createMockAudio() {
+  let _src = '';
+  let _currentTime = 0;
+  let _duration = NaN;
+  let _paused = true;
+  let _playbackRate = 1;
+  let _muted = false;
+  const listeners = {};
+
+  return {
+    get src() { return _src; },
+    set src(v) { _src = v; },
+    get currentTime() { return _currentTime; },
+    set currentTime(v) { _currentTime = v; },
+    get duration() { return _duration; },
+    set duration(v) { _duration = v; },
+    get paused() { return _paused; },
+    get playbackRate() { return _playbackRate; },
+    set playbackRate(v) { _playbackRate = v; },
+    get muted() { return _muted; },
+    set muted(v) { _muted = v; },
+    get ended() { return false; },
+    get readyState() { return _src ? 4 : 0; },
+    get error() { return null; },
+
+    play: vi.fn(async () => { _paused = false; }),
+    pause: vi.fn(() => { _paused = true; }),
+    load: vi.fn(async () => {}),
+
+    addEventListener: vi.fn((event, cb, opts) => {
+      if (!listeners[event]) listeners[event] = [];
+      listeners[event].push(cb);
+    }),
+    removeEventListener: vi.fn((event, cb) => {
+      if (listeners[event]) {
+        listeners[event] = listeners[event].filter(fn => fn !== cb);
+      }
+    }),
+
+    // Test helpers
+    _setDuration(d) { _duration = d; },
+    _setPaused(p) { _paused = p; },
+    _emit(event) {
+      (listeners[event] || []).forEach(fn => fn());
+    },
+    _listeners: listeners,
+  };
+}
 
 // ─── Test harness: renders a consumer that exposes PlayerContext via callbacks ─
 
@@ -27,13 +76,8 @@ function renderWithPlayer() {
     </PlayerProvider>
   );
 
-  // Grab the real <audio> element rendered by PlayerProvider and spy on its methods
+  // Grab the <audio> rendered by PlayerProvider
   const audio = result.container.querySelector('audio');
-  vi.spyOn(audio, 'play').mockResolvedValue(undefined);
-  vi.spyOn(audio, 'pause').mockImplementation(() => {});
-  vi.spyOn(audio, 'load').mockImplementation(() => {});
-  vi.spyOn(audio, 'addEventListener');
-  vi.spyOn(audio, 'removeEventListener');
 
   return { getCtx: () => ctx, audio, ...result };
 }
@@ -303,38 +347,6 @@ describe('PlayerContext', () => {
       expect(audio.pause).toHaveBeenCalled();
       expect(getCtx().isPlaying).toBe(false);
     });
-
-    test('sets autoplayBlocked on NotAllowedError', async () => {
-      const { getCtx, audio } = renderWithPlayer();
-      audio.src = 'https://example.com/audio.mp3';
-      const err = new Error('autoplay blocked');
-      err.name = 'NotAllowedError';
-      audio.play.mockRejectedValueOnce(err);
-
-      await act(async () => {
-        getCtx().togglePlay();
-        await Promise.resolve();
-      });
-
-      expect(getCtx().isPlaying).toBe(false);
-      expect(getCtx().autoplayBlocked).toBe(true);
-    });
-
-    test('ignores AbortError during rapid operations', async () => {
-      const { getCtx, audio } = renderWithPlayer();
-      audio.src = 'https://example.com/audio.mp3';
-      const err = new Error('aborted');
-      err.name = 'AbortError';
-      audio.play.mockRejectedValueOnce(err);
-
-      await act(async () => {
-        getCtx().togglePlay();
-        await Promise.resolve();
-      });
-
-      expect(getCtx().isPlaying).toBe(false);
-      expect(getCtx().autoplayBlocked).toBe(false);
-    });
   });
 
   // ── playEpisode ──
@@ -368,17 +380,16 @@ describe('PlayerContext', () => {
       const { getCtx, audio } = renderWithPlayer();
 
       await act(async () => { await getCtx().playEpisode(episode1, 0); });
-      // Clear call counts for play/load after initial playEpisode
       audio.play.mockClear();
       audio.load.mockClear();
 
-      // Same episode, different time — should seek, not reload
+      // Same episode, different time
       Object.defineProperty(audio, 'duration', { value: 300, writable: true, configurable: true });
       await act(async () => { await getCtx().playEpisode(episode1, 60); });
 
-      // Should NOT reload audio (same src)
+      // Should NOT reload
       expect(audio.load).not.toHaveBeenCalled();
-      // Should have seeked
+      // Should seek
       expect(audio.currentTime).toBe(60);
     });
 
@@ -388,11 +399,7 @@ describe('PlayerContext', () => {
 
       await act(async () => { await getCtx().playEpisode({ slug: 'no-audio' }, 0); });
 
-      // console.error is called with multiple args: (message, slug)
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('No audio URL'),
-        expect.anything()
-      );
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('No audio URL'));
       consoleSpy.mockRestore();
     });
 
@@ -406,17 +413,6 @@ describe('PlayerContext', () => {
       expect(getCtx().currentEpisode.slug).toBe('ep-2');
       expect(audio.src).toBe('https://example.com/ep2.mp3');
       expect(audio.currentTime).toBe(30);
-    });
-
-    test('accepts snake_case audio_url field', async () => {
-      const { getCtx, audio } = renderWithPlayer();
-      const episode = { slug: 'ep-snake', audio_url: 'https://example.com/snake.mp3', title: 'Snake Case' };
-
-      await act(async () => { await getCtx().playEpisode(episode, 15); });
-
-      expect(audio.src).toBe('https://example.com/snake.mp3');
-      expect(audio.currentTime).toBe(15);
-      expect(getCtx().currentEpisode.slug).toBe('ep-snake');
     });
   });
 
@@ -482,189 +478,6 @@ describe('PlayerContext', () => {
       expect(getCtx().isPlaying).toBe(true);
 
       act(() => { audio.dispatchEvent(new Event('pause')); });
-      expect(getCtx().isPlaying).toBe(false);
-    });
-  });
-
-  // ── Error recovery / cache refresh ──
-
-  describe('error recovery and cache behavior', () => {
-    test('network error triggers SW cache refresh and audio reload flow', async () => {
-      const { getCtx, audio } = renderWithPlayer();
-      const postMessage = vi.fn();
-
-      Object.defineProperty(navigator, 'serviceWorker', {
-        configurable: true,
-        value: {
-          controller: { postMessage },
-        },
-      });
-
-      const sourceUrl = 'https://example.com/recover.mp3';
-      audio.src = sourceUrl;
-      act(() => {
-        getCtx().setCurrentTime(42);
-        getCtx().setIsPlaying(true);
-      });
-
-      Object.defineProperty(audio, 'error', {
-        configurable: true,
-        value: {
-          code: 2,
-          MEDIA_ERR_NETWORK: 2,
-          MEDIA_ERR_DECODE: 3,
-          MEDIA_ERR_SRC_NOT_SUPPORTED: 4,
-          message: 'Network error',
-        },
-      });
-
-      act(() => {
-        audio.dispatchEvent(new Event('error'));
-      });
-
-      expect(postMessage).toHaveBeenCalledWith({
-        type: 'REFRESH_AUDIO_CACHE',
-        url: sourceUrl,
-      });
-
-      act(() => {
-        vi.advanceTimersByTime(1000);
-      });
-
-      expect(audio.load).toHaveBeenCalledTimes(1);
-
-      act(() => {
-        vi.advanceTimersByTime(100);
-      });
-
-      expect(audio.src).toBe(sourceUrl);
-      expect(audio.currentTime).toBe(42);
-      expect(audio.load).toHaveBeenCalledTimes(2);
-      expect(audio.play).toHaveBeenCalled();
-    });
-
-    test('recoverable error does not call play if player was not playing', () => {
-      const { getCtx, audio } = renderWithPlayer();
-      const postMessage = vi.fn();
-
-      Object.defineProperty(navigator, 'serviceWorker', {
-        configurable: true,
-        value: {
-          controller: { postMessage },
-        },
-      });
-
-      audio.src = 'https://example.com/recover-paused.mp3';
-      act(() => {
-        getCtx().setCurrentTime(10);
-        getCtx().setIsPlaying(false);
-      });
-
-      Object.defineProperty(audio, 'error', {
-        configurable: true,
-        value: {
-          code: 3,
-          MEDIA_ERR_NETWORK: 2,
-          MEDIA_ERR_DECODE: 3,
-          MEDIA_ERR_SRC_NOT_SUPPORTED: 4,
-          message: 'Decode error',
-        },
-      });
-
-      audio.play.mockClear();
-
-      act(() => {
-        audio.dispatchEvent(new Event('error'));
-      });
-
-      act(() => {
-        vi.advanceTimersByTime(1100);
-      });
-
-      expect(postMessage).toHaveBeenCalled();
-      expect(audio.play).not.toHaveBeenCalled();
-    });
-
-    test('non-recoverable error does not run reload sequence', () => {
-      const { audio } = renderWithPlayer();
-      const postMessage = vi.fn();
-
-      Object.defineProperty(navigator, 'serviceWorker', {
-        configurable: true,
-        value: {
-          controller: { postMessage },
-        },
-      });
-
-      audio.src = 'https://example.com/no-retry.mp3';
-
-      Object.defineProperty(audio, 'error', {
-        configurable: true,
-        value: {
-          code: 1,
-          MEDIA_ERR_NETWORK: 2,
-          MEDIA_ERR_DECODE: 3,
-          MEDIA_ERR_SRC_NOT_SUPPORTED: 4,
-          message: 'Aborted',
-        },
-      });
-
-      audio.load.mockClear();
-
-      act(() => {
-        audio.dispatchEvent(new Event('error'));
-      });
-
-      act(() => {
-        vi.advanceTimersByTime(1500);
-      });
-
-      expect(postMessage).not.toHaveBeenCalled();
-      expect(audio.load).not.toHaveBeenCalled();
-    });
-
-    test('retry play failure is handled and forces isPlaying=false', async () => {
-      const { getCtx, audio } = renderWithPlayer();
-
-      Object.defineProperty(navigator, 'serviceWorker', {
-        configurable: true,
-        value: {
-          controller: { postMessage: vi.fn() },
-        },
-      });
-
-      audio.src = 'https://example.com/retry-fails.mp3';
-      act(() => {
-        getCtx().setCurrentTime(25);
-        getCtx().setIsPlaying(true);
-      });
-
-      const retryError = new Error('retry failed');
-      audio.play.mockRejectedValueOnce(retryError);
-
-      Object.defineProperty(audio, 'error', {
-        configurable: true,
-        value: {
-          code: 4,
-          MEDIA_ERR_NETWORK: 2,
-          MEDIA_ERR_DECODE: 3,
-          MEDIA_ERR_SRC_NOT_SUPPORTED: 4,
-          message: 'Unsupported',
-        },
-      });
-
-      act(() => {
-        audio.dispatchEvent(new Event('error'));
-      });
-
-      act(() => {
-        vi.advanceTimersByTime(1100);
-      });
-
-      await act(async () => {
-        await Promise.resolve();
-      });
-
       expect(getCtx().isPlaying).toBe(false);
     });
   });

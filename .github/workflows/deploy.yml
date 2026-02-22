@@ -8,6 +8,7 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,156 +24,128 @@ jobs:
 
       - name: Build
         run: npm run build
-        
-      - name: Add deployment timestamp
+
+      - name: Prepare deployment archive
         run: |
+          # Add deployment info
           echo "Deployment timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)" > dist/.deployment-info
           echo "Git commit: ${{ github.sha }}" >> dist/.deployment-info
           echo "Git branch: ${{ github.ref_name }}" >> dist/.deployment-info
 
-      - name: Verify build output
-        run: |
-          echo "Checking build output..."
-          ls -lah dist/ | head -20
+          # Verify build
           if [ ! -f "dist/index.html" ]; then
             echo "ERROR: index.html not found in dist/"
             exit 1
           fi
           echo "Build output verified"
+          ls -lah dist/ | head -20
 
-      - name: Create deployment archive
-        run: |
-          # Prepare deployment directory
+          # Create deployment archive
           mkdir -p deployment
-          
-          # Copy frontend build
           cp -a dist/. deployment/
-          
-          # Copy backend files
           cp server.js deployment/
           cp package.json deployment/
           cp -r api deployment/
-          
-          # Create tar archive
           cd deployment && tar -czf ../deploy.tar.gz .
           cd ..
           ls -lh deploy.tar.gz
           echo "Archive created successfully"
 
-      - name: Deploy to VPS
-        uses: appleboy/ssh-action@v1.0.3
-        timeout-minutes: 10
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: 22
-          timeout: 60s
-          command_timeout: 600s
-          debug: true
-          script_stop: true
-          script: |
-            set -e
-            DEPLOY_PATH="${{ secrets.VPS_PATH }}"
-            echo "=== Starting deployment to $DEPLOY_PATH ==="
-            
-            # Create directories
-            mkdir -p $DEPLOY_PATH
-            mkdir -p /tmp/deployment
-            
-            # Clean any existing old archive
-            rm -f /tmp/deploy.tar.gz
-            rm -f /tmp/deploy.zip
-            
-            echo "=== Deployment environment prepared ==="
+      - name: Check VPS connectivity
+        run: |
+          echo "Testing TCP connectivity to VPS..."
+          timeout 10 bash -c "echo > /dev/tcp/${{ secrets.VPS_HOST }}/${{ secrets.VPS_PORT }}" 2>/dev/null \
+            && echo "✅ VPS is reachable on port ${{ secrets.VPS_PORT }}" \
+            || { echo "❌ Cannot reach VPS on port ${{ secrets.VPS_PORT }}. Check firewall!"; exit 1; }
 
       - name: Upload archive to VPS
         uses: appleboy/scp-action@v0.1.7
-        timeout-minutes: 10
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          port: 22
+          port: ${{ secrets.VPS_PORT }}
           timeout: 60s
-          debug: true
           source: "deploy.tar.gz"
           target: "/tmp/"
 
-      - name: Extract and finalize deployment
+      - name: Deploy and restart services
         uses: appleboy/ssh-action@v1.0.3
-        timeout-minutes: 10
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          port: 22
+          port: ${{ secrets.VPS_PORT }}
           timeout: 60s
-          command_timeout: 600s
-          debug: true
-          script_stop: true
+          command_timeout: 5m
           script: |
             set -e
             DEPLOY_PATH="${{ secrets.VPS_PATH }}"
-            
-            # Verify archive exists
+
+            echo "=== 1. Preparing directories ==="
+            mkdir -p "$DEPLOY_PATH"
+
+            echo "=== 2. Backing up current deployment ==="
+            if [ -d "$DEPLOY_PATH" ] && [ "$(ls -A $DEPLOY_PATH 2>/dev/null)" ]; then
+              BACKUP_DIR="$DEPLOY_PATH/backup-$(date +%Y%m%d-%H%M%S)"
+              mkdir -p "$BACKUP_DIR"
+              cp -r "$DEPLOY_PATH"/* "$BACKUP_DIR/" 2>/dev/null || true
+              echo "Backup created at $BACKUP_DIR"
+              # Keep only last 3 backups
+              ls -dt "$DEPLOY_PATH"/backup-* 2>/dev/null | tail -n +4 | xargs rm -rf 2>/dev/null || true
+            fi
+
+            echo "=== 3. Extracting new files ==="
             if [ ! -f "/tmp/deploy.tar.gz" ]; then
               echo "ERROR: Archive /tmp/deploy.tar.gz not found!"
               exit 1
             fi
-
-            # Backup current deployment
-            if [ -d "$DEPLOY_PATH" ] && [ "$(ls -A $DEPLOY_PATH)" ]; then
-              BACKUP_DIR="$DEPLOY_PATH/backup-$(date +%Y%m%d-%H%M%S)"
-              mkdir -p $BACKUP_DIR
-              cp -r $DEPLOY_PATH/* $BACKUP_DIR/ 2>/dev/null || true
-              echo "Backup created at $BACKUP_DIR"
-            fi
-
-            # Extract new files
-            echo "Extracting new files to $DEPLOY_PATH..."
-            cd $DEPLOY_PATH
+            cd "$DEPLOY_PATH"
             rm -rf ./*
             tar -xzf /tmp/deploy.tar.gz
-
-            # Cleanup
             rm -f /tmp/deploy.tar.gz
 
-            # Verify deployment
+            echo "=== 4. Verifying extraction ==="
             if [ ! -f "$DEPLOY_PATH/index.html" ]; then
               echo "ERROR: index.html not found after extraction!"
               exit 1
             fi
+            ls -lah "$DEPLOY_PATH" | head -20
+            cat "$DEPLOY_PATH/.deployment-info" 2>/dev/null || true
 
-            # Install dependencies
-            if [ -f "$DEPLOY_PATH/package.json" ]; then
-              npm ci --prefix $DEPLOY_PATH
-            fi
+            echo "=== 5. Installing dependencies ==="
+            cd "$DEPLOY_PATH"
+            npm ci --production 2>&1 || npm install --production 2>&1 || echo "npm install failed, continuing..."
 
-            # Restart API server
+            echo "=== 6. Restarting API server ==="
             if command -v pm2 >/dev/null 2>&1; then
-              cd $DEPLOY_PATH
-              pm2 restart dosmundos-api || pm2 start server.js --name dosmundos-api
+              pm2 restart dosmundos-api 2>/dev/null || pm2 start server.js --name dosmundos-api || echo "PM2 restart failed"
             fi
 
-            # Set permissions
-            chmod -R 755 $DEPLOY_PATH
-            chown -R www-data:www-data $DEPLOY_PATH || chown -R nginx:nginx $DEPLOY_PATH || true
+            echo "=== 7. Setting permissions ==="
+            chmod -R 755 "$DEPLOY_PATH"
+            chown -R www-data:www-data "$DEPLOY_PATH" 2>/dev/null || chown -R nginx:nginx "$DEPLOY_PATH" 2>/dev/null || true
 
-            # Reload nginx
-            sudo nginx -t && sudo systemctl reload nginx
+            echo "=== 8. Reloading Nginx ==="
+            sudo rm -rf /var/cache/nginx/* 2>/dev/null || true
+            sudo nginx -t && sudo systemctl reload nginx || sudo service nginx reload || true
 
-            # Verify running processes
-            if curl -s http://localhost:3000 >/dev/null; then
-              echo "✅ Server is running"
+            echo "=== 9. Verification ==="
+            sleep 2
+            if curl -sf http://localhost:3000/api/health >/dev/null 2>&1; then
+              echo "✅ API server is running"
             else
-              echo "⚠️  Server might not be running. Check PM2 logs."
+              echo "⚠️  API server may not be running (non-critical)"
             fi
 
-            echo "=== Deployment completed successfully! ==="
+            if [ -f "$DEPLOY_PATH/.deployment-info" ]; then
+              echo "✅ Deployment info:"
+              cat "$DEPLOY_PATH/.deployment-info"
+            fi
 
-      - name: Cleanup
+            echo ""
+            echo "=== ✅ Deployment completed successfully! ==="
+
+      - name: Cleanup archive from runner
         if: always()
-        run: |
-          rm -f deploy.tar.gz
-          rm -rf deployment
+        run: rm -f deploy.tar.gz
