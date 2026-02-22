@@ -100,10 +100,12 @@ app.use((req, res, next) => {
   }
 
   // Social bots get Telegram-style preview
-  if (isSocialBot(userAgent)) {
+  // Also check X-Telegram-IV header set by nginx for Telegram IP ranges
+  const isTelegramIV = req.headers['x-telegram-iv'] === '1';
+  if (isSocialBot(userAgent) || isTelegramIV) {
     const match = req.path.match(/^\/(ru|es|en|de|fr|pl)\/([^/]+)\/?$/);
     if (match) {
-      console.log(`🤖 Social bot: ${userAgent.substring(0, 50)} → ${req.path}`);
+      console.log(`🤖 Social bot: ${userAgent.substring(0, 50)} → ${req.path} (iv-header: ${isTelegramIV})`);
       req.params = { lang: match[1], episodeSlug: match[2] };
       return handleTelegramPreview(req, res);
     }
