@@ -33,6 +33,11 @@ const ArticleDetailPage = () => {
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(true);
 
+  // Scroll to top when article opens
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [articleId]);
+
   useEffect(() => {
     const fetchArticleData = async () => {
       try {
@@ -270,15 +275,18 @@ const ArticleDetailPage = () => {
                   </div>
                 </>
               )}
-              {content && (
+              {content && (() => {
+                const readingTime = calculateReadingTime(content, lang);
+                return (
                 <>
                   <span className="hidden md:inline text-slate-300">•</span>
                   <div className="flex items-center gap-2">
                     <Clock className="w-4 h-4" />
-                    <span className="normal-case">{getPluralizedLocaleString('reading_time_minutes', lang, calculateReadingTime(content, lang), { count: calculateReadingTime(content, lang) })}</span>
+                    <span className="normal-case">{getPluralizedLocaleString('reading_time_minutes', lang, readingTime, { count: readingTime })}</span>
                   </div>
                 </>
               )}
+              )()}
               {article.youtubeUrl && (
                 <>
                   <span className="hidden md:inline text-slate-300">•</span>

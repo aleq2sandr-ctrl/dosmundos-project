@@ -85,7 +85,21 @@ export const formatArticleDate = (dateString, lang = 'ru') => {
   if (!dateString) return '';
   
   try {
-    const date = new Date(dateString);
+    let date;
+    
+    // Для формата YYYY-MM-DD парсим без timezone смещения
+    // чтобы не сдвигать дату на предыдущий день в западных часовых поясах
+    if (typeof dateString === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      const [year, month, day] = dateString.split('-').map(Number);
+      date = new Date(year, month - 1, day); // local timezone, no UTC shift
+    } else if (typeof dateString === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(dateString)) {
+      // ISO datetime — parse and use as-is
+      date = new Date(dateString);
+    } else {
+      date = new Date(dateString);
+    }
+    
+    if (isNaN(date.getTime())) return '';
     
     // Locale mapping
     const localeMap = {

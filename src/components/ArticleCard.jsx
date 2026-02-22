@@ -39,8 +39,6 @@ const ArticleCard = memo(({
     readingTime
   } = article;
 
-  console.log(`[ArticleCard] Rendering: ${title}`);
-
   return (
     <div 
       ref={isLast ? lastArticleElementRef : null}

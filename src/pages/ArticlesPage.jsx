@@ -9,7 +9,6 @@ import ArticleCard from '@/components/ArticleCard';
 
 const ArticlesPage = () => {
   const { lang } = useParams();
-  console.log('[ArticlesPage] Component rendered, lang:', lang);
   const [rawArticles, setRawArticles] = useState([]);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -54,7 +53,7 @@ const ArticlesPage = () => {
             author,
             youtube_url,
             published_at,
-            article_translations(title, summary, language_code),
+            article_translations(title, summary, content, language_code),
             article_categories(
               categories(
                 slug,
@@ -84,6 +83,7 @@ const ArticlesPage = () => {
               slug: a.slug,
               title: { [lang]: translation.title },
               summary: { [lang]: translation.summary },
+              content: { [lang]: translation.content },
               categories: categories,
               author: a.author,
               youtube_url: a.youtube_url,
@@ -157,13 +157,6 @@ const ArticlesPage = () => {
 
   // Load more articles when reaching the end
   useEffect(() => {
-    console.log('[ArticlesPage] Load more check:', {
-      visibleCount,
-      rawArticlesLength: rawArticles.length,
-      hasMore,
-      loadingMore,
-      isInitialLoading
-    });
     if (visibleCount >= rawArticles.length && hasMore && !loadingMore && !isInitialLoading) {
       setLoadingMore(true);
       setOffset(prev => prev + 12);
