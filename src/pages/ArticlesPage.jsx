@@ -6,6 +6,7 @@ import { Search, Loader2 } from 'lucide-react';
 import { calculateReadingTime } from '@/lib/utils';
 import ArticleCardSkeleton from '@/components/ArticleCardSkeleton';
 import ArticleCard from '@/components/ArticleCard';
+import { updateArticlesListMetaTags, resetMetaTags } from '@/lib/updateMetaTags';
 
 const ArticlesPage = () => {
   const { lang } = useParams();
@@ -20,6 +21,12 @@ const ArticlesPage = () => {
 
   // Track current lang to prevent stale fetches from corrupting state
   const currentLangRef = useRef(lang);
+
+  // SEO: Update meta tags for articles list page
+  useEffect(() => {
+    updateArticlesListMetaTags(lang || 'ru');
+    return () => resetMetaTags();
+  }, [lang]);
 
   // Infinite scroll observer with debounce
   const observer = useRef();

@@ -281,3 +281,43 @@ export const updateEpisodesListMetaTags = (lang, baseUrl = 'https://dosmundos.pe
   setMeta('twitter:title', title);
   setMeta('twitter:description', description);
 };
+
+/**
+ * Update meta tags for the articles list page
+ */
+export const updateArticlesListMetaTags = (lang, baseUrl = 'https://dosmundos.pe') => {
+  const titles = {
+    ru: 'Статьи — Dos Mundos',
+    es: 'Artículos — Dos Mundos',
+    en: 'Articles — Dos Mundos',
+    de: 'Artikel — Dos Mundos',
+    fr: 'Articles — Dos Mundos',
+    pl: 'Artykuły — Dos Mundos'
+  };
+  const descriptions = {
+    ru: 'Статьи центра интегрального развития Dos Mundos. Духовность, аяуаска, медитации, энергетические практики, шаманизм.',
+    es: 'Artículos del centro de desarrollo integral Dos Mundos. Espiritualidad, ayahuasca, meditaciones, prácticas energéticas.',
+    en: 'Articles from Dos Mundos integral development center. Spirituality, ayahuasca, meditations, energy practices.',
+    de: 'Artikel des integralen Entwicklungszentrums Dos Mundos.',
+    fr: 'Articles du centre de développement intégral Dos Mundos.',
+    pl: 'Artykuły centrum integralnego rozwoju Dos Mundos.'
+  };
+
+  const title = titles[lang] || titles.ru;
+  const description = descriptions[lang] || descriptions.ru;
+  const pageUrl = `${baseUrl}/${lang}/articles`;
+
+  document.title = title;
+  setLink('canonical', pageUrl);
+  setMeta('description', description);
+  setMeta('robots', 'index, follow');
+  setMeta('og:type', 'website', true);
+  setMeta('og:title', title, true);
+  setMeta('og:description', description, true);
+  setMeta('og:url', pageUrl, true);
+  setMeta('og:image', `${baseUrl}/og-default.jpg`, true);
+  setMeta('og:site_name', 'Dos Mundos', true);
+  setMeta('twitter:card', 'summary_large_image');
+  setMeta('twitter:title', title);
+  setMeta('twitter:description', description);
+};
