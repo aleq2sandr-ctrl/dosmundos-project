@@ -1,32 +1,45 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { usePlayer } from '@/contexts/PlayerContext';
 import logger from '@/lib/logger';
 
 const usePlayerInteractions = (audioRef, playerControlsContainerRef, episodeSlug, questions, initialShowTranscript = false) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { seek, seekAndPlay, togglePlay, isPlaying, currentTime, duration } = usePlayer();
+  
   const [jumpDetails, setJumpDetails] = useState({ time: null, id: null, questionId: null, playAfterJump: false, segmentToHighlight: null });
   const [showFloatingControls, setShowFloatingControls] = useState(false);
   const [playerState, setPlayerState] = useState({ isPlaying: false, currentTime: 0, duration: 0, activeQuestionTitle: '' });
   const [showTranscriptUI, setShowTranscriptUI] = useState(() => {
-    // Check localStorage first, fallback to initialShowTranscript
     const saved = localStorage.getItem('showTranscriptUI');
     return saved !== null ? saved === 'true' : initialShowTranscript;
   });
 
-
   const didDefaultAutoplayRef = useRef(false);
+  // Track last hash we set ourselves to avoid re-processing our own navigation
+  const lastSetHashRef = useRef('');
+  // Debounce timer for hash changes
+  const hashDebounceRef = useRef(null);
 
+  // Sync playerState with PlayerContext
+  useEffect(() => {
+    setPlayerState(prev => ({ ...prev, isPlaying, currentTime, duration }));
+  }, [isPlaying, currentTime, duration]);
+
+  // Process URL hash for initial load and external hash changes only
   useEffect(() => {
     const hash = location.hash;
     logger.debug('usePlayerInteractions: Processing hash', hash);
+    
+    // Skip processing if this is a hash we set ourselves
+    if (hash === lastSetHashRef.current) {
+      return;
+    }
+    
     if (hash) {
-      // Обновленное регулярное выражение для поддержки &play=true без разделителя
       const segmentMatch = hash.match(/^#segment-(\d+(?:\.\d+)?)(?:&play=true)?$/);
-      // Allow any characters in question ID until & or end of string
       const questionMatch = hash.match(/^#question-([^&]+)(?:&play=true)?$/);
-      
-      // New compact formats: #123 (seconds), #12:34 (mm:ss)
       const secondsMatch = hash.match(/^#(\d+(?:\.\d+)?)$/);
       const timeMatch = hash.match(/^#(\d+):(\d+)$/);
 
@@ -35,39 +48,37 @@ const usePlayerInteractions = (audioRef, playerControlsContainerRef, episodeSlug
       if (segmentMatch) {
         const time = parseFloat(segmentMatch[1]) / 1000; 
         const play = hash.includes('&play=true');
-        setJumpDetails({ time: time, id: `segment-${segmentMatch[1]}`, questionId: null, playAfterJump: play, segmentToHighlight: parseFloat(segmentMatch[1]) });
+        setJumpDetails({ time, id: `segment-${segmentMatch[1]}`, questionId: null, playAfterJump: play, segmentToHighlight: parseFloat(segmentMatch[1]) });
       } else if (questionMatch) {
         const questionId = questionMatch[1];
         const play = hash.includes('&play=true');
         let question = questions.find(q => String(q.id) === questionId || q.slug === questionId);
         if (question) {
-          setJumpDetails({ time: question.time, id: `question-${questionId}`, questionId: questionId, playAfterJump: play, segmentToHighlight: null });
+          setJumpDetails({ time: question.time, id: `question-${questionId}`, questionId, playAfterJump: play, segmentToHighlight: null });
         } else {
           const retry = setTimeout(() => {
             const q2 = questions.find(q => String(q.id) === questionId || q.slug === questionId);
             if (q2) {
-              setJumpDetails({ time: q2.time, id: `question-${questionId}`, questionId: questionId, playAfterJump: play, segmentToHighlight: null });
+              setJumpDetails({ time: q2.time, id: `question-${questionId}`, questionId, playAfterJump: play, segmentToHighlight: null });
             }
-            clearTimeout(retry);
           }, 600);
+          return () => clearTimeout(retry);
         }
       } else if (secondsMatch) {
-        // Compact seconds format: #123 -> 123 seconds. Auto-play by default.
         const time = parseFloat(secondsMatch[1]);
-        setJumpDetails({ time: time, id: `time-${time}`, questionId: null, playAfterJump: true, segmentToHighlight: time * 1000 });
+        setJumpDetails({ time, id: `time-${time}`, questionId: null, playAfterJump: true, segmentToHighlight: time * 1000 });
       } else if (timeMatch) {
-        // Compact mm:ss format: #12:34 -> 12m 34s. Auto-play by default.
         const minutes = parseInt(timeMatch[1], 10);
         const seconds = parseInt(timeMatch[2], 10);
         const totalSeconds = minutes * 60 + seconds;
         setJumpDetails({ time: totalSeconds, id: `time-${totalSeconds}`, questionId: null, playAfterJump: true, segmentToHighlight: totalSeconds * 1000 });
       }
     } else {
-      // Нет якоря — включаем автозапуск с начала один раз
+      // No hash — trigger autoplay from start once
       if (!didDefaultAutoplayRef.current) {
         didDefaultAutoplayRef.current = true;
-        // Use compact format for default start
         const newHash = '#0';
+        lastSetHashRef.current = newHash;
         if (location.hash !== newHash) {
           navigate(`${location.pathname}${newHash}`, { replace: true, state: location.state });
         }
@@ -76,28 +87,45 @@ const usePlayerInteractions = (audioRef, playerControlsContainerRef, episodeSlug
     }
   }, [location.hash, questions, episodeSlug]);
 
+  // handleSeekToTime: The single entry point for all seek operations.
+  // Sets jumpDetails for PodcastPlayer AND performs seek directly via PlayerContext.
+  // Does NOT trigger URL hash change that would re-process in the hash effect.
   const handleSeekToTime = useCallback((time, id = null, playAfterJump = false, questionId = null) => {
     logger.debug('usePlayerInteractions: handleSeekToTime called', { time, id, playAfterJump, questionId });
     
     const segmentStartTimeMs = Math.round(time * 1000);
-    // Оптимизация: обновляем состояние сразу
-    setJumpDetails({ time, id: id || `time-${time}`, questionId, playAfterJump, segmentToHighlight: segmentStartTimeMs });
+    const jumpId = id || `seek-${Date.now()}`;
     
-    // Always use compact format: #seconds (integer)
-    // This replaces the verbose #question-ID&play=true format
-    const newHash = `#${Math.floor(time)}`;
-      
-    if (location.hash !== newHash) {
-        if (newHash) {
-            navigate(`${location.pathname}${newHash}`, { replace: true, state: location.state });
-        } else {
-             navigate(location.pathname, { replace: true, state: location.state });
-        }
+    // Update jump details for highlighting and question tracking
+    setJumpDetails({ time, id: jumpId, questionId, playAfterJump, segmentToHighlight: segmentStartTimeMs });
+    
+    // Perform the seek directly via PlayerContext — this is the authoritative path
+    if (playAfterJump) {
+      seekAndPlay(time, true);
+    } else {
+      seek(time);
     }
-  }, [navigate, location.pathname, location.hash, location.state]);
+    
+    // Update URL hash without re-triggering the hash effect
+    const newHash = `#${Math.floor(time)}`;
+    lastSetHashRef.current = newHash;
+    
+    if (location.hash !== newHash) {
+      // Debounce hash updates during rapid seeks (e.g., skip button spam)
+      if (hashDebounceRef.current) {
+        clearTimeout(hashDebounceRef.current);
+      }
+      hashDebounceRef.current = setTimeout(() => {
+        if (newHash) {
+          navigate(`${location.pathname}${newHash}`, { replace: true, state: location.state });
+        } else {
+          navigate(location.pathname, { replace: true, state: location.state });
+        }
+      }, 150);
+    }
+  }, [navigate, location.pathname, location.hash, location.state, seek, seekAndPlay]);
 
   const handlePlayerStateChange = useCallback((newState) => {
-    logger.debug('usePlayerInteractions: handlePlayerStateChange called', newState);
     setPlayerState(prevState => ({ ...prevState, ...newState }));
   }, []);
 
@@ -109,26 +137,18 @@ const usePlayerInteractions = (audioRef, playerControlsContainerRef, episodeSlug
     });
   }, []);
 
+  // Floating player skip — uses PlayerContext directly for low-latency skip
   const handleFloatingPlayerSkip = useCallback((seconds) => {
     if (audioRef.current) {
-      const newTime = audioRef.current.currentTime + seconds;
-      const isPlaying = !audioRef.current.paused;
-      handleSeekToTime(newTime, null, isPlaying);
+      const newTime = Math.max(0, audioRef.current.currentTime + seconds);
+      seek(newTime);
     }
-  }, [audioRef, handleSeekToTime]);
+  }, [audioRef, seek]);
 
+  // Floating play/pause — uses PlayerContext for state consistency
   const handleFloatingPlayPause = useCallback(() => {
-    if (audioRef.current) {
-      const newIsPlaying = !audioRef.current.paused; 
-      if (newIsPlaying) {
-        audioRef.current.pause();
-      } else {
-        audioRef.current.play().catch(e => console.error("Floating player play error:", e));
-      }
-       setPlayerState(prev => ({ ...prev, isPlaying: !newIsPlaying }));
-    }
-  }, [audioRef]);
-
+    togglePlay();
+  }, [togglePlay]);
 
   return {
     jumpDetails,

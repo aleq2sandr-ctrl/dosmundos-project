@@ -81,7 +81,8 @@ const PodcastPlayer = ({
     isPlaying, 
     setIsPlaying,
     togglePlay, 
-    seek, 
+    seek,
+    seekAndPlay,
     playbackRate, 
     setPlaybackRate,
     currentEpisode: contextEpisode,
@@ -181,16 +182,10 @@ const PodcastPlayer = ({
   
   const lastJumpIdRef = useRef(null);
 
-  // Sync episode with PlayerContext when episodeData changes
+  // Sync episode with PlayerContext — only handles loading a NEW episode.
+  // Same-episode seeks are handled directly by handleSeekToTime in usePlayerInteractions
+  // which calls seek()/seekAndPlay() on PlayerContext immediately.
   useEffect(() => {
-    console.log('🎵 [PodcastPlayer] Episode sync effect:', {
-      episodeSlug: episodeData?.slug,
-      contextSlug: contextEpisode?.slug,
-      episodeAudioUrl,
-      jumpToTime: episodeData?.jumpToTime,
-      jumpId: episodeData?.jumpId
-    });
-    
     if (episodeData && episodeData.slug !== contextEpisode?.slug) {
       const audioUrl = episodeAudioUrl || getAudioUrl(episodeData);
       console.log('🎵 [PodcastPlayer] Playing new episode:', {
@@ -208,23 +203,8 @@ const PodcastPlayer = ({
       } else {
         console.error('🎵 [PodcastPlayer] No audio URL available for episode:', episodeData.slug);
       }
-    } else if (episodeData && episodeData.slug === contextEpisode?.slug) {
-        // Handle seeking within the same episode
-        if (episodeData.jumpId && episodeData.jumpId !== lastJumpIdRef.current) {
-            console.log('🎵 [PodcastPlayer] Seeking in current episode:', {
-                to: episodeData.jumpToTime,
-                id: episodeData.jumpId
-            });
-            
-            seek(episodeData.jumpToTime);
-            lastJumpIdRef.current = episodeData.jumpId;
-            
-            if (episodeData.playAfterJump && !isPlaying) {
-                togglePlay();
-            }
-        }
     }
-  }, [episodeData?.slug, episodeData?.jumpToTime, episodeData?.jumpId, episodeAudioUrl, contextEpisode?.slug, playEpisode, seek, isPlaying, togglePlay]);
+  }, [episodeData?.slug, episodeAudioUrl, contextEpisode?.slug, playEpisode]);
 
   // Состояние для диалога скачивания текста
   const [isDownloadTextDialogOpen, setIsDownloadTextDialogOpen] = useState(false);
@@ -317,9 +297,8 @@ const PodcastPlayer = ({
   };
   
   const handleSkip = (seconds) => {
-    // Don't clamp to duration here as it might be 0 if metadata hasn't loaded yet
-    // seek() in PlayerContext handles clamping using audioRef.current.duration as fallback
-    seek(currentTime + seconds);
+    const newTime = Math.max(0, currentTime + seconds);
+    seek(newTime);
   };
   
   const navigateQuestion = (direction) => {
@@ -361,14 +340,16 @@ const PodcastPlayer = ({
     }
     
     if (newIndex >= 0 && newIndex < sortedQuestions.length) {
-      seek(sortedQuestions[newIndex].time);
+      // Use seekAndPlay so navigation always continues playback
+      seekAndPlay(sortedQuestions[newIndex].time, isPlaying);
     }
   };
   
   const seekAudio = (time, playAfter = false) => {
-    seek(time);
-    if (playAfter && !isPlaying) {
-      togglePlay();
+    if (playAfter) {
+      seekAndPlay(time, true);
+    } else {
+      seek(time);
     }
   };
   

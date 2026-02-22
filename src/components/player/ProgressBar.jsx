@@ -1,6 +1,7 @@
 import React, { useRef, useCallback, useEffect } from 'react';
 import { formatTime } from '@/lib/utils';
 import { getLocaleString } from '@/lib/locales';
+import { usePlayer } from '@/contexts/PlayerContext';
 
 const DEFAULT_MARKER_COLOR = '#FFC107';
 
@@ -9,6 +10,7 @@ const ProgressBar = ({ currentTime, duration, sections, onProgressChange, onSect
   const progressBarRef = useRef(null);
   const isDraggingRef = useRef(false);
   const lastUpdateTimeRef = useRef(0);
+  const { startDragging, stopDragging } = usePlayer();
 
   const handleProgressInteraction = useCallback((clientX) => {
     if (progressBarRef.current && duration > 0) {
@@ -32,6 +34,7 @@ const ProgressBar = ({ currentTime, duration, sections, onProgressChange, onSect
 
   const handleMouseDown = (e) => {
     isDraggingRef.current = true;
+    startDragging(); // Notify PlayerContext to suppress timeupdate
     handleProgressInteraction(e.clientX);
   };
 
@@ -42,7 +45,10 @@ const ProgressBar = ({ currentTime, duration, sections, onProgressChange, onSect
   };
 
   const handleMouseUp = () => {
-    isDraggingRef.current = false;
+    if (isDraggingRef.current) {
+      isDraggingRef.current = false;
+      stopDragging(); // Allow timeupdate to resume
+    }
   };
 
   const handleTouchInteraction = (touch) => {
@@ -52,6 +58,7 @@ const ProgressBar = ({ currentTime, duration, sections, onProgressChange, onSect
   const handleTouchStart = (e) => {
     if (e.touches.length > 0) {
       isDraggingRef.current = true;
+      startDragging();
       handleTouchInteraction(e.touches[0]);
     }
   };
@@ -64,7 +71,10 @@ const ProgressBar = ({ currentTime, duration, sections, onProgressChange, onSect
   };
 
   const handleTouchEnd = () => {
-    isDraggingRef.current = false;
+    if (isDraggingRef.current) {
+      isDraggingRef.current = false;
+      stopDragging();
+    }
   };
 
   const handleSectionMarkerClick = useCallback((e, time, id) => {
@@ -74,40 +84,38 @@ const ProgressBar = ({ currentTime, duration, sections, onProgressChange, onSect
     }
   }, [onSectionJump]);
 
-  // Add global drag handlers
+  // Add global drag handlers — always attached, check isDragging inside handler
   useEffect(() => {
     const handleGlobalMouseMove = (e) => {
       if (isDraggingRef.current) {
-        handleMouseMove(e);
+        handleProgressInteraction(e.clientX);
       }
     };
 
     const handleGlobalMouseUp = () => {
       if (isDraggingRef.current) {
-        handleMouseUp();
+        isDraggingRef.current = false;
+        stopDragging();
       }
     };
 
     const handleGlobalTouchMove = (e) => {
-      if (isDraggingRef.current) {
-        if (e.touches.length > 0) {
-          handleTouchInteraction(e.touches[0]);
-        }
+      if (isDraggingRef.current && e.touches.length > 0) {
+        handleTouchInteraction(e.touches[0]);
       }
     };
 
     const handleGlobalTouchEnd = () => {
       if (isDraggingRef.current) {
-        handleTouchEnd();
+        isDraggingRef.current = false;
+        stopDragging();
       }
     };
 
-    if (isDraggingRef.current) {
-      document.addEventListener('mousemove', handleGlobalMouseMove);
-      document.addEventListener('mouseup', handleGlobalMouseUp);
-      document.addEventListener('touchmove', handleGlobalTouchMove, { passive: false });
-      document.addEventListener('touchend', handleGlobalTouchEnd);
-    }
+    document.addEventListener('mousemove', handleGlobalMouseMove);
+    document.addEventListener('mouseup', handleGlobalMouseUp);
+    document.addEventListener('touchmove', handleGlobalTouchMove, { passive: false });
+    document.addEventListener('touchend', handleGlobalTouchEnd);
 
     return () => {
       document.removeEventListener('mousemove', handleGlobalMouseMove);
@@ -115,7 +123,7 @@ const ProgressBar = ({ currentTime, duration, sections, onProgressChange, onSect
       document.removeEventListener('touchmove', handleGlobalTouchMove);
       document.removeEventListener('touchend', handleGlobalTouchEnd);
     };
-  }, [isDraggingRef.current]);
+  }, [handleProgressInteraction, stopDragging]);
 
   return (
     <div
