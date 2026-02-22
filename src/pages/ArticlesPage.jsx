@@ -14,10 +14,13 @@ const ArticlesPage = () => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
-  const [visibleCount, setVisibleCount] = useState(6); // Start with 6 items for faster initial load
+  const [visibleCount, setVisibleCount] = useState(6);
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
-  
+
+  // Track current lang to prevent stale fetches from corrupting state
+  const currentLangRef = useRef(lang);
+
   // Infinite scroll observer with debounce
   const observer = useRef();
   const debounceTimer = useRef();
@@ -26,63 +29,104 @@ const ArticlesPage = () => {
     if (observer.current) observer.current.disconnect();
     observer.current = new IntersectionObserver(entries => {
       if (entries[0].isIntersecting && hasMore && !loadingMore) {
-        // Debounce to prevent multiple triggers
         if (debounceTimer.current) clearTimeout(debounceTimer.current);
         debounceTimer.current = setTimeout(() => {
-          setVisibleCount(prev => prev + 6); // Load 6 more items at a time
+          setVisibleCount(prev => prev + 6);
         }, 300);
       }
     });
     if (node) observer.current.observe(node);
   }, [isInitialLoading, loadingMore, hasMore]);
 
-  // Reset state when language changes
+  // When language changes, reset offset to 0 to trigger a fresh fetch
   useEffect(() => {
-    setRawArticles([]);
-    setOffset(0);
-    setHasMore(true);
-    setVisibleCount(6);
-    setIsInitialLoading(true);
+    if (currentLangRef.current !== lang) {
+      currentLangRef.current = lang;
+      setOffset(0);
+      setHasMore(true);
+      setVisibleCount(6);
+      setSelectedCategory('All');
+    }
   }, [lang]);
 
-  // Fetch raw data with progressive loading
+  // Unified fetch effect — handles both initial load and pagination
   useEffect(() => {
+    let cancelled = false;
+
     const fetchArticles = async () => {
-      // Only show full-page skeletons on first load, not on pagination
       if (offset === 0) {
         setIsInitialLoading(true);
       }
       setLoadingMore(true);
+
       try {
-        // Try fetching from new schema first - with pagination
         const BATCH_SIZE = 12;
-        
-        const { data, error, count } = await supabase
-          .from('articles_v2')
-          .select(`
-            id,
-            slug,
-            author,
-            youtube_url,
-            published_at,
-            article_translations(title, summary, content, language_code),
-            article_categories(
-              categories(
-                slug,
-                category_translations(name, language_code)
+
+        // Try fetching with language filter first (optimal — only requested translation)
+        let data, error, count;
+        try {
+          const result = await supabase
+            .from('articles_v2')
+            .select(`
+              id,
+              slug,
+              author,
+              youtube_url,
+              published_at,
+              article_translations!inner(title, summary, content, language_code),
+              article_categories(
+                categories(
+                  slug,
+                  category_translations(name, language_code)
+                )
               )
-            )
-          `, { count: 'est' })
-          .order('published_at', { ascending: false })
-          .range(offset, offset + BATCH_SIZE - 1);
+            `, { count: 'est' })
+            .eq('article_translations.language_code', lang)
+            .order('published_at', { ascending: false })
+            .range(offset, offset + BATCH_SIZE - 1);
+
+          data = result.data;
+          error = result.error;
+          count = result.count;
+        } catch (e) {
+          error = e;
+        }
+
+        // If inner join returned no results or failed, try without language filter
+        if (error || !data || data.length === 0) {
+          const fallbackResult = await supabase
+            .from('articles_v2')
+            .select(`
+              id,
+              slug,
+              author,
+              youtube_url,
+              published_at,
+              article_translations(title, summary, content, language_code),
+              article_categories(
+                categories(
+                  slug,
+                  category_translations(name, language_code)
+                )
+              )
+            `, { count: 'est' })
+            .order('published_at', { ascending: false })
+            .range(offset, offset + BATCH_SIZE - 1);
+
+          data = fallbackResult.data;
+          error = fallbackResult.error;
+          count = fallbackResult.count;
+        }
+
+        if (cancelled) return;
 
         if (!error && data) {
-          // Transform new schema to component format
           const transformed = data.map(a => {
             const translations = a.article_translations || [];
-            const translation = translations.find(t => t.language_code === lang) || 
-                                translations.find(t => t.language_code === 'ru') || {};
-            
+            const translation = translations.find(t => t.language_code === lang) ||
+                                translations.find(t => t.language_code === 'ru') ||
+                                translations[0] || {};
+
             const articleCategories = a.article_categories || [];
             const categories = articleCategories.map(ac => {
               const catTranslations = ac.categories?.category_translations || [];
@@ -103,10 +147,15 @@ const ArticlesPage = () => {
             };
           });
 
-          // Update articles progressively
-          setRawArticles(prev => [...prev, ...transformed]);
-          
-          // Check if there are more articles to load
+          if (cancelled) return;
+
+          // On offset 0 (fresh load / lang change), replace articles entirely
+          if (offset === 0) {
+            setRawArticles(transformed);
+          } else {
+            setRawArticles(prev => [...prev, ...transformed]);
+          }
+
           if (transformed.length < BATCH_SIZE || (count && offset + BATCH_SIZE >= count)) {
             setHasMore(false);
           } else {
@@ -117,19 +166,24 @@ const ArticlesPage = () => {
           return;
         }
 
-        // Fallback to old schema if new one fails
+        // Fallback to old schema
         console.warn('New schema fetch failed, falling back to old schema:', error);
-        
+
         const { data: oldData, error: oldError, count: oldCount } = await supabase
           .from('articles')
           .select('id, slug, title, summary, categories, author, youtube_url, created_at', { count: 'est' })
           .order('created_at', { ascending: false })
           .range(offset, offset + 11);
 
+        if (cancelled) return;
         if (oldError) throw oldError;
 
         if (oldData) {
-          setRawArticles(prev => [...prev, ...oldData]);
+          if (offset === 0) {
+            setRawArticles(oldData);
+          } else {
+            setRawArticles(prev => [...prev, ...oldData]);
+          }
           if (oldData.length < 12 || (oldCount && offset + 12 >= oldCount)) {
             setHasMore(false);
           } else {
@@ -137,11 +191,13 @@ const ArticlesPage = () => {
           }
         }
         setIsInitialLoading(false);
-      } catch (error) {
-        console.error('Error fetching articles:', error);
+      } catch (fetchError) {
+        console.error('Error fetching articles:', fetchError);
+        if (cancelled) return;
         // Fallback to local JSON
         try {
           const response = await fetch('/articles/index.json');
+          if (cancelled) return;
           if (response.ok) {
             const data = await response.json();
             const batch = data.slice(offset, offset + 12).map(a => ({
@@ -152,7 +208,11 @@ const ArticlesPage = () => {
               author: a.author,
               youtube_url: a.youtubeUrl
             }));
-            setRawArticles(prev => [...prev, ...batch]);
+            if (offset === 0) {
+              setRawArticles(batch);
+            } else {
+              setRawArticles(prev => [...prev, ...batch]);
+            }
             setHasMore(offset + 12 < data.length);
           }
         } catch (e) {
@@ -160,11 +220,17 @@ const ArticlesPage = () => {
         }
         setIsInitialLoading(false);
       } finally {
-        setLoadingMore(false);
+        if (!cancelled) {
+          setLoadingMore(false);
+        }
       }
     };
 
     fetchArticles();
+
+    return () => {
+      cancelled = true;
+    };
   }, [offset, lang]);
 
   // Load more articles when reaching the end
@@ -188,7 +254,7 @@ const ArticlesPage = () => {
         author: article.author,
         youtubeUrl: article.youtube_url,
         publishedAt: article.published_at,
-        readingTime: calculateReadingTime(content, lang) // Pre-calculate reading time
+        readingTime: calculateReadingTime(content, lang)
       };
     });
   }, [rawArticles, lang]);
@@ -219,8 +285,8 @@ const ArticlesPage = () => {
     // Filter by search query
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(a => 
-        a.title.toLowerCase().includes(query) || 
+      filtered = filtered.filter(a =>
+        a.title.toLowerCase().includes(query) ||
         (a.summary && a.summary.toLowerCase().includes(query))
       );
     }
@@ -262,7 +328,7 @@ const ArticlesPage = () => {
                 key={cat}
                 onClick={() => {
                   setSelectedCategory(cat);
-                  setVisibleCount(6); // Reset visible count
+                  setVisibleCount(6);
                 }}
                 className={`px-4 py-2 rounded-full text-sm transition-all duration-300 border ${
                   selectedCategory === cat
@@ -297,7 +363,7 @@ const ArticlesPage = () => {
                   />
                 );
               })}
-              
+
               {/* Show loading skeletons while loading more */}
               {loadingMore && visibleCount >= filteredArticles.length && (
                 <>
@@ -307,7 +373,7 @@ const ArticlesPage = () => {
                 </>
               )}
             </div>
-            
+
             {/* Loading indicator for infinite scroll */}
             {visibleCount < filteredArticles.length && loadingMore && (
               <div className="flex justify-center py-8">

@@ -33,13 +33,21 @@ const ArticleDetailPage = () => {
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(true);
 
-  // Scroll to top when article opens
+  // Scroll to top when article or language changes
   useEffect(() => {
     window.scrollTo(0, 0);
-  }, [articleId]);
+  }, [articleId, lang]);
 
   useEffect(() => {
+    let cancelled = false;
+
     const fetchArticleData = async () => {
+      // Show loading spinner when language or article changes
+      setLoading(true);
+      setArticle(null);
+      setContent('');
+      resetMetaTags();
+
       try {
         // Try fetching from new schema first
         const { data: newArticleData, error: newError } = await supabase
@@ -58,6 +66,8 @@ const ArticleDetailPage = () => {
           .single();
 
         if (!newError && newArticleData) {
+          if (cancelled) return;
+
           const translations = newArticleData.article_translations || [];
           const translation = translations.find(t => t.language_code === lang) || 
                               translations.find(t => t.language_code === 'ru') || {};
@@ -110,6 +120,8 @@ const ArticleDetailPage = () => {
           .select('*')
           .eq('slug', articleId)
           .single();
+
+        if (cancelled) return;
 
         if (error || !articleData) {
           console.error('Error fetching article from Supabase:', error);
@@ -173,14 +185,21 @@ const ArticleDetailPage = () => {
         }
 
       } catch (error) {
+        if (cancelled) return;
         console.error('Error fetching article:', error);
         navigate(`/${lang}/articles`);
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
     fetchArticleData();
+
+    return () => {
+      cancelled = true;
+    };
   }, [lang, articleId, navigate]);
 
   // Reset meta tags when component unmounts
