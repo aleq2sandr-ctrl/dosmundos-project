@@ -1,5 +1,5 @@
 // Утилита для получения URL аудио с поддержкой вариантов дорожек
-const AUDIO_PUBLIC_BASE = import.meta.env.VITE_AUDIO_PUBLIC_BASE || 'https://dosmundos.pe/files/audio';
+const AUDIO_PUBLIC_BASE = import.meta.env.VITE_AUDIO_PUBLIC_BASE || 'https://silver-lemur-512881.hostingersite.com/wp-content/uploads/Audio';
 
 export const getAudioUrl = (episode, lang = null) => {
   if (!episode) return null;

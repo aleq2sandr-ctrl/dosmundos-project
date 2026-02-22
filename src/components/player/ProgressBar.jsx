@@ -1,4 +1,4 @@
-import React, { useRef, useCallback } from 'react';
+import React, { useRef, useCallback, useEffect } from 'react';
 import { formatTime } from '@/lib/utils';
 import { getLocaleString } from '@/lib/locales';
 
@@ -17,9 +17,8 @@ const ProgressBar = ({ currentTime, duration, sections, onProgressChange, onSect
       const newTime = Math.max(0, Math.min(duration, clickPosition * duration));
 
       if (typeof onProgressChange === 'function' && !isNaN(newTime)) {
-        // Throttle updates during dragging for better performance
         const now = Date.now();
-        if (!isDraggingRef.current || now - lastUpdateTimeRef.current > 50) {
+        if (!isDraggingRef.current || now - lastUpdateTimeRef.current > 30) {
           onProgressChange(newTime);
           lastUpdateTimeRef.current = now;
         }
@@ -51,7 +50,7 @@ const ProgressBar = ({ currentTime, duration, sections, onProgressChange, onSect
   }
 
   const handleTouchStart = (e) => {
-     if (e.touches.length > 0) {
+    if (e.touches.length > 0) {
       isDraggingRef.current = true;
       handleTouchInteraction(e.touches[0]);
     }
@@ -75,8 +74,8 @@ const ProgressBar = ({ currentTime, duration, sections, onProgressChange, onSect
     }
   }, [onSectionJump]);
 
-  // Добавляем глобальные обработчики для drag
-  React.useEffect(() => {
+  // Add global drag handlers
+  useEffect(() => {
     const handleGlobalMouseMove = (e) => {
       if (isDraggingRef.current) {
         handleMouseMove(e);
@@ -89,16 +88,34 @@ const ProgressBar = ({ currentTime, duration, sections, onProgressChange, onSect
       }
     };
 
+    const handleGlobalTouchMove = (e) => {
+      if (isDraggingRef.current) {
+        if (e.touches.length > 0) {
+          handleTouchInteraction(e.touches[0]);
+        }
+      }
+    };
+
+    const handleGlobalTouchEnd = () => {
+      if (isDraggingRef.current) {
+        handleTouchEnd();
+      }
+    };
+
     if (isDraggingRef.current) {
       document.addEventListener('mousemove', handleGlobalMouseMove);
       document.addEventListener('mouseup', handleGlobalMouseUp);
+      document.addEventListener('touchmove', handleGlobalTouchMove, { passive: false });
+      document.addEventListener('touchend', handleGlobalTouchEnd);
     }
 
     return () => {
       document.removeEventListener('mousemove', handleGlobalMouseMove);
       document.removeEventListener('mouseup', handleGlobalMouseUp);
+      document.removeEventListener('touchmove', handleGlobalTouchMove);
+      document.removeEventListener('touchend', handleGlobalTouchEnd);
     };
-  }, []);
+  }, [isDraggingRef.current]);
 
   return (
     <div

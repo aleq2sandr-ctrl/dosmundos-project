@@ -136,7 +136,9 @@ function convertWordsToUtterances(words) {
   let currentUtterance = null;
   let utteranceId = 0;
 
-  for (const word of words) {
+  const sortedWords = [...words].sort((a, b) => a.start - b.start);
+
+  for (const word of sortedWords) {
     const speaker = word.speaker || 'A';
     
     // Create normalized word object (remove confidence, keep essential fields)
@@ -147,8 +149,21 @@ function convertWordsToUtterances(words) {
       speaker: speaker
     };
     
-    if (!currentUtterance || currentUtterance.speaker !== speaker) {
-      // Save previous utterance
+    const timeGap = currentUtterance ? word.start - currentUtterance.end : 0;
+    const isNewSpeaker = !currentUtterance || currentUtterance.speaker !== speaker;
+    const isLongPause = timeGap > 3000; // Увеличиваем интервал до 3 секунд для лучшего разбиения
+
+    // Если speaker равен null или не определен, используем только время для разбиения
+    let shouldCreateNew = false;
+    if (!currentUtterance) {
+      shouldCreateNew = true;
+    } else if (word.speaker === null || word.speaker === undefined) {
+      shouldCreateNew = isLongPause;
+    } else {
+      shouldCreateNew = isNewSpeaker || isLongPause;
+    }
+
+    if (shouldCreateNew) {
       if (currentUtterance) {
         utterances.push(currentUtterance);
       }
@@ -179,26 +194,35 @@ function convertWordsToUtterances(words) {
 }
 
 /**
- * Scan directory and collect all files
+ * Scan directory and collect all files (including subdirectories)
  */
 function scanFiles() {
-  const files = fs.readdirSync(SOURCE_DIR);
-  
   const audioFiles = [];
   const transcriptFiles = [];
-  
-  for (const file of files) {
-    const filePath = path.join(SOURCE_DIR, file);
-    const stat = fs.statSync(filePath);
+
+  // Recursive directory scanner
+  function scanDirectory(dir) {
+    const files = fs.readdirSync(dir);
     
-    if (stat.isFile()) {
-      if (file.endsWith('.mp3')) {
-        audioFiles.push({ filename: file, path: filePath, size: stat.size });
-      } else if (file.endsWith('.json') && (file.includes('_ES.json') || file.includes('_RU.json'))) {
-        transcriptFiles.push({ filename: file, path: filePath, size: stat.size });
+    for (const file of files) {
+      const filePath = path.join(dir, file);
+      const stat = fs.statSync(filePath);
+      
+      if (stat.isDirectory()) {
+        // Recursively scan subdirectories
+        scanDirectory(filePath);
+      } else if (stat.isFile()) {
+        const relativeFilename = file;
+        if (file.endsWith('.mp3')) {
+          audioFiles.push({ filename: relativeFilename, path: filePath, size: stat.size });
+        } else if (file.endsWith('.json') && (file.includes('_ES.json') || file.includes('_RU.json'))) {
+          transcriptFiles.push({ filename: relativeFilename, path: filePath, size: stat.size });
+        }
       }
     }
   }
+
+  scanDirectory(SOURCE_DIR);
   
   return { audioFiles, transcriptFiles };
 }
@@ -366,8 +390,149 @@ async function upsertTranscript(slug, lang, transcriptData, updateExisting = fal
 }
 
 /**
+ * Check if text is a single word
+ */
+function isSingleWord(text) {
+  const trimmed = text.trim();
+  return trimmed.length > 0 && !trimmed.includes(' ');
+}
+
+/**
+ * Combine single-word utterances with adjacent utterances
+ */
+function combineSingleWordUtterances(utterances) {
+  if (!utterances || utterances.length < 2) {
+    return utterances;
+  }
+  
+  const result = [];
+  let i = 0;
+  
+  while (i < utterances.length) {
+    const current = utterances[i];
+    
+    if (isSingleWord(current.text)) {
+      const prev = result.length > 0 ? result[result.length - 1] : null;
+      const next = i + 1 < utterances.length ? utterances[i + 1] : null;
+      
+      if (prev && prev.speaker === current.speaker) {
+        prev.text = prev.text.trim() + ' ' + current.text.trim();
+        prev.end = current.end;
+        i++;
+      } else if (next && next.speaker === current.speaker) {
+        const combined = {
+          id: result.length,
+          start: current.start,
+          end: next.end,
+          text: current.text.trim() + ' ' + next.text.trim(),
+          speaker: current.speaker
+        };
+        result.push(combined);
+        i += 2;
+      } else if (prev) {
+        prev.text = prev.text.trim() + ' ' + current.text.trim();
+        prev.end = current.end;
+        i++;
+      } else if (next) {
+        const combined = {
+          id: result.length,
+          start: current.start,
+          end: next.end,
+          text: current.text.trim() + ' ' + next.text.trim(),
+          speaker: next.speaker
+        };
+        result.push(combined);
+        i += 2;
+      } else {
+        current.id = result.length;
+        result.push(current);
+        i++;
+      }
+    } else {
+      current.id = result.length;
+      result.push(current);
+      i++;
+    }
+  }
+  
+  return result;
+}
+
+/**
  * Process transcript JSON file
  */
+
+/**
+ * Split long utterances by sentence endings
+ */
+function splitUtteranceBySentences(utterance) {
+  const sentences = [];
+  const regex = /[.!?]+\s*/g;
+  let startIndex = 0;
+  let match;
+  
+  while ((match = regex.exec(utterance.text)) !== null) {
+    const endIndex = match.index + match[0].length;
+    const sentenceText = utterance.text.slice(startIndex, endIndex).trim();
+    
+    if (sentenceText.length > 0) {
+      const totalDuration = utterance.end - utterance.start;
+      const totalLength = utterance.text.length;
+      const sentenceLength = endIndex - startIndex;
+      const sentenceDuration = Math.round((sentenceLength / totalLength) * totalDuration);
+      
+      const sentenceStart = sentences.length === 0 ? utterance.start : sentences[sentences.length - 1].end;
+      const sentenceEnd = sentenceStart + sentenceDuration;
+      
+      sentences.push({
+        id: sentences.length,
+        start: sentenceStart,
+        end: sentenceEnd,
+        text: sentenceText,
+        speaker: utterance.speaker
+      });
+      
+      startIndex = endIndex;
+    }
+  }
+  
+  if (startIndex < utterance.text.length) {
+    const sentenceText = utterance.text.slice(startIndex).trim();
+    if (sentenceText.length > 0) {
+      const sentenceStart = sentences.length === 0 ? utterance.start : sentences[sentences.length - 1].end;
+      sentences.push({
+        id: sentences.length,
+        start: sentenceStart,
+        end: utterance.end,
+        text: sentenceText,
+        speaker: utterance.speaker
+      });
+    }
+  }
+  
+  // Ensure all durations are positive and valid
+  return sentences.map((s, i) => {
+    if (i > 0 && s.start < sentences[i - 1].end) {
+      return {
+        ...s,
+        start: sentences[i - 1].end
+      };
+    }
+    if (s.end > utterance.end) {
+      return {
+        ...s,
+        end: utterance.end
+      };
+    }
+    if (s.start < utterance.start) {
+      return {
+        ...s,
+        start: utterance.start
+      };
+    }
+    return s;
+  }).filter(s => s.end > s.start);
+}
 async function processTranscriptFile(file, updateExisting = false) {
   console.log(`\n📄 Processing transcript: ${file.filename}`);
   
@@ -389,7 +554,6 @@ async function processTranscriptFile(file, updateExisting = false) {
         end: u.end,
         text: u.text,
         speaker: u.speaker
-        // Note: words are NOT included to reduce data size
       }));
       console.log(`   Using ${utterances.length} utterances from AssemblyAI`);
     } else if (json.words && json.words.length > 0) {
@@ -400,9 +564,51 @@ async function processTranscriptFile(file, updateExisting = false) {
       throw new Error('No utterances or words found in transcript JSON');
     }
     
-    // Create compact transcript data
+    // Combine single-word utterances
+    const singleWordBefore = utterances.filter(u => isSingleWord(u.text)).length;
+    if (singleWordBefore > 0) {
+      utterances = combineSingleWordUtterances(utterances);
+      const singleWordAfter = utterances.filter(u => isSingleWord(u.text)).length;
+      console.log(`   Combined single-word utterances: ${singleWordBefore} → ${singleWordAfter}`);
+    }
+    
+    // Split long utterances (more than 2 minutes)
+    const MAX_DURATION = 2 * 60 * 1000; // 2 minutes
+    const longBefore = utterances.filter(u => u.end - u.start > MAX_DURATION).length;
+    if (longBefore > 0) {
+      const processedUtterances = [];
+      let idCounter = 0;
+      
+      for (const u of utterances) {
+        if (u.end - u.start > MAX_DURATION) {
+          const sentences = splitUtteranceBySentences(u);
+          sentences.forEach(s => {
+            s.id = idCounter++;
+            processedUtterances.push(s);
+          });
+          console.log(`   Split long utterance into ${sentences.length} sentences`);
+        } else {
+          u.id = idCounter++;
+          processedUtterances.push(u);
+        }
+      }
+      
+      utterances = processedUtterances;
+      const longAfter = utterances.filter(u => u.end - u.start > MAX_DURATION).length;
+      console.log(`   Split long utterances: ${longBefore} → ${longAfter}`);
+    }
+    
+    // Create compact transcript data (remove words field to reduce size)
+    const compactUtterances = utterances.map(u => ({
+      id: u.id,
+      start: u.start,
+      end: u.end,
+      text: u.text,
+      speaker: u.speaker
+    }));
+    
     const transcriptData = {
-      utterances: utterances,
+      utterances: compactUtterances,
       text: json.text || ''
     };
     
