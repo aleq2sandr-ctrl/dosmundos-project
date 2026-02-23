@@ -29,6 +29,7 @@ import EditHistoryAdminPage from '@/pages/EditHistoryAdminPage';
 import LivePage from '@/pages/LivePage';
 import ArticlesPage from '@/pages/ArticlesPage';
 import ArticleDetailPage from '@/pages/ArticleDetailPage';
+import ArticleEditorPage from '@/pages/ArticleEditorPage';
 import { initGA4, trackPageView } from '@/lib/analyticsService';
 import PlayerDiagnostics from '@/components/debug/PlayerDiagnostics';
 
@@ -228,6 +229,11 @@ const AppLayout = ({ user }) => {
           <Route path="/:lang/articles" element={
             <LanguageRouteWrapper>
               <ArticlesPage />
+            </LanguageRouteWrapper>
+          } />
+          <Route path="/:lang/articles/:articleId/edit" element={
+            <LanguageRouteWrapper>
+              <ArticleEditorPage />
             </LanguageRouteWrapper>
           } />
           <Route path="/:lang/articles/:articleId" element={

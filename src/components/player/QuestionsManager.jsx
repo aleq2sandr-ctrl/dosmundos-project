@@ -1,5 +1,9 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import QuestionBlock from '@/components/player/questions_manager_parts/QuestionBlock.jsx';
+import useArticleStatus from '@/hooks/useArticleStatus';
+import { createDraftFromQuestion } from '@/services/articleService';
+import { useEditorAuth } from '@/contexts/EditorAuthContext';
 
 const QuestionsManager = ({
   questions,
@@ -35,6 +39,11 @@ const QuestionsManager = ({
 }) => {
   const [activeQuestionId, setActiveQuestionId] = useState(null);
   const [expandedById, setExpandedById] = useState({});
+  const navigate = useNavigate();
+  const { editor: editorAuth, isAuthenticated } = useEditorAuth();
+
+  // Batch-load article statuses for all questions in this episode
+  const { articleStatuses, refreshStatuses } = useArticleStatus(episodeSlug);
 
   const langForContent = episodeLang === 'all' ? currentLanguage : episodeLang;
   const utterances = transcriptUtterances || [];
@@ -114,6 +123,41 @@ const QuestionsManager = ({
     if (mainPlayerSeekAudio) mainPlayerSeekAudio(timeInSeconds, true);
   }, [mainPlayerSeekAudio]);
 
+  // Handle article actions from QuestionBlock icons
+  const handleArticleAction = useCallback((question, action) => {
+    const status = articleStatuses[question.id];
+    
+    if (action === 'view' && status?.slug) {
+      navigate(`/${currentLanguage}/articles/${status.slug}`);
+    } else if (action === 'edit' && status?.slug) {
+      navigate(`/${currentLanguage}/articles/${status.slug}/edit`);
+    } else if (action === 'create') {
+      // Get time range for this question
+      const sorted = [...questions].sort((a, b) => a.time - b.time);
+      const qIdx = sorted.findIndex(q => q.id === question.id);
+      const nextQ = sorted[qIdx + 1];
+      const endTime = nextQ ? nextQ.time : (duration ? Math.floor(duration) : null);
+
+      // Build segments HTML for initial content
+      const qSegments = transcriptUtterances?.filter(u => {
+        const startMs = question.time * 1000;
+        const endMs = endTime ? endTime * 1000 : Infinity;
+        return u.start >= startMs && u.start < endMs;
+      }) || [];
+      const transcriptHtml = qSegments.map(s => `<p>${s.text || ''}</p>`).join('\n');
+
+      // Navigate to new article editor with question params
+      const params = new URLSearchParams({
+        questionId: question.id,
+        episode: episodeSlug,
+        title: question.title || '',
+        time: question.time,
+        ...(endTime ? { endTime } : {})
+      });
+      navigate(`/${currentLanguage}/articles/new/edit?${params.toString()}`);
+    }
+  }, [articleStatuses, currentLanguage, navigate, questions, duration, transcriptUtterances, episodeSlug]);
+
   const displayableQuestions = useMemo(() => {
     if (!Array.isArray(questions)) return [];
     const sorted = [...questions].sort((a, b) => a.time - b.time);
@@ -167,6 +211,8 @@ const QuestionsManager = ({
           transcriptLoading={transcriptLoading}
           questionRangeEndMs={questionEndTimeMsMap[q.id]}
           isEditMode={isEditMode}
+          articleStatus={articleStatuses[q.id] || null}
+          onArticleAction={(action) => handleArticleAction(q, action)}
         />
       ))}
     </div>

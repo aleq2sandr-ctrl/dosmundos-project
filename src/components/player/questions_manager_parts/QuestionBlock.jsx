@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Edit, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { Edit, ChevronDown, ChevronUp, Loader2, FilePlus, FileEdit, FileSearch, FileCheck } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { getLocaleString } from '@/lib/locales';
 import { formatFullTime } from '@/lib/utils';
@@ -9,6 +10,7 @@ import useSegmentEditing from '@/hooks/useSegmentEditing.js';
 import { useEditorAuth } from '@/contexts/EditorAuthContext';
 import { saveEditToHistory } from '@/services/editHistoryService';
 import { useToast } from '@/components/ui/use-toast';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 const QuestionBlockHeader = ({ 
   question, 
@@ -21,7 +23,10 @@ const QuestionBlockHeader = ({
   currentLanguage,
   segmentsAvailable,
   isReadingMode,
-  isEditMode
+  isEditMode,
+  articleStatus,
+  onArticleAction,
+  isAuthenticated
 }) => (
   <div 
     className={`flex justify-between items-center p-1.5 rounded-t-md transition-colors
@@ -43,6 +48,64 @@ const QuestionBlockHeader = ({
       <span className={`font-medium line-clamp-1 flex-grow min-w-0 ${isReadingMode ? 'text-xl font-semibold text-slate-900' : 'text-sm text-slate-100'}`}>
         {question.title || ''}
       </span>
+      
+      {/* Article status icon — visible to everyone for published, editors for draft/pending */}
+      {articleStatus?.status === 'published' && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={(e) => { e.stopPropagation(); onArticleAction?.('view'); }}
+              className="shrink-0 text-green-400 hover:text-green-300 transition-colors"
+              aria-label={getLocaleString('article_published', currentLanguage)}
+            >
+              <FileCheck className="h-4 w-4" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top">{getLocaleString('article_published', currentLanguage)}</TooltipContent>
+        </Tooltip>
+      )}
+      {isAuthenticated && articleStatus?.status === 'pending' && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={(e) => { e.stopPropagation(); onArticleAction?.('edit'); }}
+              className="shrink-0 text-orange-400 hover:text-orange-300 transition-colors"
+              aria-label={getLocaleString('article_pending', currentLanguage)}
+            >
+              <FileSearch className="h-4 w-4" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top">{getLocaleString('article_pending', currentLanguage)}</TooltipContent>
+        </Tooltip>
+      )}
+      {isAuthenticated && articleStatus?.status === 'draft' && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={(e) => { e.stopPropagation(); onArticleAction?.('edit'); }}
+              className="shrink-0 text-yellow-400 hover:text-yellow-300 transition-colors"
+              aria-label={getLocaleString('article_in_progress', currentLanguage)}
+            >
+              <FileEdit className="h-4 w-4" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top">{getLocaleString('article_in_progress', currentLanguage)}</TooltipContent>
+        </Tooltip>
+      )}
+      {isAuthenticated && isEditMode && !articleStatus && !question.is_full_transcript && !question.is_intro && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={(e) => { e.stopPropagation(); onArticleAction?.('create'); }}
+              className="shrink-0 text-slate-500 hover:text-slate-300 transition-colors opacity-50 hover:opacity-100"
+              aria-label={getLocaleString('create_article', currentLanguage)}
+            >
+              <FilePlus className="h-3.5 w-3.5" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top">{getLocaleString('create_article', currentLanguage)}</TooltipContent>
+        </Tooltip>
+      )}
     </div>
     {!isReadingMode && (
       <div className="flex items-center shrink-0">
@@ -104,7 +167,9 @@ const QuestionBlock = React.memo(({
   segmentToHighlight,
   transcriptLoading,
   questionRangeEndMs,
-  isEditMode
+  isEditMode,
+  articleStatus,
+  onArticleAction
 }) => {
   const [visibleSegmentsCount, setVisibleSegmentsCount] = useState(isReadingMode ? Infinity : 5);
   const { editor, isAuthenticated, openAuthModal } = useEditorAuth();
@@ -282,6 +347,9 @@ const QuestionBlock = React.memo(({
           segmentsAvailable={segmentsAvailableForHeader}
           isReadingMode={isReadingMode}
           isEditMode={isEditMode}
+          articleStatus={articleStatus}
+          onArticleAction={onArticleAction}
+          isAuthenticated={isAuthenticated}
         />
         {(isExpanded || editingSegment) && displaySegments && displaySegments.length > 0 && showTranscript && (
           <div className="animate-expand-collapse overflow-hidden">

@@ -1,11 +1,13 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { getLocaleString, getPluralizedLocaleString } from '@/lib/locales';
 import { supabase } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, User, Youtube, Clock, Calendar } from 'lucide-react';
+import { ArrowLeft, User, Youtube, Clock, Calendar, Radio, Play, Pause, Edit } from 'lucide-react';
 import { calculateReadingTime, formatArticleDate } from '@/lib/utils';
 import { updateMetaTags, resetMetaTags } from '@/lib/updateMetaTags';
+import { useEditorAuth } from '@/contexts/EditorAuthContext';
+import { getEpisodeAudioUrl } from '@/services/articleService';
 
 // Lazy load the article content component
 const LazyArticleContent = lazy(() => import('@/components/LazyArticleContent'));
@@ -35,6 +37,13 @@ const ArticleDetailPage = () => {
   const [article, setArticle] = useState(null);
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(true);
+  const { isAuthenticated } = useEditorAuth();
+  
+  // Question audio player state
+  const [questionAudioUrl, setQuestionAudioUrl] = useState(null);
+  const [questionData, setQuestionData] = useState(null); // { episodeSlug, questionTime, questionEndTime }
+  const [isPlaying, setIsPlaying] = useState(false);
+  const audioRef = useRef(null);
 
   // Scroll to top when article or language changes
   useEffect(() => {
@@ -93,6 +102,21 @@ const ArticleDetailPage = () => {
             youtubeUrl: newArticleData.youtube_url,
             publishedAt: newArticleData.published_at
           });
+
+          // Load question audio if article is linked to a question
+          if (newArticleData.episode_slug && newArticleData.question_time !== null && newArticleData.question_time !== undefined) {
+            setQuestionData({
+              episodeSlug: newArticleData.episode_slug,
+              questionTime: newArticleData.question_time,
+              questionEndTime: newArticleData.question_end_time
+            });
+            const audioUrl = await getEpisodeAudioUrl(newArticleData.episode_slug, lang);
+            if (audioUrl) {
+              const startT = newArticleData.question_time;
+              const endT = newArticleData.question_end_time;
+              setQuestionAudioUrl(endT ? `${audioUrl}#t=${startT},${endT}` : `${audioUrl}#t=${startT}`);
+            }
+          }
 
           // Update meta tags for SEO and social media preview
           updateMetaTags({
@@ -331,6 +355,75 @@ const ArticleDetailPage = () => {
               )}
             </div>
           </header>
+
+          {/* Question audio player & link to episode */}
+          {questionData && questionAudioUrl && (
+            <div className="mb-8 p-4 bg-purple-50/80 border border-purple-200/50 rounded-xl">
+              <div className="flex items-center gap-3 mb-2">
+                <button
+                  onClick={() => {
+                    if (!audioRef.current) return;
+                    if (isPlaying) audioRef.current.pause();
+                    else audioRef.current.play();
+                    setIsPlaying(!isPlaying);
+                  }}
+                  className="shrink-0 h-10 w-10 rounded-full bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center transition-colors"
+                >
+                  {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 ml-0.5" />}
+                </button>
+                
+                <div className="flex-1">
+                  <Link
+                    to={`/${lang}/${questionData.episodeSlug}`}
+                    className="flex items-center gap-2 text-sm text-purple-700 hover:text-purple-900 transition-colors font-sans"
+                  >
+                    <Radio className="h-4 w-4" />
+                    <span className="border-b border-transparent hover:border-purple-500">
+                      {getLocaleString('listen_answer_on_air', lang)}
+                    </span>
+                    <span className="text-xs text-purple-500">({questionData.episodeSlug})</span>
+                  </Link>
+                </div>
+
+                {isAuthenticated && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => navigate(`/${lang}/articles/${articleId}/edit`)}
+                    className="text-purple-600 hover:text-purple-800 font-sans"
+                  >
+                    <Edit className="h-4 w-4 mr-1" />
+                    {getLocaleString('edit', lang)}
+                  </Button>
+                )}
+              </div>
+              
+              <audio
+                ref={audioRef}
+                src={questionAudioUrl}
+                onEnded={() => setIsPlaying(false)}
+                onPause={() => setIsPlaying(false)}
+                onPlay={() => setIsPlaying(true)}
+                className="w-full h-8"
+                controls
+              />
+            </div>
+          )}
+
+          {/* Edit button for authenticated editors (articles without question link) */}
+          {isAuthenticated && !questionData && (
+            <div className="mb-6 flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate(`/${lang}/articles/${articleId}/edit`)}
+                className="text-purple-600 border-purple-200 hover:bg-purple-50 font-sans"
+              >
+                <Edit className="h-4 w-4 mr-1" />
+                {getLocaleString('edit', lang)}
+              </Button>
+            </div>
+          )}
 
           <Suspense fallback={
             <div className="prose prose-xl max-w-none text-justify animate-pulse">
