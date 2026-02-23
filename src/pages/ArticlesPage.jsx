@@ -139,7 +139,8 @@ const ArticlesPage = () => {
               const catTranslations = ac.categories?.category_translations || [];
               const catTrans = catTranslations.find(t => t.language_code === lang) ||
                                catTranslations.find(t => t.language_code === 'ru');
-              return catTrans ? catTrans.name : ac.categories?.slug;
+              const name = catTrans ? catTrans.name : ac.categories?.slug;
+              return name ? { slug: ac.categories?.slug, name } : null;
             }).filter(Boolean);
 
             return {
@@ -267,25 +268,33 @@ const ArticlesPage = () => {
   }, [rawArticles, lang]);
 
   const categories = useMemo(() => {
-    const allCats = new Set();
+    const catMap = new Map(); // slug -> name
     articles.forEach(article => {
       if (Array.isArray(article.categories)) {
-        article.categories.forEach(cat => allCats.add(cat));
-      } else if (article.category) {
-        allCats.add(article.category);
+        article.categories.forEach(cat => {
+          if (typeof cat === 'object' && cat.slug) {
+            catMap.set(cat.slug, cat.name);
+          } else if (typeof cat === 'string') {
+            catMap.set(cat, cat);
+          }
+        });
       }
     });
-    return ['All', ...Array.from(allCats).sort()];
+    const sorted = [...catMap.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+    return [{ slug: 'All', name: 'All' }, ...sorted.map(([slug, name]) => ({ slug, name }))];
   }, [articles]);
 
   const filteredArticles = useMemo(() => {
     let filtered = articles;
 
-    // Filter by category
+    // Filter by category slug
     if (selectedCategory !== 'All') {
       filtered = filtered.filter(a => {
-        const articleCats = Array.isArray(a.categories) ? a.categories : (a.category ? [a.category] : []);
-        return articleCats.includes(selectedCategory);
+        const articleCats = Array.isArray(a.categories) ? a.categories : [];
+        return articleCats.some(cat => {
+          const catSlug = typeof cat === 'object' ? cat.slug : cat;
+          return catSlug === selectedCategory;
+        });
       });
     }
 
@@ -332,18 +341,18 @@ const ArticlesPage = () => {
           <div className="flex flex-wrap justify-center gap-2 mb-12 font-sans">
             {categories.map(cat => (
               <button
-                key={cat}
+                key={cat.slug}
                 onClick={() => {
-                  setSelectedCategory(cat);
+                  setSelectedCategory(cat.slug);
                   setVisibleCount(6);
                 }}
                 className={`px-4 py-2 rounded-full text-sm transition-all duration-300 border ${
-                  selectedCategory === cat
+                  selectedCategory === cat.slug
                     ? 'bg-slate-900 text-white border-slate-900 shadow-md scale-105'
                     : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400 hover:text-slate-900'
                 }`}
               >
-                {cat === 'All' ? getLocaleString('all_categories', lang) : cat}
+                {cat.slug === 'All' ? getLocaleString('all_categories', lang) : cat.name}
               </button>
             ))}
           </div>

@@ -7,19 +7,23 @@ import { getPluralizedLocaleString } from '@/lib/locales';
 import { formatArticleDate } from '@/lib/utils';
 
 // Color palette for categories (same as ArticlesPage)
-const categoryColors = {
-  'Растения Учителя и Процесс Диеты': 'bg-green-100 text-green-800 border-green-200',
-  'Целительство и Энергетические практики': 'bg-purple-100 text-purple-800 border-purple-200',
-  'Взаимоотношения и семья': 'bg-pink-100 text-pink-800 border-pink-200',
-  'Внутренние развитие': 'bg-indigo-100 text-indigo-800 border-indigo-200',
-  'Здоровье и Питание': 'bg-red-100 text-red-800 border-red-200',
-  'Энергетическая защита и очищение': 'bg-orange-100 text-orange-800 border-orange-200',
-  'Медитации': 'bg-blue-100 text-blue-800 border-blue-200',
+// Slug-based color mapping — works for all languages
+const categoryColorsBySlug = {
+  'teacher-plants-diet': 'bg-green-100 text-green-800 border-green-200',
+  'healing-energy-practices': 'bg-purple-100 text-purple-800 border-purple-200',
+  'relationships-family': 'bg-pink-100 text-pink-800 border-pink-200',
+  'inner-development': 'bg-indigo-100 text-indigo-800 border-indigo-200',
+  'health-nutrition': 'bg-red-100 text-red-800 border-red-200',
+  'energy-protection-cleansing': 'bg-orange-100 text-orange-800 border-orange-200',
+  'meditations': 'bg-blue-100 text-blue-800 border-blue-200',
   'default': 'bg-slate-100 text-slate-600 border-slate-200'
 };
 
-const getCategoryColor = (category) => {
-  return categoryColors[category] || categoryColors.default;
+const getCategoryColor = (cat) => {
+  // Support both {slug, name} objects and plain strings
+  const slug = typeof cat === 'object' ? cat?.slug : cat;
+  if (slug && categoryColorsBySlug[slug]) return categoryColorsBySlug[slug];
+  return categoryColorsBySlug.default;
 };
 
 const ArticleCard = memo(({ 
@@ -52,14 +56,17 @@ const ArticleCard = memo(({
           <CardHeader className="pb-4">
             <div className="flex justify-between items-start mb-3">
               <div className="flex flex-wrap gap-1">
-                {(Array.isArray(categories) ? categories : []).map((cat, index) => (
-                  <span
-                    key={index}
-                    className={`px-2 py-1 rounded-full text-xs font-medium tracking-wide uppercase border font-sans ${getCategoryColor(cat)}`}
-                  >
-                    {cat}
-                  </span>
-                ))}
+                {(Array.isArray(categories) ? categories : []).map((cat, index) => {
+                  const catName = typeof cat === 'object' ? cat.name : cat;
+                  return (
+                    <span
+                      key={index}
+                      className={`px-2 py-1 rounded-full text-xs font-medium tracking-wide uppercase border font-sans ${getCategoryColor(cat)}`}
+                    >
+                      {catName}
+                    </span>
+                  );
+                })}
               </div>
               {youtubeUrl && (
                 <Youtube className="w-5 h-5 text-red-600 opacity-80" />

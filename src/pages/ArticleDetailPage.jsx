@@ -11,19 +11,22 @@ import { updateMetaTags, resetMetaTags } from '@/lib/updateMetaTags';
 const LazyArticleContent = lazy(() => import('@/components/LazyArticleContent'));
 
 // Color palette for categories (same as ArticlesPage)
-const categoryColors = {
-  'Растения Учителя и Процесс Диеты': 'bg-green-100 text-green-800 border-green-200',
-  'Целительство и Энергетические практики': 'bg-purple-100 text-purple-800 border-purple-200',
-  'Взаимоотношения и семья': 'bg-pink-100 text-pink-800 border-pink-200',
-  'Внутренние развитие': 'bg-indigo-100 text-indigo-800 border-indigo-200',
-  'Здоровье и Питание': 'bg-red-100 text-red-800 border-red-200',
-  'Энергетическая защита и очищение': 'bg-orange-100 text-orange-800 border-orange-200',
-  'Медитации': 'bg-blue-100 text-blue-800 border-blue-200',
+// Slug-based color mapping — works for all languages
+const categoryColorsBySlug = {
+  'teacher-plants-diet': 'bg-green-100 text-green-800 border-green-200',
+  'healing-energy-practices': 'bg-purple-100 text-purple-800 border-purple-200',
+  'relationships-family': 'bg-pink-100 text-pink-800 border-pink-200',
+  'inner-development': 'bg-indigo-100 text-indigo-800 border-indigo-200',
+  'health-nutrition': 'bg-red-100 text-red-800 border-red-200',
+  'energy-protection-cleansing': 'bg-orange-100 text-orange-800 border-orange-200',
+  'meditations': 'bg-blue-100 text-blue-800 border-blue-200',
   'default': 'bg-slate-100 text-slate-600 border-slate-200'
 };
 
-const getCategoryColor = (category) => {
-  return categoryColors[category] || categoryColors.default;
+const getCategoryColor = (cat) => {
+  const slug = typeof cat === 'object' ? cat?.slug : cat;
+  if (slug && categoryColorsBySlug[slug]) return categoryColorsBySlug[slug];
+  return categoryColorsBySlug.default;
 };
 
 const ArticleDetailPage = () => {
@@ -77,7 +80,8 @@ const ArticleDetailPage = () => {
             const catTranslations = ac.categories?.category_translations || [];
             const catTrans = catTranslations.find(t => t.language_code === lang) ||
                              catTranslations.find(t => t.language_code === 'ru');
-            return catTrans ? catTrans.name : ac.categories?.slug;
+            const name = catTrans ? catTrans.name : ac.categories?.slug;
+            return name ? { slug: ac.categories?.slug, name } : null;
           }).filter(Boolean);
 
           setArticle({
@@ -266,14 +270,17 @@ const ArticleDetailPage = () => {
         <article className="animate-in fade-in slide-in-from-bottom-4 duration-700">
           <header className="mb-10 text-center">
             <div className="flex justify-center flex-wrap gap-2 mb-6">
-              {(Array.isArray(article.categories) ? article.categories : (article.category ? [article.category] : [])).map((cat, index) => (
-                <span
-                  key={index}
-                  className={`px-3 py-1.5 rounded-full text-sm font-sans font-medium tracking-wide uppercase border ${getCategoryColor(cat)}`}
-                >
-                  {cat}
-                </span>
-              ))}
+              {(Array.isArray(article.categories) ? article.categories : (article.category ? [article.category] : [])).map((cat, index) => {
+                const catName = typeof cat === 'object' ? cat.name : cat;
+                return (
+                  <span
+                    key={index}
+                    className={`px-3 py-1.5 rounded-full text-sm font-sans font-medium tracking-wide uppercase border ${getCategoryColor(cat)}`}
+                  >
+                    {catName}
+                  </span>
+                );
+              })}
             </div>
             
             <h1 className="text-3xl md:text-5xl font-bold text-slate-900 mb-8 leading-tight">
