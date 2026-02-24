@@ -21,6 +21,7 @@ export const PlayerProvider = ({ children }) => {
   const [playbackRate, setPlaybackRate] = useState(1);
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [buffered, setBuffered] = useState(0); // Buffered percentage
   
   // ─── Seeking guard: prevents timeupdate from overwriting seek target ───
   const isSeekingRef = useRef(false);
@@ -28,6 +29,15 @@ export const PlayerProvider = ({ children }) => {
   const seekTimeoutRef = useRef(null);
   // Track whether user is dragging the progress bar
   const isDraggingRef = useRef(false);
+  
+  // ─── Playback health monitor: detects stuck audio ───
+  const healthCheckRef = useRef(null);
+  const lastHealthTimeRef = useRef(0);
+  const stallCountRef = useRef(0);
+  const retryCountRef = useRef(0);
+  const MAX_RETRIES = 3;
+  // Track stalled events to avoid loading flicker
+  const stalledTimerRef = useRef(null);
 
   // Helper for safe playback
   const safePlay = useCallback(async () => {
@@ -129,6 +139,16 @@ export const PlayerProvider = ({ children }) => {
     }
   }, [isPlaying, safePlay]);
 
+  // Force-release seeking guard — used as a safety valve
+  const releaseSeekingGuard = useCallback(() => {
+    isSeekingRef.current = false;
+    seekTargetRef.current = null;
+    if (seekTimeoutRef.current) {
+      clearTimeout(seekTimeoutRef.current);
+      seekTimeoutRef.current = null;
+    }
+  }, []);
+
   const seek = useCallback((time) => {
     if (!audioRef.current) return;
     
@@ -150,16 +170,21 @@ export const PlayerProvider = ({ children }) => {
       setCurrentTime(clampedTime);
     } catch (error) {
       console.error('[PlayerContext] Seek error:', error);
-      isSeekingRef.current = false;
-      seekTargetRef.current = null;
+      releaseSeekingGuard();
     }
     
-    // Safety: release seeking guard after timeout in case 'seeked' event doesn't fire
+    // Safety: release seeking guard after timeout (reduced from 2000ms to 800ms)
     seekTimeoutRef.current = setTimeout(() => {
-      isSeekingRef.current = false;
-      seekTargetRef.current = null;
-    }, 2000);
-  }, []);
+      if (isSeekingRef.current) {
+        console.warn('[PlayerContext] Seek timeout — force-releasing seeking guard');
+        releaseSeekingGuard();
+        // Sync to actual position
+        if (audioRef.current && !isDraggingRef.current) {
+          setCurrentTime(audioRef.current.currentTime);
+        }
+      }
+    }, 800);
+  }, [releaseSeekingGuard]);
 
   // Seek and optionally play — atomic operation that avoids race conditions
   const seekAndPlay = useCallback((time, shouldPlay = false) => {
@@ -181,8 +206,7 @@ export const PlayerProvider = ({ children }) => {
       setCurrentTime(clampedTime);
     } catch (error) {
       console.error('[PlayerContext] SeekAndPlay seek error:', error);
-      isSeekingRef.current = false;
-      seekTargetRef.current = null;
+      releaseSeekingGuard();
       return;
     }
     
@@ -195,11 +219,17 @@ export const PlayerProvider = ({ children }) => {
       audioRef.current.addEventListener('seeked', onSeeked, { once: true });
     }
     
+    // Reduced timeout for faster recovery
     seekTimeoutRef.current = setTimeout(() => {
-      isSeekingRef.current = false;
-      seekTargetRef.current = null;
-    }, 2000);
-  }, [isPlaying, safePlay]);
+      if (isSeekingRef.current) {
+        console.warn('[PlayerContext] SeekAndPlay timeout — force-releasing seeking guard');
+        releaseSeekingGuard();
+        if (audioRef.current && !isDraggingRef.current) {
+          setCurrentTime(audioRef.current.currentTime);
+        }
+      }
+    }, 800);
+  }, [isPlaying, safePlay, releaseSeekingGuard]);
 
   // Notify context that a drag operation started/ended (called from ProgressBar)
   const startDragging = useCallback(() => {
@@ -212,11 +242,10 @@ export const PlayerProvider = ({ children }) => {
     // Small delay before releasing seeking guard so the final seek value sticks
     setTimeout(() => {
       if (!isDraggingRef.current) {
-        isSeekingRef.current = false;
-        seekTargetRef.current = null;
+        releaseSeekingGuard();
       }
     }, 100);
-  }, []);
+  }, [releaseSeekingGuard]);
 
   const setRate = useCallback((rate) => {
     setPlaybackRate(rate);
@@ -240,7 +269,15 @@ export const PlayerProvider = ({ children }) => {
     if (!audioRef.current) return;
     // During seeking or dragging, don't let timeupdate overwrite the target position
     if (isSeekingRef.current || isDraggingRef.current) return;
-    setCurrentTime(audioRef.current.currentTime);
+    
+    const time = audioRef.current.currentTime;
+    // Validate time value
+    if (isNaN(time) || time < 0) return;
+    
+    setCurrentTime(time);
+    // Update health monitor reference
+    lastHealthTimeRef.current = time;
+    stallCountRef.current = 0;
   };
 
   const handleSeeking = () => {
@@ -258,8 +295,7 @@ export const PlayerProvider = ({ children }) => {
       // Small delay to let the final timeupdate after seeked pass
       setTimeout(() => {
         if (!isDraggingRef.current) {
-          isSeekingRef.current = false;
-          seekTargetRef.current = null;
+          releaseSeekingGuard();
           // Sync to the actual position after seek completes
           if (audioRef.current) {
             setCurrentTime(audioRef.current.currentTime);
@@ -271,18 +307,23 @@ export const PlayerProvider = ({ children }) => {
 
   const handleLoadedMetadata = () => {
     if (audioRef.current) {
-      setDuration(audioRef.current.duration);
+      const d = audioRef.current.duration;
+      if (Number.isFinite(d) && d > 0) {
+        setDuration(d);
+      }
     }
   };
 
   const handleEnded = () => {
     setIsPlaying(false);
     setIsLoading(false);
+    releaseSeekingGuard();
   };
 
   const handlePlay = () => {
     setIsPlaying(true);
     setIsLoading(false);
+    retryCountRef.current = 0; // Reset retry counter on successful play
   };
 
   const handlePause = () => {
@@ -296,31 +337,73 @@ export const PlayerProvider = ({ children }) => {
 
   const handleCanPlay = () => {
     setIsLoading(false);
+    // If seeking guard is stuck and we can play now, release it
+    if (isSeekingRef.current && !isDraggingRef.current) {
+      releaseSeekingGuard();
+      if (audioRef.current) {
+        setCurrentTime(audioRef.current.currentTime);
+      }
+    }
+  };
+  
+  const handleCanPlayThrough = () => {
+    setIsLoading(false);
+    // Ensure seeking guard is released when enough data is buffered
+    if (isSeekingRef.current && !isDraggingRef.current) {
+      releaseSeekingGuard();
+      if (audioRef.current) {
+        setCurrentTime(audioRef.current.currentTime);
+      }
+    }
   };
 
   const handleLoadStart = () => {
     setIsLoading(true);
   };
+  
+  // Stalled: browser is trying to fetch but data isn't arriving
+  // Use a debounced approach to avoid loading flicker
+  const handleStalled = () => {
+    if (stalledTimerRef.current) clearTimeout(stalledTimerRef.current);
+    // Only show loading if stall persists for 1.5 seconds
+    stalledTimerRef.current = setTimeout(() => {
+      if (audioRef.current && !audioRef.current.paused && audioRef.current.readyState < 3) {
+        setIsLoading(true);
+      }
+    }, 1500);
+  };
+  
+  // Progress: update buffered percentage
+  const handleProgress = () => {
+    if (!audioRef.current || !audioRef.current.duration) return;
+    const buf = audioRef.current.buffered;
+    if (buf.length > 0) {
+      const bufferedEnd = buf.end(buf.length - 1);
+      setBuffered((bufferedEnd / audioRef.current.duration) * 100);
+    }
+  };
 
   const handleError = (e) => {
-    console.error('[PlayerContext] Audio error:', e.target.error);
-    console.error('Audio error code:', e.target.error?.code);
-    console.error('Audio error message:', e.target.error?.message);
+    const error = e.target.error;
+    console.error('[PlayerContext] Audio error:', error);
+    console.error('Audio error code:', error?.code, 'message:', error?.message);
     console.error('Audio source:', e.target.src);
     
     // Stop playback on error
     setIsPlaying(false);
     setIsLoading(false);
-    isSeekingRef.current = false;
+    releaseSeekingGuard();
     
-    // Attempt to recover from network/decode errors
-    if (e.target.error?.code === e.target.error?.MEDIA_ERR_NETWORK || 
-        e.target.error?.code === e.target.error?.MEDIA_ERR_DECODE ||
-        e.target.error?.code === e.target.error?.MEDIA_ERR_SRC_NOT_SUPPORTED) {
+    // Attempt to recover from network/decode errors (with retry limit)
+    const isRecoverable = error?.code === MediaError.MEDIA_ERR_NETWORK || 
+                          error?.code === MediaError.MEDIA_ERR_DECODE;
+    
+    if (isRecoverable && retryCountRef.current < MAX_RETRIES) {
+      retryCountRef.current++;
+      const delay = Math.min(1000 * Math.pow(2, retryCountRef.current - 1), 8000); // Exponential backoff: 1s, 2s, 4s
+      console.log(`[PlayerContext] Recovery attempt ${retryCountRef.current}/${MAX_RETRIES} in ${delay}ms...`);
       
-      console.log('[PlayerContext] Attempting to recover from audio error...');
-      
-      // 1. Try to refresh cache if SW is active
+      // Try to refresh cache if SW is active
       if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator && navigator.serviceWorker.controller) {
         navigator.serviceWorker.controller.postMessage({
           type: 'REFRESH_AUDIO_CACHE',
@@ -328,39 +411,111 @@ export const PlayerProvider = ({ children }) => {
         });
       }
 
-      // 2. Save current time to restore after reload
-      const savedTime = currentTime;
+      const savedTime = audioRef.current?.currentTime || currentTime;
       const savedSrc = audioRef.current?.src;
-      const wasPlaying = isPlaying;
 
-      // 3. Retry loading after a short delay
       setTimeout(() => {
-        if (audioRef.current && savedSrc) {
-          console.log('[PlayerContext] Reloading audio source...');
-          
-          // Clear and reload
-          audioRef.current.src = '';
-          audioRef.current.load();
-          
-          // Set source again after a brief pause
-          setTimeout(() => {
-            if (audioRef.current) {
-              audioRef.current.src = savedSrc;
-              audioRef.current.load();
-              audioRef.current.currentTime = savedTime;
-              
-              if (wasPlaying) {
-                audioRef.current.play().catch(err => {
-                  console.error('[PlayerContext] Retry play failed:', err);
-                  setIsPlaying(false);
-                });
-              }
-            }
-          }, 100);
-        }
-      }, 1000);
+        if (!audioRef.current || !savedSrc) return;
+        console.log(`[PlayerContext] Reloading audio source (attempt ${retryCountRef.current})...`);
+        
+        audioRef.current.src = savedSrc;
+        audioRef.current.load();
+        
+        // Restore position and play after metadata loads
+        const onReady = () => {
+          audioRef.current?.removeEventListener('loadedmetadata', onReady);
+          if (!audioRef.current) return;
+          try {
+            audioRef.current.currentTime = savedTime;
+            audioRef.current.play().catch(err => {
+              console.error('[PlayerContext] Retry play failed:', err);
+              setIsPlaying(false);
+            });
+          } catch (err) {
+            console.error('[PlayerContext] Retry restore failed:', err);
+          }
+        };
+        audioRef.current.addEventListener('loadedmetadata', onReady, { once: true });
+        
+        // Fallback if metadata never loads
+        setTimeout(() => {
+          audioRef.current?.removeEventListener('loadedmetadata', onReady);
+        }, 5000);
+      }, delay);
+    } else if (retryCountRef.current >= MAX_RETRIES) {
+      console.error('[PlayerContext] Max retries reached, giving up recovery');
     }
   };
+
+  // ─── Playback health monitor ───
+  // Detects when audio is supposed to be playing but currentTime isn't advancing
+  useEffect(() => {
+    if (!isPlaying) {
+      // Clear health check when not playing
+      if (healthCheckRef.current) {
+        clearInterval(healthCheckRef.current);
+        healthCheckRef.current = null;
+      }
+      stallCountRef.current = 0;
+      return;
+    }
+    
+    lastHealthTimeRef.current = audioRef.current?.currentTime || 0;
+    
+    healthCheckRef.current = setInterval(() => {
+      if (!audioRef.current || !isPlaying || isSeekingRef.current || isDraggingRef.current) return;
+      
+      const currentAudioTime = audioRef.current.currentTime;
+      const timeDelta = Math.abs(currentAudioTime - lastHealthTimeRef.current);
+      
+      // If time hasn't advanced in ~2 seconds and we're supposed to be playing
+      if (timeDelta < 0.1 && !audioRef.current.paused && !audioRef.current.ended) {
+        stallCountRef.current++;
+        console.warn(`[PlayerContext] Stall detected (count: ${stallCountRef.current}), time stuck at ${currentAudioTime.toFixed(2)}s`);
+        
+        if (stallCountRef.current >= 2) {
+          // Audio is stuck — attempt recovery
+          console.warn('[PlayerContext] Audio stuck, attempting recovery...');
+          stallCountRef.current = 0;
+          
+          // Force release any stuck seeking guards
+          releaseSeekingGuard();
+          
+          // Strategy: nudge the currentTime slightly
+          try {
+            const nudgeTime = currentAudioTime + 0.1;
+            audioRef.current.currentTime = nudgeTime;
+          } catch (err) {
+            console.error('[PlayerContext] Nudge failed:', err);
+          }
+          
+          // If still paused after nudge, try to play
+          if (audioRef.current.paused) {
+            safePlay();
+          }
+        }
+      } else {
+        stallCountRef.current = 0;
+        lastHealthTimeRef.current = currentAudioTime;
+      }
+    }, 2000);
+    
+    return () => {
+      if (healthCheckRef.current) {
+        clearInterval(healthCheckRef.current);
+        healthCheckRef.current = null;
+      }
+    };
+  }, [isPlaying, releaseSeekingGuard, safePlay]);
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (seekTimeoutRef.current) clearTimeout(seekTimeoutRef.current);
+      if (healthCheckRef.current) clearInterval(healthCheckRef.current);
+      if (stalledTimerRef.current) clearTimeout(stalledTimerRef.current);
+    };
+  }, []);
 
   return (
     <PlayerContext.Provider value={{
@@ -385,7 +540,9 @@ export const PlayerProvider = ({ children }) => {
       closeGlobalPlayer,
       autoplayBlocked,
       setAutoplayBlocked,
-      isLoading
+      isLoading,
+      buffered,
+      releaseSeekingGuard
     }}>
       {children}
       <audio
@@ -400,9 +557,11 @@ export const PlayerProvider = ({ children }) => {
         onPause={handlePause}
         onError={handleError}
         onWaiting={handleWaiting}
-        onStalled={handleWaiting}
+        onStalled={handleStalled}
         onCanPlay={handleCanPlay}
+        onCanPlayThrough={handleCanPlayThrough}
         onLoadStart={handleLoadStart}
+        onProgress={handleProgress}
         style={{ display: 'none' }}
       />
     </PlayerContext.Provider>

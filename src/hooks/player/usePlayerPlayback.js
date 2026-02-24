@@ -229,11 +229,10 @@ const usePlayerPlayback = ({
          // Fallback to ensure seek operation completes even if seeked event fails
          setTimeout(() => {
            if (isSeekingRef.current) {
-             console.warn('🔧 [usePlayerPlayback] Seek timeout - clearing seeking flag');
+             console.warn('🔧 [usePlayerPlayback] Seek timeout — force-releasing seeking flag');
              isSeekingRef.current = false;
              
              if (playAfterJump && audioRef.current && audioRef.current.paused) {
-               console.log('[usePlayerPlayback] Seek timeout, attempting play');
                attemptPlay(audioRef.current).then(ok => {
                  if (ok) {
                    setIsPlayingState(true);
@@ -247,7 +246,7 @@ const usePlayerPlayback = ({
                onPlayerStateChange?.({ isPlaying: wasPlaying });
              }
            }
-         }, 2000); // Longer timeout for more reliable fallback
+         }, 800); // Reduced from 2000ms for faster recovery
          
        } catch (error) {
          console.error('🔧 [usePlayerPlayback] Error during seek:', error);
@@ -300,11 +299,10 @@ const usePlayerPlayback = ({
                   description: getLocaleString('playbackErrorDescription', currentLanguage),
                   variant: "destructive",
                 });
-                // Обновляем состояние с защитой от цикла
                 isUpdatingPlayStateRef.current = true;
                 setIsPlayingState(false);
                 onPlayerStateChange?.({isPlaying: false});
-                setTimeout(() => { isUpdatingPlayStateRef.current = false; }, 50);
+                requestAnimationFrame(() => { isUpdatingPlayStateRef.current = false; });
               }
             });
           }
@@ -334,11 +332,10 @@ const usePlayerPlayback = ({
             description: getLocaleString('playbackErrorDescription', currentLanguage),
             variant: "destructive",
           });
-          // Обновляем состояние с защитой от цикла
           isUpdatingPlayStateRef.current = true;
           setIsPlayingState(false);
           onPlayerStateChange?.({isPlaying: false});
-          setTimeout(() => { isUpdatingPlayStateRef.current = false; }, 50);
+          requestAnimationFrame(() => { isUpdatingPlayStateRef.current = false; });
         }
       });
     } 
@@ -354,43 +351,52 @@ const usePlayerPlayback = ({
   }, [isPlayingState, toast, currentLanguage, setIsPlayingState, onPlayerStateChange]);
 
   // Синхронизация состояния с реальным состоянием аудио элемента (Audio -> React state)
+  // Note: PlayerContext also handles play/pause/ended via JSX props on the <audio> element.
+  // This effect syncs the LOCAL component state (isPlayingState) separately.
+  // We use isUpdatingPlayStateRef to prevent feedback loops between the two.
   useEffect(() => {
     const audioElement = audioRef.current;
     if (!audioElement) return;
 
     const handlePlay = () => {
-      logger.debug('usePlayerPlayback: Audio play event, syncing state');
-      if (!isPlayingState && !isUpdatingPlayStateRef.current) {
+      if (!isPlayingState && !isUpdatingPlayStateRef.current && !isSeekingRef.current) {
         isUpdatingPlayStateRef.current = true;
         setIsPlayingState(true);
         onPlayerStateChange?.({ isPlaying: true });
-        setTimeout(() => { isUpdatingPlayStateRef.current = false; }, 50);
+        // Use requestAnimationFrame instead of setTimeout for more reliable timing
+        requestAnimationFrame(() => { isUpdatingPlayStateRef.current = false; });
       }
     };
 
     const handlePause = () => {
-      logger.debug('usePlayerPlayback: Audio pause event, syncing state');
-      if (isPlayingState && !isUpdatingPlayStateRef.current) {
+      if (isPlayingState && !isUpdatingPlayStateRef.current && !isSeekingRef.current) {
         isUpdatingPlayStateRef.current = true;
         setIsPlayingState(false);
         onPlayerStateChange?.({ isPlaying: false });
-        setTimeout(() => { isUpdatingPlayStateRef.current = false; }, 50);
+        requestAnimationFrame(() => { isUpdatingPlayStateRef.current = false; });
       }
     };
 
     const handleEnded = () => {
-      logger.debug('usePlayerPlayback: Audio ended event, syncing state');
-      if (isPlayingState && !isUpdatingPlayStateRef.current) {
+      if (!isUpdatingPlayStateRef.current) {
         isUpdatingPlayStateRef.current = true;
         setIsPlayingState(false);
         onPlayerStateChange?.({ isPlaying: false });
-        setTimeout(() => { isUpdatingPlayStateRef.current = false; }, 50);
+        requestAnimationFrame(() => { isUpdatingPlayStateRef.current = false; });
+      }
+    };
+    
+    // Release seeking guard on canplaythrough — handles cases where seeked event is missed
+    const handleCanPlayThrough = () => {
+      if (isSeekingRef.current) {
+        isSeekingRef.current = false;
       }
     };
 
     audioElement.addEventListener('play', handlePlay);
     audioElement.addEventListener('pause', handlePause);
     audioElement.addEventListener('ended', handleEnded);
+    audioElement.addEventListener('canplaythrough', handleCanPlayThrough);
 
     // Если был NotAllowedError и есть намерение воспроизвести (например, play=true),
     // пробуем один раз запустить при первом пользовательском взаимодействии
@@ -423,6 +429,7 @@ const usePlayerPlayback = ({
       audioElement.removeEventListener('play', handlePlay);
       audioElement.removeEventListener('pause', handlePause);
       audioElement.removeEventListener('ended', handleEnded);
+      audioElement.removeEventListener('canplaythrough', handleCanPlayThrough);
       window.removeEventListener('pointerdown', handleFirstUserGesture, true);
       window.removeEventListener('click', handleFirstUserGesture, true);
       window.removeEventListener('keydown', handleFirstUserGesture, true);
@@ -508,7 +515,7 @@ const usePlayerPlayback = ({
           isUpdatingPlayStateRef.current = true;
           setIsPlayingState(true);
           onPlayerStateChange?.({ isPlaying: true });
-          setTimeout(() => { isUpdatingPlayStateRef.current = false; }, 50);
+          requestAnimationFrame(() => { isUpdatingPlayStateRef.current = false; });
           return;
         }
         // Пытаемся запустить воспроизведение сразу
@@ -522,7 +529,7 @@ const usePlayerPlayback = ({
           isUpdatingPlayStateRef.current = true;
           setIsPlayingState(true);
           onPlayerStateChange?.({ isPlaying: true });
-          setTimeout(() => { isUpdatingPlayStateRef.current = false; }, 50);
+          requestAnimationFrame(() => { isUpdatingPlayStateRef.current = false; });
           // Пытаемся автоматически включить звук, если запустили в mute
           if (firstVisitRef.current || autoplayPendingRef.current === 'unmute') {
             scheduleAutoUnmute(audioElement);
@@ -548,7 +555,7 @@ const usePlayerPlayback = ({
           isUpdatingPlayStateRef.current = true;
           setIsPlayingState(true);
           onPlayerStateChange?.({ isPlaying: true });
-          setTimeout(() => { isUpdatingPlayStateRef.current = false; }, 50);
+          requestAnimationFrame(() => { isUpdatingPlayStateRef.current = false; });
           return;
         }
         
@@ -559,7 +566,7 @@ const usePlayerPlayback = ({
           isUpdatingPlayStateRef.current = true;
           setIsPlayingState(true);
           onPlayerStateChange?.({ isPlaying: true });
-          setTimeout(() => { isUpdatingPlayStateRef.current = false; }, 50);
+          requestAnimationFrame(() => { isUpdatingPlayStateRef.current = false; });
           if (firstVisitRef.current || autoplayPendingRef.current === 'unmute') {
             scheduleAutoUnmute(audioElement);
           }

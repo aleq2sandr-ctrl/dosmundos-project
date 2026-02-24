@@ -69,7 +69,7 @@ const usePlayerTimeUpdates = ({
   const handleLoadedMetadata = useCallback(() => {
     if (audioRef.current) {
       const newDuration = audioRef.current.duration;
-      if (!isNaN(newDuration) && newDuration > 0) {
+      if (Number.isFinite(newDuration) && newDuration > 0) {
         setDurationState(newDuration);
         if (onPlayerStateChange) {
           onPlayerStateChange({ duration: newDuration });

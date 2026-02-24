@@ -118,7 +118,12 @@ export const createDraftFromQuestion = async ({
   transcriptHtml,
   editor
 }) => {
+  const startTime = Date.now();
   try {
+    console.log('[articleService] createDraftFromQuestion called', {
+      episodeSlug, questionTime, questionEndTime, titleLength: title?.length, lang
+    });
+    
     const slug = generateSlug(title, new Date());
 
     const articleRow = {
@@ -144,6 +149,8 @@ export const createDraftFromQuestion = async ({
       throw articleError;
     }
 
+    console.log('[articleService] Article created successfully:', article);
+
     const { error: transError } = await supabase
       .from('article_translations')
       .insert({
@@ -154,11 +161,24 @@ export const createDraftFromQuestion = async ({
         content: transcriptHtml || ''
       });
 
-    if (transError) throw transError;
+    if (transError) {
+      console.error('[articleService] article_translations insert error:', transError);
+      throw transError;
+    }
+
+    const duration = Date.now() - startTime;
+    console.log('[articleService] createDraftFromQuestion completed in', duration, 'ms');
 
     return { success: true, data: { slug: article.slug, id: article.id } };
   } catch (error) {
+    const duration = Date.now() - startTime;
     console.error('[articleService] Error creating draft:', error);
+    console.error('[articleService] Error details:', {
+      message: error.message,
+      code: error.code,
+      duration: `${duration}ms`,
+      stack: error.stack
+    });
     return { success: false, error: error.message };
   }
 };
@@ -236,7 +256,13 @@ export const saveArticle = async (slug, {
   title, summary, content, status, categories,
   imageUrl, youtubeUrl, lang, publishedAt
 }, editor) => {
+  const startTime = Date.now();
   try {
+    console.log('[articleService] saveArticle called', {
+      slug, titleLength: title?.length, contentLength: content?.length,
+      status, categoriesCount: categories?.length || 0, lang
+    });
+
     const updateData = {
       status: status || 'draft',
       youtube_url: youtubeUrl || null,
@@ -275,6 +301,8 @@ export const saveArticle = async (slug, {
 
     if (articleError) throw articleError;
 
+    console.log('[articleService] Article updated successfully:', article);
+
     const { error: transError } = await supabase
       .from('article_translations')
       .upsert({
@@ -285,7 +313,12 @@ export const saveArticle = async (slug, {
         content: content || ''
       }, { onConflict: 'article_id, language_code' });
 
-    if (transError) throw transError;
+    if (transError) {
+      console.error('[articleService] article_translations upsert error:', transError);
+      throw transError;
+    }
+
+    console.log('[articleService] Translation upserted successfully');
 
     if (Array.isArray(categories)) {
       await supabase.from('article_categories').delete().eq('article_id', article.id);
@@ -293,6 +326,7 @@ export const saveArticle = async (slug, {
         await supabase.from('article_categories').insert(
           categories.map(catId => ({ article_id: article.id, category_id: catId }))
         );
+        console.log('[articleService] Categories updated:', categories.length, 'categories');
       }
     }
 
@@ -310,9 +344,19 @@ export const saveArticle = async (slug, {
       });
     }
 
+    const duration = Date.now() - startTime;
+    console.log('[articleService] saveArticle completed in', duration, 'ms');
+
     return { success: true, data: { slug: article.slug, id: article.id, status: article.status } };
   } catch (error) {
+    const duration = Date.now() - startTime;
     console.error('[articleService] Error saving article:', error);
+    console.error('[articleService] Error details:', {
+      message: error.message,
+      code: error.code,
+      duration: `${duration}ms`,
+      stack: error.stack
+    });
     return { success: false, error: error.message };
   }
 };

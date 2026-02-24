@@ -938,6 +938,14 @@ const ArticleEditorPage = () => {
       },
     },
     onUpdate: () => setHasUnsaved(true),
+    onError: (error) => {
+      console.error('[ArticleEditorPage] TipTap editor error:', error);
+      toast({ 
+        title: 'Editor error', 
+        description: error.message || 'An error occurred in the editor', 
+        variant: 'destructive' 
+      });
+    },
   });
   editorRef.current = editor;
 
@@ -1151,10 +1159,16 @@ const ArticleEditorPage = () => {
   // ─── Unsaved changes warning ──────────────────────────────────────
   useEffect(() => {
     if (!hasUnsaved) return;
-    const handler = (e) => { e.preventDefault(); e.returnValue = ''; };
+    
+    const handler = (e) => { 
+      e.preventDefault(); 
+      e.returnValue = getLocaleString('unsaved_changes', lang); 
+      return e.returnValue;
+    };
+    
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
-  }, [hasUnsaved]);
+  }, [hasUnsaved, lang]);
 
   const refreshTranslationStatuses = useCallback(async () => {
     if (!articleSlug || articleSlug === 'new') {
@@ -1197,7 +1211,14 @@ const ArticleEditorPage = () => {
 
   // ─── Save handler ─────────────────────────────────────────────────
   const handleSave = useCallback(async (newStatus) => {
-    if (!editor) return;
+    console.log('[ArticleEditorPage] handleSave called', { newStatus, hasEditor: !!editor, title });
+    
+    if (!editor) {
+      console.error('[ArticleEditorPage] Editor not available');
+      toast({ title: getLocaleString('editor_not_available', lang), variant: 'destructive' });
+      return;
+    }
+    
     if (!title.trim()) {
       toast({ title: getLocaleString('title_required', lang), variant: 'destructive' });
       return;
@@ -1208,6 +1229,15 @@ const ArticleEditorPage = () => {
       const content = editor.getHTML();
       const requestedStatus = newStatus || status;
       const saveStatus = requestedStatus === 'published' && !canPublish ? 'pending' : requestedStatus;
+
+      console.log('[ArticleEditorPage] Save details', {
+        isNew, hasArticleSlug: !!articleSlug, saveStatus,
+        contentLength: content.length,
+        categoriesCount: selectedCategories.length,
+        hasSummary: !!summary,
+        hasImage: !!imageUrl,
+        hasYoutube: !!youtubeUrl
+      });
 
       if (isNew && !articleSlug) {
         // Create new
@@ -1228,6 +1258,7 @@ const ArticleEditorPage = () => {
 
         // Update if status differs or categories exist
         if (saveStatus !== 'draft' || selectedCategories.length > 0 || summary) {
+          console.log('[ArticleEditorPage] Updating article with additional details');
           await saveArticle(result.data.slug, {
             title: title.trim(), summary, content, status: saveStatus,
             categories: selectedCategories, imageUrl, youtubeUrl, lang,
@@ -1257,7 +1288,12 @@ const ArticleEditorPage = () => {
       toast({ title: getLocaleString(toastKey, lang) });
     } catch (err) {
       console.error('[ArticleEditorPage] Save error:', err);
-      toast({ title: err.message || 'Error saving', variant: 'destructive' });
+      console.error('[ArticleEditorPage] Error stack:', err.stack);
+      toast({ 
+        title: err.message || 'Error saving', 
+        description: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+        variant: 'destructive' 
+      });
     } finally {
       setSaving(false);
     }
@@ -1378,6 +1414,8 @@ const ArticleEditorPage = () => {
 
   // ─── AI action handler ────────────────────────────────────────────
   const handleAiAction = useCallback(async (action, customPrompt) => {
+    console.log('[ArticleEditorPage] handleAiAction called', { action, hasEditor: !!editor, aiLoading });
+    
     if (!editor || aiLoading) return;
 
     const selected = getSelectedHtml();
@@ -1387,9 +1425,21 @@ const ArticleEditorPage = () => {
     }
 
     setAiLoading(true);
+    
+    // Set timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      console.error('[ArticleEditorPage] AI action timed out');
+      setAiLoading(false);
+      toast({ 
+        title: getLocaleString('ai_timeout', lang) || 'AI action timed out', 
+        variant: 'destructive' 
+      });
+    }, 60000);
+
     try {
       const html = selected.html;
       let result;
+      
       switch (action) {
         case 'clean':
           result = await aiCleanText(html, lang);
@@ -1403,6 +1453,9 @@ const ArticleEditorPage = () => {
         default:
           return;
       }
+      
+      clearTimeout(timeoutId);
+      
       if (result) {
         const { from, to } = selected;
         editor.chain().focus().insertContentAt({ from, to }, result).run();
@@ -1418,9 +1471,16 @@ const ArticleEditorPage = () => {
         toast({ title: getLocaleString('ai_action_done', lang) || 'AI applied successfully' });
       }
     } catch (err) {
+      clearTimeout(timeoutId);
       console.error('[AI Action] Error:', err);
-      toast({ title: err.message || 'AI error', variant: 'destructive' });
+      console.error('[AI Action] Stack:', err.stack);
+      toast({ 
+        title: err.message || 'AI error', 
+        description: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+        variant: 'destructive' 
+      });
     } finally {
+      clearTimeout(timeoutId);
       setAiLoading(false);
     }
   }, [editor, aiLoading, lang, toast, getSelectedHtml]);
