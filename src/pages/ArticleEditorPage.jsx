@@ -1396,7 +1396,16 @@ const ArticleEditorPage = () => {
           return;
       }
       if (result) {
-        editor.chain().focus().insertContentAt({ from: selected.from, to: selected.to }, result).run();
+        const { from, to } = selected;
+        editor.chain().focus().insertContentAt({ from, to }, result).run();
+        
+        // Restore selection after AI insertion
+        setTimeout(() => {
+          const resultLength = editor.state.doc.textBetween(from, editor.state.doc.content.size, '').length;
+          const newTo = Math.min(from + resultLength, editor.state.doc.content.size);
+          editor.chain().setTextSelection({ from, to: newTo }).run();
+        }, 10);
+        
         setHasUnsaved(true);
         toast({ title: getLocaleString('ai_action_done', lang) || 'AI applied successfully' });
       }
