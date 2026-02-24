@@ -9,6 +9,7 @@ import Underline from '@tiptap/extension-underline';
 import Highlight from '@tiptap/extension-highlight';
 import Placeholder from '@tiptap/extension-placeholder';
 import QuestionBlock from '@/extensions/QuestionBlock';
+import TimecodeExtension from '@/extensions/TimecodeExtension';
 import { getLocaleString } from '@/lib/locales';
 import { useEditorAuth } from '@/contexts/EditorAuthContext';
 import { useToast } from '@/components/ui/use-toast';
@@ -927,6 +928,7 @@ const ArticleEditorPage = () => {
         multicolor: true,
       }),
       QuestionBlock,
+      TimecodeExtension,
       Placeholder.configure({
         placeholder: getLocaleString('start_writing', lang),
       }),
@@ -1387,9 +1389,9 @@ const ArticleEditorPage = () => {
   // ─── Timecode click handler ───────────────────────────────────────
   const handleTimecodeClick = useCallback((e) => {
     const target = e.target;
-    const strong = target.tagName === 'STRONG' ? target : target.closest?.('strong');
-    if (!strong) return;
-    const m = strong.textContent.match(/^\[([\d:]+)\]$/);
+    const timecodeNode = target.classList?.contains('tc-link') ? target : target.closest?.('.tc-link');
+    if (!timecodeNode) return;
+    const m = timecodeNode.textContent.match(/^\[([\d:]+)\]$/);
     if (!m) return;
     e.preventDefault();
     const parts = m[1].split(':').map(Number);
@@ -1899,7 +1901,7 @@ const ArticleEditorPage = () => {
         }
 
         /* ── Timecode links ── */
-        .ProseMirror strong.tc-link {
+        .ProseMirror .tc-link {
           cursor: pointer;
           color: #7c3aed !important;
           font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -1914,26 +1916,20 @@ const ArticleEditorPage = () => {
           position: relative;
           font-weight: 600;
         }
-        .ProseMirror strong.tc-link::before {
-          content: '\u25B6';
-          font-size: 0.65em;
-          margin-right: 2px;
-          opacity: 0.6;
-        }
-        .ProseMirror strong.tc-link:hover {
+        .ProseMirror .tc-link:hover {
           color: #6d28d9 !important;
           background: rgba(124, 58, 237, 0.18);
           border-color: rgba(124, 58, 237, 0.5);
           box-shadow: 0 1px 4px rgba(124, 58, 237, 0.15);
           transform: translateY(-0.5px);
         }
-        .dark .ProseMirror strong.tc-link {
+        .dark .ProseMirror .tc-link {
           color: #a78bfa !important;
           background: rgba(167, 139, 250, 0.12);
           border-color: rgba(167, 139, 250, 0.25);
           box-shadow: 0 1px 2px rgba(167, 139, 250, 0.08);
         }
-        .dark .ProseMirror strong.tc-link:hover {
+        .dark .ProseMirror .tc-link:hover {
           color: #c4b5fd !important;
           background: rgba(167, 139, 250, 0.22);
           border-color: rgba(167, 139, 250, 0.5);
