@@ -6,6 +6,7 @@ import StarterKit from '@tiptap/starter-kit';
 import ImageExtension from '@tiptap/extension-image';
 import LinkExtension from '@tiptap/extension-link';
 import Underline from '@tiptap/extension-underline';
+import Highlight from '@tiptap/extension-highlight';
 import Placeholder from '@tiptap/extension-placeholder';
 import QuestionBlock from '@/extensions/QuestionBlock';
 import { getLocaleString } from '@/lib/locales';
@@ -34,7 +35,7 @@ import {
   Play, Pause, RotateCcw, RotateCw,
   FileEdit, FileCheck, FileSearch, Radio, Calendar, User,
   X, Loader2, Code, Trash2, Languages,
-  Sparkles, Wand2, MessageSquare, AlignLeft, HelpCircle
+  Sparkles, Wand2, MessageSquare, AlignLeft, HelpCircle, Highlighter
 } from 'lucide-react';
 import {
   aiCleanText, aiSplitParagraphs, aiCustomPrompt, aiGenerateSummary, aiTranslateArticle
@@ -181,6 +182,63 @@ const AIDropdown = ({ onAction, loading, lang }) => {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// HIGHLIGHT COLOR PICKER
+// ═══════════════════════════════════════════════════════════════════════════════
+const HighlightColorPicker = ({ editor }) => {
+  const [showColors, setShowColors] = useState(false);
+  
+  const colors = [
+    { name: 'Yellow', value: '#fef08a', class: 'bg-yellow-200' },
+    { name: 'Green', value: '#bbf7d0', class: 'bg-green-200' },
+    { name: 'Blue', value: '#bfdbfe', class: 'bg-blue-200' },
+    { name: 'Pink', value: '#fbcfe8', class: 'bg-pink-200' },
+    { name: 'Purple', value: '#e9d5ff', class: 'bg-purple-200' },
+  ];
+
+  const currentColor = colors.find(c => editor.isActive('highlight', { color: c.value }));
+  const isActive = editor.isActive('highlight');
+
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => setShowColors(true)}
+      onMouseLeave={() => setShowColors(false)}
+    >
+      <button
+        onMouseDown={e => e.preventDefault()}
+        onClick={() => editor.chain().focus().toggleHighlight().run()}
+        title="Highlight"
+        className={`p-2 rounded-lg transition-all duration-150 ${
+          isActive
+            ? 'bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300'
+            : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/50 hover:text-slate-800 dark:hover:text-slate-200'
+        }`}
+      >
+        <Highlighter className="w-4 h-4" />
+      </button>
+      
+      {showColors && (
+        <div className="absolute top-full left-0 mt-1 flex gap-1 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 p-1.5 z-50">
+          {colors.map((color) => (
+            <button
+              key={color.value}
+              onMouseDown={e => e.preventDefault()}
+              onClick={() => editor.chain().focus().toggleHighlight({ color: color.value }).run()}
+              title={color.name}
+              className={`w-6 h-6 rounded ${color.class} border-2 ${
+                editor.isActive('highlight', { color: color.value })
+                  ? 'border-slate-900 dark:border-slate-100 scale-110'
+                  : 'border-transparent hover:border-slate-400'
+              } transition-all`}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // TOOLBAR COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
 const EditorToolbar = ({ editor, onAiAction, aiLoading, lang }) => {
@@ -227,6 +285,7 @@ const EditorToolbar = ({ editor, onAiAction, aiLoading, lang }) => {
             </button>
           );
         })}
+        <HighlightColorPicker editor={editor} />
         <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1" />
         <AIDropdown onAction={onAiAction} loading={aiLoading} lang={lang} />
       </div>
@@ -736,6 +795,9 @@ const ArticleEditorPage = () => {
       ImageExtension.configure({ inline: false, allowBase64: true }),
       LinkExtension.configure({ openOnClick: false, autolink: true }),
       Underline,
+      Highlight.configure({
+        multicolor: true,
+      }),
       QuestionBlock,
       Placeholder.configure({
         placeholder: getLocaleString('start_writing', lang),
@@ -744,7 +806,7 @@ const ArticleEditorPage = () => {
     content: '',
     editorProps: {
       attributes: {
-        class: 'prose prose-xl max-w-none font-serif focus:outline-none min-h-[50vh] px-6 py-8 md:px-10 md:py-10 text-slate-800 dark:text-slate-200 prose-headings:font-serif prose-headings:text-slate-900 dark:prose-headings:text-slate-100 prose-p:leading-relaxed prose-a:text-purple-700 dark:prose-a:text-purple-400 prose-blockquote:border-l-purple-400 prose-blockquote:bg-purple-50/50 dark:prose-blockquote:bg-purple-500/5 prose-blockquote:rounded-r-xl prose-blockquote:py-2 prose-blockquote:px-6 prose-img:rounded-xl prose-img:shadow-lg',
+        class: 'prose prose-xl max-w-none font-serif focus:outline-none min-h-[50vh] px-6 py-8 md:px-10 md:py-10 text-slate-800 dark:text-slate-200 prose-headings:font-serif prose-headings:text-slate-900 dark:prose-headings:text-slate-100 prose-p:leading-loose prose-p:indent-8 prose-p:mb-5 prose-p:mt-0 prose-a:text-purple-700 dark:prose-a:text-purple-400 prose-blockquote:border-l-purple-400 prose-blockquote:bg-purple-50/50 dark:prose-blockquote:bg-purple-500/5 prose-blockquote:rounded-r-xl prose-blockquote:py-2 prose-blockquote:px-6 prose-img:rounded-xl prose-img:shadow-lg',
       },
     },
     onUpdate: () => setHasUnsaved(true),
@@ -1517,6 +1579,36 @@ const ArticleEditorPage = () => {
           color: #cbd5e1;
         }
 
+        /* ── Paragraph rhythm ── */
+        .ProseMirror p {
+          margin-top: 0;
+          margin-bottom: 0.75em;
+          text-indent: 1em;
+          line-height: 1.72;
+        }
+
+        /* ── Highlight (text background colors) ── */
+        .ProseMirror mark {
+          padding: 2px 4px;
+          border-radius: 3px;
+          background-color: #fef08a;
+        }
+        .ProseMirror mark[data-color="#fef08a"] {
+          background-color: #fef08a;
+        }
+        .ProseMirror mark[data-color="#bbf7d0"] {
+          background-color: #bbf7d0;
+        }
+        .ProseMirror mark[data-color="#bfdbfe"] {
+          background-color: #bfdbfe;
+        }
+        .ProseMirror mark[data-color="#fbcfe8"] {
+          background-color: #fbcfe8;
+        }
+        .ProseMirror mark[data-color="#e9d5ff"] {
+          background-color: #e9d5ff;
+        }
+
         /* ── Blockquote (Question style) ── */
         .ProseMirror blockquote {
           position: relative;
@@ -1544,6 +1636,7 @@ const ArticleEditorPage = () => {
           margin: 0.3em 0;
           color: #4c1d95;
           font-weight: 500;
+          text-indent: 0;
         }
         .dark .ProseMirror blockquote {
           background: linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(139, 92, 246, 0.04) 100%);
@@ -1586,6 +1679,7 @@ const ArticleEditorPage = () => {
           font-size: 1.1em;
           line-height: 1.6;
           font-style: italic;
+          text-indent: 0;
         }
         .dark .ProseMirror .question-block {
           background: rgba(251, 191, 36, 0.06);

@@ -2,10 +2,9 @@ import React, { memo } from 'react';
 import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { User, ArrowRight, Youtube, Clock, Calendar, FileEdit, FileCheck, FileSearch } from 'lucide-react';
-import { getPluralizedLocaleString, getLocaleString } from '@/lib/locales';
+import { User, ArrowRight, Youtube, Clock, Calendar } from 'lucide-react';
+import { getPluralizedLocaleString } from '@/lib/locales';
 import { formatArticleDate } from '@/lib/utils';
-import { useEditorAuth } from '@/contexts/EditorAuthContext';
 
 // Color palette for categories (same as ArticlesPage)
 // Slug-based color mapping — works for all languages
@@ -27,19 +26,14 @@ const getCategoryColor = (cat) => {
   return categoryColorsBySlug.default;
 };
 
-const statusConfig = {
-  draft:     { icon: FileEdit,   color: 'text-yellow-500', bg: 'bg-yellow-50', border: 'border-yellow-200' },
-  pending:   { icon: FileSearch, color: 'text-orange-500', bg: 'bg-orange-50', border: 'border-orange-200' },
-  published: { icon: FileCheck,  color: 'text-emerald-500', bg: 'bg-emerald-50', border: 'border-emerald-200' },
-};
 
 const ArticleCard = memo(({ 
   article, 
   lang, 
   isLast,
-  lastArticleElementRef 
+  lastArticleElementRef,
+  hideStatus = false
 }) => {
-  const { isAuthenticated } = useEditorAuth();
   const {
     id,
     title,
@@ -48,12 +42,8 @@ const ArticleCard = memo(({
     author,
     youtubeUrl,
     publishedAt,
-    readingTime,
-    status
+    readingTime
   } = article;
-
-  const showStatus = status && (status === 'published' || isAuthenticated);
-  const statusCfg = status ? statusConfig[status] : null;
 
   return (
     <div 
@@ -81,15 +71,6 @@ const ArticleCard = memo(({
                 })}
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
-                {showStatus && statusCfg && (() => {
-                  const Icon = statusCfg.icon;
-                  return (
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${statusCfg.bg} ${statusCfg.color} ${statusCfg.border}`}>
-                      <Icon className="w-3 h-3" />
-                      <span className="hidden sm:inline">{getLocaleString(status === 'draft' ? 'status_draft' : status === 'pending' ? 'status_pending' : 'status_published', lang)}</span>
-                    </span>
-                  );
-                })()}
                 {youtubeUrl && (
                   <Youtube className="w-5 h-5 text-red-600 opacity-80" />
                 )}
@@ -151,12 +132,12 @@ ArticleCard.propTypes = {
     author: PropTypes.string,
     youtubeUrl: PropTypes.string,
     publishedAt: PropTypes.string,
-    readingTime: PropTypes.number,
-    status: PropTypes.string
+    readingTime: PropTypes.number
   }).isRequired,
   lang: PropTypes.string.isRequired,
   isLast: PropTypes.bool,
-  lastArticleElementRef: PropTypes.func
+  lastArticleElementRef: PropTypes.func,
+  hideStatus: PropTypes.bool
 };
 
 export default ArticleCard;

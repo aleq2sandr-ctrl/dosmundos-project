@@ -805,6 +805,7 @@ export const aiCleanText = async (htmlContent, lang = 'ru') => {
 Remove filler words (um, uh, well, like, you know, ну, вот, как бы, то есть, значит, типа, короче, pues, este, o sea, etc.), false starts, repeated phrases and stutters.
 Keep the HTML structure intact — preserve all tags (<p>, <strong>, <em>, <br>, <h2>, <h3>, <blockquote>, etc.) and their attributes exactly as they are.
 Do NOT remove or modify any <strong class="tc-link"> timecode elements.
+CRITICAL: Preserve ALL timecodes in square brackets like [2:20], [1:30:45], [0:15] exactly as they are in the original text.
 Return ONLY the cleaned HTML, nothing else.` },
       { role: 'user', content: htmlContent }
     ],
@@ -826,26 +827,19 @@ export const aiSplitParagraphs = async (htmlContent, lang = 'ru') => {
     model: 'deepseek-chat',
     messages: [
       { role: 'system', content: `You are a text editor working in ${langName}.
-Split the given HTML text into logical paragraphs using only <p> blocks for paragraph separation.
+Split the given HTML text into logical paragraphs using <p> tags. Each paragraph should cover one topic or thought.
 Keep the HTML structure intact — preserve all tags and attributes exactly as they are.
 Do NOT remove or modify any <strong class="tc-link"> timecode elements.
+CRITICAL: Preserve ALL timecodes in square brackets like [2:20], [1:30:45], [0:15] exactly as they are in the original text.
 If text already has paragraphs, optimize them — merge too-short ones, split too-long ones.
-Do NOT add empty paragraphs, spacer lines, repeated <br> tags, or visual separators.
-Output should contain clean paragraph structure only.
+Place paragraphs directly one after another without empty lines or empty <p> tags between them.
 Return ONLY the restructured HTML, nothing else.` },
       { role: 'user', content: htmlContent }
     ],
     temperature: 0.3,
     max_tokens: 8000,
   });
-  const raw = completion.choices[0].message.content.trim();
-
-  return raw
-    .replace(/<p>\s*(?:<br\s*\/?\s*>\s*)+<\/p>/gi, '')
-    .replace(/<p>(?:\s|&nbsp;)*<\/p>/gi, '')
-    .replace(/(?:<br\s*\/?\s*>\s*){2,}/gi, '<br>')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
+  return completion.choices[0].message.content.trim();
 };
 
 /**
@@ -863,6 +857,7 @@ export const aiCustomPrompt = async (htmlContent, userPrompt, lang = 'ru') => {
 Apply the user's instruction to the provided HTML article content.
 Keep the HTML structure intact — preserve all tags and attributes.
 Do NOT remove or modify any <strong class="tc-link"> timecode elements.
+CRITICAL: Preserve ALL timecodes in square brackets like [2:20], [1:30:45], [0:15] exactly as they are in the original text.
 Return ONLY the modified HTML, nothing else.` },
       { role: 'user', content: `Instruction: ${userPrompt}\n\nArticle HTML:\n${htmlContent}` }
     ],
@@ -891,7 +886,8 @@ Translate article fields from ${sourceLangName} to ${targetLangName}.
 Rules:
 - Keep meaning accurate and natural in ${targetLangName}.
 - Preserve HTML in content exactly (tags/attributes/structure).
-- Preserve all timecodes like [12:34] and all <strong class="tc-link"> elements unchanged in semantics.
+- CRITICAL: Preserve ALL timecodes in square brackets like [2:20], [1:30:45], [0:15] exactly as they are — do NOT translate or modify them.
+- Preserve all <strong class="tc-link"> elements unchanged.
 - Do not add explanations.
 - Return ONLY valid JSON object with keys: title, summary, content.`
       },

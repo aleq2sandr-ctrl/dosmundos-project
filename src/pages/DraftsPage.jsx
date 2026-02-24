@@ -222,6 +222,7 @@ const DraftsPage = () => {
                 key={article.id}
                 article={article}
                 lang={lang}
+                hideStatus={true}
               />
             ))}
           </div>

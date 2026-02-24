@@ -541,12 +541,35 @@ const ArticleDetailPage = () => {
             </div>
           }>
             <style>{`
-              .article-body p {
-                margin: 0;
-                text-indent: 1.8em;
+              .prose p {
+                margin-top: 0;
+                margin-bottom: 0.75em;
+                text-indent: 1em;
+                line-height: 1.72;
               }
-              .article-body p + p {
-                margin-top: 1.05em;
+              .prose blockquote p,
+              .prose .question-block p {
+                text-indent: 0;
+              }
+              .prose mark {
+                padding: 2px 4px;
+                border-radius: 3px;
+                background-color: #fef08a;
+              }
+              .prose mark[data-color="#fef08a"] {
+                background-color: #fef08a;
+              }
+              .prose mark[data-color="#bbf7d0"] {
+                background-color: #bbf7d0;
+              }
+              .prose mark[data-color="#bfdbfe"] {
+                background-color: #bfdbfe;
+              }
+              .prose mark[data-color="#fbcfe8"] {
+                background-color: #fbcfe8;
+              }
+              .prose mark[data-color="#e9d5ff"] {
+                background-color: #e9d5ff;
               }
               .question-block {
                 position: relative;
@@ -579,9 +602,9 @@ const ArticleDetailPage = () => {
                 text-indent: 0;
               }
             `}</style>
-            <div className="article-body prose prose-xl max-w-none text-justify
+            <div className="prose prose-xl max-w-none text-justify
               prose-headings:font-serif prose-headings:text-slate-900 prose-headings:font-bold
-              prose-p:text-slate-800 prose-p:leading-loose prose-p:font-serif prose-p:indent-8 prose-p:mb-4
+              prose-p:text-slate-800 prose-p:leading-loose prose-p:font-serif prose-p:indent-8 prose-p:mb-5 prose-p:mt-0
               prose-a:text-purple-700 prose-a:no-underline hover:prose-a:text-purple-900 hover:prose-a:underline
               prose-strong:text-slate-900 prose-strong:font-semibold
               prose-ul:text-slate-800 prose-ol:text-slate-800

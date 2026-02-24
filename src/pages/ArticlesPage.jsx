@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom';
 import { getLocaleString } from '@/lib/locales';
 import { supabase } from '@/lib/supabaseClient';
-import { Search, Loader2, Plus, FileEdit, LogOut } from 'lucide-react';
+import { Search, Loader2, Plus, FileEdit, LogOut, User } from 'lucide-react';
 import { calculateReadingTime } from '@/lib/utils';
 import ArticleCardSkeleton from '@/components/ArticleCardSkeleton';
 import ArticleCard from '@/components/ArticleCard';
@@ -21,7 +21,7 @@ const ArticlesPage = () => {
   const [visibleCount, setVisibleCount] = useState(6);
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
-  const { isAuthenticated, logout } = useEditorAuth();
+  const { isAuthenticated, logout, openAuthModal } = useEditorAuth();
 
   // Track current lang to prevent stale fetches from corrupting state
   const currentLangRef = useRef(lang);
@@ -324,37 +324,49 @@ const ArticlesPage = () => {
   return (
     <div className="min-h-screen bg-[#fdfbf7] text-slate-900 font-serif">
       <div className="container mx-auto px-4 py-12">
-        {/* Editor controls: Drafts, New Article, Logout */}
-        {isAuthenticated && (
-          <div className="flex items-center justify-end gap-2 mb-8 font-sans">
+        {/* Editor controls: Drafts, New Article, Logout OR Login */}
+        <div className="flex items-center justify-end gap-2 mb-8 font-sans">
+          {isAuthenticated ? (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate(`/${lang}/drafts`)}
+                className="text-slate-600 border-slate-200 hover:bg-slate-50"
+              >
+                <FileEdit className="h-4 w-4 mr-1" />
+                {getLocaleString('manage_drafts', lang)}
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => navigate(`/${lang}/articles/new/edit`)}
+                className="bg-purple-600 hover:bg-purple-700 text-white"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                {getLocaleString('new_article', lang)}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={logout}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <LogOut className="h-4 w-4 mr-1" />
+                {getLocaleString('logout', lang)}
+              </Button>
+            </>
+          ) : (
             <Button
               variant="outline"
               size="sm"
-              onClick={() => navigate(`/${lang}/drafts`)}
-              className="text-slate-600 border-slate-200 hover:bg-slate-50"
+              onClick={openAuthModal}
+              className="text-slate-500 border-slate-200 hover:bg-slate-50"
             >
-              <FileEdit className="h-4 w-4 mr-1" />
-              {getLocaleString('manage_drafts', lang)}
+              <User className="h-4 w-4 mr-1" />
+              {getLocaleString('login_as_editor', lang)}
             </Button>
-            <Button
-              size="sm"
-              onClick={() => navigate(`/${lang}/articles/new/edit`)}
-              className="bg-purple-600 hover:bg-purple-700 text-white"
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              {getLocaleString('new_article', lang)}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={logout}
-              className="text-slate-400 hover:text-slate-600"
-            >
-              <LogOut className="h-4 w-4 mr-1" />
-              {getLocaleString('logout', lang)}
-            </Button>
-          </div>
-        )}
+          )}
+        </div>
 
         <div className="flex flex-col items-center mb-12 text-center">
           <h1 className="text-4xl md:text-5xl font-bold text-slate-900 mb-4 tracking-tight">
@@ -419,6 +431,7 @@ const ArticlesPage = () => {
                     lang={lang}
                     isLast={isLast}
                     lastArticleElementRef={lastArticleElementRef}
+                    hideStatus={true}
                   />
                 );
               })}
