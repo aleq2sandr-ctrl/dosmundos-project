@@ -1516,95 +1516,18 @@ const ArticleEditorPage = () => {
             />
           </div>
 
-          {/* Status + unsaved */}
-          <div className="flex items-center gap-2">
-            {StatusBadge}
-            {hasUnsaved && (
-              <span className="w-2 h-2 rounded-full bg-yellow-400 shrink-0" title={getLocaleString('unsaved_changes', lang)} />
-            )}
-          </div>
-
-          {/* Action buttons */}
+          {/* Save button */}
           <div className="flex items-center gap-2 shrink-0">
-            {/* Delete */}
-            {articleSlug && !isNew && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowDeleteConfirm(true)}
-                disabled={deleting}
-                className="text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10"
-                title={getLocaleString('delete', lang)}
-              >
-                <Trash2 className="w-4 h-4" />
-              </Button>
-            )}
-
-            {/* Preview */}
-            {articleSlug && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => window.open(`/${lang}/articles/${articleSlug}`, '_blank')}
-                className="text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
-              >
-                <Eye className="w-4 h-4 mr-1.5" />
-                <span className="hidden sm:inline">{getLocaleString('preview', lang)}</span>
-              </Button>
-            )}
-
-            {/* Save draft */}
             <Button
               variant="outline"
               size="sm"
               onClick={() => handleSave('draft')}
               disabled={saving}
               className="border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+              title={getLocaleString('save_draft', lang)}
             >
-              {saving ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Save className="w-4 h-4 mr-1.5" />}
-              <span className="hidden sm:inline">{getLocaleString('save_draft', lang)}</span>
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             </Button>
-
-            {/* Submit for review */}
-            {status !== 'published' && status !== 'pending' && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleSave('pending')}
-                disabled={saving}
-                className="border-orange-300 dark:border-orange-500/30 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-500/10"
-              >
-                <Send className="w-4 h-4 mr-1.5" />
-                <span className="hidden md:inline">{getLocaleString('submit_for_review', lang)}</span>
-              </Button>
-            )}
-
-            {/* Return for revision (from pending/published → draft) */}
-            {(status === 'pending' || status === 'published') && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleSave('draft')}
-                disabled={saving}
-                className="border-yellow-300 dark:border-yellow-500/30 text-yellow-600 dark:text-yellow-400 hover:bg-yellow-50 dark:hover:bg-yellow-500/10"
-              >
-                <FileEdit className="w-4 h-4 mr-1.5" />
-                <span className="hidden md:inline">{getLocaleString('return_for_revision', lang)}</span>
-              </Button>
-            )}
-
-            {/* Publish (allowed only for main publisher) */}
-            {canPublish && (
-              <Button
-                size="sm"
-                onClick={() => handleSave('published')}
-                disabled={saving}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/25"
-              >
-                {saving ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Globe className="w-4 h-4 mr-1.5" />}
-                <span className="hidden sm:inline">{getLocaleString('publish', lang)}</span>
-              </Button>
-            )}
           </div>
         </div>
 
