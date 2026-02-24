@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useEditor, EditorContent } from '@tiptap/react';
 import { DOMSerializer } from '@tiptap/pm/model';
@@ -1396,16 +1396,20 @@ const ArticleEditorPage = () => {
 
   // ─── Timecode styling scanner ─────────────────────────────────────
   useEffect(() => {
-    if (!editor) return;
+    if (!editor || !editor.view) return;
     const el = editor.view.dom;
     const scan = () => {
-      el.querySelectorAll('strong').forEach(s => {
-        if (/^\[[\d:]+\]$/.test(s.textContent)) {
-          s.classList.add('tc-link');
-        } else {
-          s.classList.remove('tc-link');
-        }
-      });
+      try {
+        el.querySelectorAll('strong').forEach(s => {
+          if (/^\[[\d:]+\]$/.test(s.textContent)) {
+            s.classList.add('tc-link');
+          } else {
+            s.classList.remove('tc-link');
+          }
+        });
+      } catch (error) {
+        console.error('[ArticleEditorPage] Timecode scan error:', error);
+      }
     };
     scan();
     editor.on('update', scan);

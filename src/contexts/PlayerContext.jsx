@@ -194,6 +194,9 @@ export const PlayerProvider = ({ children }) => {
     const maxTime = Number.isFinite(dur) ? dur : time;
     const clampedTime = Math.max(0, Math.min(time, maxTime));
     
+    // Remember if player was playing before seek
+    const wasPlaying = isPlaying;
+    
     isSeekingRef.current = true;
     seekTargetRef.current = clampedTime;
     
@@ -210,8 +213,9 @@ export const PlayerProvider = ({ children }) => {
       return;
     }
     
-    // Play after the browser confirms the seek completed
-    if (shouldPlay && !isPlaying) {
+    // Resume playback if it was playing before seek, or if shouldPlay is explicitly true
+    // This ensures that seeking during playback doesn't pause the audio
+    if ((shouldPlay || wasPlaying) && audioRef.current?.paused) {
       const onSeeked = () => {
         audioRef.current?.removeEventListener('seeked', onSeeked);
         safePlay();

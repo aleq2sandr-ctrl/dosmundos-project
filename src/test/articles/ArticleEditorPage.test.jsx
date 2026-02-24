@@ -1,39 +1,49 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { MemoryRouter } from 'react-router-dom';
 import ArticleEditorPage from '@/pages/ArticleEditorPage';
 import { useEditorAuth } from '@/contexts/EditorAuthContext';
 import { getCategories, getArticle, createDraftFromQuestion, saveArticle } from '@/services/articleService';
 
 // Mock dependencies
-jest.mock('@/contexts/EditorAuthContext');
-jest.mock('@/services/articleService');
-jest.mock('@tiptap/react', () => ({
-  useEditor: jest.fn(),
-  EditorContent: jest.fn(() => <div data-testid="editor-content" />)
+vi.mock('@/contexts/EditorAuthContext');
+vi.mock('@/services/articleService');
+
+vi.mock('@tiptap/react', () => ({
+  useEditor: vi.fn(() => ({
+    chain: vi.fn(() => ({
+      focus: vi.fn(() => ({})),
+      toggleBold: vi.fn(() => ({})),
+      toggleItalic: vi.fn(() => ({})),
+      toggleUnderline: vi.fn(() => ({})),
+      toggleHighlight: vi.fn(() => ({})),
+      toggleQuestionBlock: vi.fn(() => ({})),
+      undo: vi.fn(() => ({})),
+      redo: vi.fn(() => ({})),
+      run: vi.fn()
+    })),
+    isActive: vi.fn(),
+    can: vi.fn(() => ({
+      undo: vi.fn(() => true),
+      redo: vi.fn(() => true)
+    })),
+    getHTML: vi.fn(() => '<p>Test content</p>'),
+    commands: {
+      setContent: vi.fn()
+    },
+    view: {
+      dom: document.createElement('div')
+    },
+    on: vi.fn(),
+    off: vi.fn()
+  })),
+  EditorContent: vi.fn(() => <div data-testid="editor-content" />)
 }));
 
 describe('ArticleEditorPage', () => {
-  const mockEditor = {
-    chain: jest.fn(() => ({
-      focus: jest.fn(() => ({})),
-      toggleBold: jest.fn(() => ({})),
-      toggleItalic: jest.fn(() => ({})),
-      toggleUnderline: jest.fn(() => ({})),
-      toggleHighlight: jest.fn(() => ({})),
-      toggleQuestionBlock: jest.fn(() => ({})),
-      undo: jest.fn(() => ({})),
-      redo: jest.fn(() => ({})),
-      run: jest.fn()
-    })),
-    isActive: jest.fn(),
-    can: jest.fn(() => true),
-    getHTML: jest.fn(() => '<p>Test content</p>')
-  };
-
   beforeEach(() => {
     // Reset all mocks
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     
     // Mock authenticated user
     useEditorAuth.mockReturnValue({
@@ -43,11 +53,8 @@ describe('ArticleEditorPage', () => {
         email: 'test@example.com'
       },
       isAuthenticated: true,
-      openAuthModal: jest.fn()
+      openAuthModal: vi.fn()
     });
-
-    // Mock useEditor
-    require('@tiptap/react').useEditor.mockReturnValue(mockEditor);
 
     // Mock article service
     getCategories.mockResolvedValue({
@@ -94,6 +101,27 @@ describe('ArticleEditorPage', () => {
     saveArticle.mockResolvedValue({
       success: true,
       data: { slug: 'test-article', id: '1', status: 'published' }
+    });
+
+    // Mock additional translation functions
+    getArticleTranslationStatuses.mockResolvedValue({
+      success: true,
+      data: {
+        statusByLang: {
+          ru: true,
+          en: false,
+          es: false,
+          fr: false,
+          de: false,
+          pl: false
+        },
+        translatedLanguages: ['ru']
+      }
+    });
+
+    ensureArticleTranslationLink.mockResolvedValue({
+      success: true,
+      created: false
     });
   });
 
@@ -178,7 +206,7 @@ describe('ArticleEditorPage', () => {
   test('prevents navigation with unsaved changes', async () => {
     // Mock window.confirm
     const originalConfirm = window.confirm;
-    window.confirm = jest.fn(() => false);
+    window.confirm = vi.fn(() => false);
     
     render(
       <MemoryRouter initialEntries={['/ru/articles/test-article/edit']}>
