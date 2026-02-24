@@ -974,12 +974,13 @@ const ArticleEditorPage = () => {
     }
   }, [editor]);
 
-  // ─── Auth check ───────────────────────────────────────────────────
+  // ─── Auth check - open modal if not authenticated ────────────────
   useEffect(() => {
-    if (!isAuthenticated) {
+    // Wait for auth check to complete before opening modal
+    if (!authLoading && !isAuthenticated) {
       openAuthModal();
     }
-  }, [isAuthenticated, openAuthModal]);
+  }, [authLoading, isAuthenticated, openAuthModal]);
 
   // ─── Load categories ──────────────────────────────────────────────
   useEffect(() => {
@@ -1047,7 +1048,12 @@ const ArticleEditorPage = () => {
   useEffect(() => {
     // Don't load data until auth is checked
     if (authLoading) return;
-    if (!isAuthenticated) return;
+    
+    // If not authenticated, just set loading to false and let the auth modal open
+    if (!isAuthenticated) {
+      setLoading(false);
+      return;
+    }
     
     let cancelled = false;
     const load = async () => {
@@ -1593,13 +1599,13 @@ const ArticleEditorPage = () => {
     );
   }
 
-  // ─── Auth guard ───────────────────────────────────────────────────
+  // ─── Auth guard - render minimal UI if not authenticated ─────────
   if (!isAuthenticated) {
     return (
-      <div className="fixed inset-0 z-[100] bg-white dark:bg-slate-900 flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <p className="text-slate-600 dark:text-slate-400">{getLocaleString('auth_required_for_editing', lang)}</p>
-          <Button onClick={openAuthModal}>{getLocaleString('login', lang)}</Button>
+      <div className="min-h-screen bg-white dark:bg-slate-900 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+          <p className="text-sm text-slate-500">{getLocaleString('loading', lang)}</p>
         </div>
       </div>
     );
