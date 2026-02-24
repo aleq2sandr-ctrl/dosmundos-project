@@ -879,7 +879,7 @@ const ArticleEditorPage = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { editor: editorAuth, isAuthenticated, openAuthModal } = useEditorAuth();
+  const { editor: editorAuth, isAuthenticated, isLoading: authLoading, openAuthModal } = useEditorAuth();
 
   // ─── State ────────────────────────────────────────────────────────
   const [loading, setLoading] = useState(true);
@@ -1045,6 +1045,10 @@ const ArticleEditorPage = () => {
   }, [searchParams]);
 
   useEffect(() => {
+    // Don't load data until auth is checked
+    if (authLoading) return;
+    if (!isAuthenticated) return;
+    
     let cancelled = false;
     const load = async () => {
       setLoading(true);
@@ -1141,7 +1145,7 @@ const ArticleEditorPage = () => {
 
     load();
     return () => { cancelled = true; };
-  }, [articleId, lang, isNew]);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [articleId, lang, isNew, authLoading, isAuthenticated]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─── Autosave to localStorage ─────────────────────────────────────
   useEffect(() => {
@@ -1578,7 +1582,7 @@ const ArticleEditorPage = () => {
   }, [status, lang]);
 
   // ─── Loading state ────────────────────────────────────────────────
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="fixed inset-0 z-[100] bg-white dark:bg-slate-900 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
