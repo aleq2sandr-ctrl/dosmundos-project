@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Edit, ChevronDown, ChevronUp, Loader2, FilePlus, FileEdit, FileSearch, FileCheck } from 'lucide-react';
+import { Edit, ChevronDown, ChevronUp, Loader2, FilePlus, FileEdit, FileSearch, FileCheck, Languages } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { getLocaleString } from '@/lib/locales';
@@ -70,8 +70,8 @@ const QuestionBlockHeader = ({
     </div>
     {!isReadingMode && (
       <div className="flex items-center shrink-0 gap-0.5">
-        {/* Published article — visible to everyone */}
-        {articleStatus?.status === 'published' && (
+        {/* Published article with translation in current lang — visible to everyone */}
+        {articleStatus?.status === 'published' && articleStatus?.hasTranslation !== false && (
           <Tooltip>
             <TooltipTrigger asChild>
               <button
@@ -85,8 +85,8 @@ const QuestionBlockHeader = ({
             <TooltipContent side="top">{getLocaleString('article_published', currentLanguage)}</TooltipContent>
           </Tooltip>
         )}
-        {/* Pending article — editors only */}
-        {isAuthenticated && articleStatus?.status === 'pending' && (
+        {/* Pending article with translation — editors only */}
+        {isAuthenticated && articleStatus?.status === 'pending' && articleStatus?.hasTranslation !== false && (
           <Tooltip>
             <TooltipTrigger asChild>
               <button
@@ -100,8 +100,8 @@ const QuestionBlockHeader = ({
             <TooltipContent side="top">{getLocaleString('article_pending', currentLanguage)}</TooltipContent>
           </Tooltip>
         )}
-        {/* Draft article — editors only */}
-        {isAuthenticated && articleStatus?.status === 'draft' && (
+        {/* Draft article with translation — editors only */}
+        {isAuthenticated && articleStatus?.status === 'draft' && articleStatus?.hasTranslation !== false && (
           <Tooltip>
             <TooltipTrigger asChild>
               <button
@@ -115,7 +115,22 @@ const QuestionBlockHeader = ({
             <TooltipContent side="top">{getLocaleString('article_in_progress', currentLanguage)}</TooltipContent>
           </Tooltip>
         )}
-        {/* Create article — editors only */}
+        {/* Article exists but NO translation in current language — editors can add translation */}
+        {isAuthenticated && isEditMode && articleStatus && articleStatus.hasTranslation === false && !question.is_full_transcript && !question.is_intro && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={(e) => { e.stopPropagation(); onArticleAction?.('translate'); }}
+                className="shrink-0 text-blue-400 hover:text-blue-300 transition-colors opacity-70 hover:opacity-100 p-1"
+                aria-label={getLocaleString('create_translation', currentLanguage) || 'Add translation'}
+              >
+                <Languages className="h-3.5 w-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">{getLocaleString('create_translation', currentLanguage) || 'Add translation'}</TooltipContent>
+          </Tooltip>
+        )}
+        {/* Create article — editors only, no article exists at all */}
         {isAuthenticated && isEditMode && !articleStatus && !question.is_full_transcript && !question.is_intro && (
           <Tooltip>
             <TooltipTrigger asChild>

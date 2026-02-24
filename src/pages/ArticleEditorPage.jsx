@@ -1145,6 +1145,17 @@ const ArticleEditorPage = () => {
             setSelectedCategories(d.categories.map(c => c.id));
             setEditorContent(d.content || '');
 
+            // Notify user if showing content from a different language (fallback)
+            if (d.isFallbackTranslation && d.fallbackLang) {
+              const langNames = { ru: 'Русский', es: 'Español', en: 'English', de: 'Deutsch', fr: 'Français', pl: 'Polski' };
+              const fallbackName = langNames[d.fallbackLang] || d.fallbackLang;
+              toast({
+                title: getLocaleString('translation_not_found', lang) || 'Translation not found',
+                description: (getLocaleString('showing_fallback_content', lang) || 'Showing content from {language}. Edit and save to create a translation.').replace('{language}', fallbackName),
+                duration: 8000
+              });
+            }
+
             if (d.episodeSlug && d.questionTime != null) {
               setQuestionInfo({
                 episodeSlug: d.episodeSlug,

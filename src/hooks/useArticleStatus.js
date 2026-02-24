@@ -5,11 +5,12 @@ import { supabase } from '@/lib/supabaseClient';
 /**
  * Hook to get article statuses for all questions in an episode.
  * Maps timecode IDs to article statuses for showing icons on QuestionBlock.
+ * Language-aware: checks if the article has a translation for the current language.
  * 
  * @param {string} episodeSlug
  * @param {string} lang - Language code to filter timecodes (must match the questions displayed)
  * @returns {{ articleStatuses: Object, refreshStatuses: Function }}
- *   articleStatuses: { [timecodeId]: { status: 'draft'|'pending'|'published', slug: string } }
+ *   articleStatuses: { [timecodeId]: { status, slug, hasTranslation } }
  */
 const useArticleStatus = (episodeSlug, lang) => {
   const [articleStatuses, setArticleStatuses] = useState({});
@@ -29,7 +30,6 @@ const useArticleStatus = (episodeSlug, lang) => {
       }
 
       // 2. Get timecodes for this episode filtered by lang
-      //    so IDs match the question IDs displayed in QuestionsManager
       let query = supabase
         .from('timecodes')
         .select('id, time')
@@ -47,16 +47,35 @@ const useArticleStatus = (episodeSlug, lang) => {
         return;
       }
 
-      // 3. Match articles to timecodes by question_time === time
+      // 3. Get translation statuses for all articles in this episode
+      const articleIds = articles.map(a => a.id);
+      const { data: translations, error: transError } = await supabase
+        .from('article_translations')
+        .select('article_id, language_code')
+        .in('article_id', articleIds);
+
+      if (transError) {
+        console.error('[useArticleStatus] Error fetching translations:', transError);
+      }
+
+      // Build a set of article IDs that have translation in current lang
+      const translatedArticleIds = new Set(
+        (translations || [])
+          .filter(t => t.language_code === lang)
+          .map(t => t.article_id)
+      );
+
+      // 4. Match articles to timecodes by question_time === time
       const statusMap = {};
       for (const article of articles) {
         if (article.question_time == null) continue;
-        // Use loose equality (==) to handle int vs float type mismatches
         const matchingTimecodes = timecodes?.filter(tc => Number(tc.time) === Number(article.question_time)) || [];
+        const hasTranslation = translatedArticleIds.has(article.id);
         for (const tc of matchingTimecodes) {
           statusMap[tc.id] = {
             status: article.status || 'draft',
-            slug: article.slug
+            slug: article.slug,
+            hasTranslation
           };
         }
       }
