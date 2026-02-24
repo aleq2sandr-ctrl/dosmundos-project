@@ -868,6 +868,8 @@
   "status_pending": "На проверке",
   "status_published": "Опубликовано",
   "save_draft": "Сохранить",
+  "save_as_draft": "Сохранить как черновик",
+  "article_status": "Статус статьи",
   "submit_for_review": "На проверку",
   "publish": "Опубликовать",
   "unpublish": "Снять с публикации",

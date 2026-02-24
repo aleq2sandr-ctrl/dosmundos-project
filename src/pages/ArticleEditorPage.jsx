@@ -385,7 +385,16 @@ const MiniPlayer = ({ audioUrl, episodeSlug, questionTime, questionEndTime, lang
   const togglePlay = () => {
     const audio = audioRef.current;
     if (!audio) return;
-    if (isPlaying) { audio.pause(); } else { audio.play(); }
+    if (isPlaying) {
+      audio.pause();
+    } else {
+      // Reset speed to 1x when pressing play
+      if (playbackRate !== 1) {
+        setPlaybackRate(1);
+        audio.playbackRate = 1;
+      }
+      audio.play();
+    }
   };
 
   const skip = (sec) => {
@@ -428,7 +437,16 @@ const MiniPlayer = ({ audioUrl, episodeSlug, questionTime, questionEndTime, lang
           {[1.5, 2, 3].map(rate => (
             <button
               key={rate}
-              onClick={() => setPlaybackRate(rate)}
+              onClick={() => {
+                // If already at this rate, toggle off (return to 1x)
+                if (playbackRate === rate) {
+                  setPlaybackRate(1);
+                  if (audioRef.current) audioRef.current.playbackRate = 1;
+                } else {
+                  setPlaybackRate(rate);
+                  if (audioRef.current) audioRef.current.playbackRate = rate;
+                }
+              }}
               className={`px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors ${
                 playbackRate === rate
                   ? 'bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300'
@@ -493,7 +511,12 @@ const BottomSettingsPanel = ({
   translationStatusByLang,
   translatingLang,
   onTranslateLanguage,
-  lang
+  lang,
+  status,
+  onSaveStatus,
+  saving,
+  canPublish,
+  onDelete
 }) => {
   return (
     <div className="mx-auto max-w-4xl px-2 mt-4">
@@ -739,6 +762,79 @@ const BottomSettingsPanel = ({
                 )}
               </div>
             )}
+        </div>
+
+        {/* Status selection panel */}
+        <div className="mt-4 bg-white dark:bg-slate-800/80 rounded-2xl border border-slate-200/80 dark:border-slate-700/50 shadow-sm overflow-hidden">
+          <div className="p-5">
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-4">
+              {getLocaleString('article_status', lang) || 'Article Status'}
+            </label>
+            <div className="flex flex-col sm:flex-row gap-3">
+              {/* Save as Draft */}
+              <button
+                onClick={() => onSaveStatus('draft')}
+                disabled={saving}
+                className="flex-1 px-4 py-3 rounded-lg font-medium text-sm transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50"
+                style={{
+                  backgroundColor: status === 'draft' ? '#fef08a' : '#fef3c7',
+                  color: '#b45309',
+                  border: '1px solid #fbcf33'
+                }}
+              >
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileEdit className="w-4 h-4" />}
+                <span>{getLocaleString('save_as_draft', lang) || 'Save as Draft'}</span>
+              </button>
+
+              {/* Submit for Review */}
+              {status !== 'published' && status !== 'pending' && (
+                <button
+                  onClick={() => onSaveStatus('pending')}
+                  disabled={saving}
+                  className="flex-1 px-4 py-3 rounded-lg font-medium text-sm transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50"
+                  style={{
+                    backgroundColor: status === 'pending' ? '#fed7aa' : '#fedd5e',
+                    color: '#92400e',
+                    border: '1px solid #f59e0b'
+                  }}
+                >
+                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  <span>{getLocaleString('submit_for_review', lang) || 'Submit for Review'}</span>
+                </button>
+              )}
+
+              {/* Publish */}
+              {canPublish && (
+                <button
+                  onClick={() => onSaveStatus('published')}
+                  disabled={saving}
+                  className="flex-1 px-4 py-3 rounded-lg font-medium text-sm transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 text-white"
+                  style={{
+                    backgroundColor: status === 'published' ? '#059669' : '#10b981',
+                    border: '1px solid #059669'
+                  }}
+                >
+                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4" />}
+                  <span>{getLocaleString('publish', lang) || 'Publish'}</span>
+                </button>
+              )}
+
+              {/* Delete */}
+              {articleSlug && (
+                <button
+                  onClick={onDelete}
+                  disabled={saving}
+                  className="flex-1 px-4 py-3 rounded-lg font-medium text-sm transition-all duration-200 flex items-center justify-center gap-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 disabled:opacity-50"
+                  style={{
+                    border: '1px solid #fca5a5'
+                  }}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>{getLocaleString('delete', lang) || 'Delete'}</span>
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -1737,7 +1833,7 @@ const ArticleEditorPage = () => {
       `}</style>
       <div className="mx-auto max-w-4xl px-2 mt-4" onClick={handleTimecodeClick}>
         <div className="bg-white dark:bg-slate-800/60 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-700/50 overflow-hidden min-h-[60vh]">
-          <EditorContent editor={editor} />
+          <EditorContent editor={editor} spellCheck="false" />
         </div>
       </div>
 
@@ -1767,6 +1863,11 @@ const ArticleEditorPage = () => {
         translatingLang={translatingLang}
         onTranslateLanguage={handleTranslateLanguage}
         lang={lang}
+        status={status}
+        onSaveStatus={handleSave}
+        saving={saving}
+        canPublish={canPublish}
+        onDelete={() => setShowDeleteConfirm(true)}
       />
 
       <div className="h-32" />

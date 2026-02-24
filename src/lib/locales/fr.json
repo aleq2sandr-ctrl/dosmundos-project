@@ -886,6 +886,8 @@
   "status_pending": "En attente",
   "status_published": "Publié",
   "save_draft": "Enregistrer",
+  "save_as_draft": "Enregistrer comme brouillon",
+  "article_status": "Statut de l'article",
   "submit_for_review": "Soumettre pour révision",
   "publish": "Publier",
   "unpublish": "Dépublier",

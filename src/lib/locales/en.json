@@ -935,6 +935,8 @@
   "status_pending": "Under review",
   "status_published": "Published",
   "save_draft": "Save",
+  "save_as_draft": "Save as Draft",
+  "article_status": "Article Status",
   "submit_for_review": "Submit for review",
   "publish": "Publish",
   "unpublish": "Unpublish",

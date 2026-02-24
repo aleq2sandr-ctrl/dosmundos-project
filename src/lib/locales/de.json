@@ -886,6 +886,8 @@
   "status_pending": "In Prüfung",
   "status_published": "Veröffentlicht",
   "save_draft": "Speichern",
+  "save_as_draft": "Als Entwurf speichern",
+  "article_status": "Artikelstatus",
   "submit_for_review": "Zur Prüfung senden",
   "publish": "Veröffentlichen",
   "unpublish": "Zurückziehen",

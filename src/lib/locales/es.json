@@ -897,6 +897,8 @@
   "status_pending": "En revisión",
   "status_published": "Publicado",
   "save_draft": "Guardar",
+  "save_as_draft": "Guardar como borrador",
+  "article_status": "Estado del artículo",
   "submit_for_review": "Enviar a revisión",
   "publish": "Publicar",
   "unpublish": "Despublicar",
