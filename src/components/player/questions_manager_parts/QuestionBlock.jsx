@@ -76,7 +76,7 @@ const QuestionBlockHeader = ({
             <TooltipTrigger asChild>
               <button
                 onClick={(e) => { e.stopPropagation(); onArticleAction?.('view'); }}
-                className="shrink-0 text-green-400 hover:text-green-300 transition-colors p-1"
+                className="shrink-0 text-white hover:text-slate-200 transition-colors p-1"
                 aria-label={getLocaleString('article_published', currentLanguage)}
               >
                 <FileCheck className="h-4 w-4" />
@@ -116,7 +116,7 @@ const QuestionBlockHeader = ({
           </Tooltip>
         )}
         {/* Create article — editors only */}
-        {isAuthenticated && !articleStatus && !question.is_full_transcript && !question.is_intro && (
+        {isAuthenticated && isEditMode && !articleStatus && !question.is_full_transcript && !question.is_intro && (
           <Tooltip>
             <TooltipTrigger asChild>
               <button
