@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import ArticleEditorPage from '@/pages/ArticleEditorPage';
 import { useEditorAuth } from '@/contexts/EditorAuthContext';
-import { getCategories, getArticle, createDraftFromQuestion, saveArticle } from '@/services/articleService';
+import { getCategories, getArticle, createDraftFromQuestion, saveArticle, getArticleTranslationStatuses, ensureArticleTranslationLink } from '@/services/articleService';
 
 // Mock dependencies
 vi.mock('@/contexts/EditorAuthContext');
@@ -45,12 +45,12 @@ describe('ArticleEditorPage', () => {
     // Reset all mocks
     vi.clearAllMocks();
     
-    // Mock authenticated user
+    // Mock authenticated user with publish permissions
     useEditorAuth.mockReturnValue({
       editor: {
         id: '1',
         name: 'Test Editor',
-        email: 'test@example.com'
+        email: 'perudosmundosperu@gmail.com' // This email has publish permissions
       },
       isAuthenticated: true,
       openAuthModal: vi.fn()

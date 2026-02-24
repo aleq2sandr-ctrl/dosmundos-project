@@ -721,7 +721,7 @@ const BottomSettingsPanel = ({
                     {getLocaleString('translations_deepseek', lang)}
                   </label>
                   <span className="text-[11px] text-emerald-700/80 dark:text-emerald-300/80">
-                    {getLocaleString('source_lang', lang, { lang: lang.toUpperCase() })}
+                    {getLocaleString('source_lang', lang, { lang: (lang || 'ru').toUpperCase() })}
                   </span>
                 </div>
 
