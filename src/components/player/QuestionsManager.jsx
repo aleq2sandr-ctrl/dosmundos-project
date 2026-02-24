@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import QuestionBlock from '@/components/player/questions_manager_parts/QuestionBlock.jsx';
 import useArticleStatus from '@/hooks/useArticleStatus';
 import { createDraftFromQuestion } from '@/services/articleService';
@@ -40,6 +40,7 @@ const QuestionsManager = ({
   const [activeQuestionId, setActiveQuestionId] = useState(null);
   const [expandedById, setExpandedById] = useState({});
   const navigate = useNavigate();
+  const location = useLocation();
   const { editor: editorAuth, isAuthenticated } = useEditorAuth();
 
   const langForContent = episodeLang === 'all' ? currentLanguage : episodeLang;
@@ -126,11 +127,13 @@ const QuestionsManager = ({
   // Handle article actions from QuestionBlock icons
   const handleArticleAction = useCallback((question, action) => {
     const status = articleStatuses[question.id];
+    const playerReturnTo = `${location.pathname}${location.search}${location.hash || ''}`;
+    const playerNavState = { fromPlayer: true, returnTo: playerReturnTo };
     
     if (action === 'view' && status?.slug) {
-      navigate(`/${currentLanguage}/articles/${status.slug}`);
+      navigate(`/${currentLanguage}/articles/${status.slug}`, { state: playerNavState });
     } else if (action === 'edit' && status?.slug) {
-      navigate(`/${currentLanguage}/articles/${status.slug}/edit`);
+      navigate(`/${currentLanguage}/articles/${status.slug}/edit`, { state: playerNavState });
     } else if (action === 'create') {
       // Get time range for this question
       const sorted = [...questions].sort((a, b) => a.time - b.time);
@@ -165,9 +168,11 @@ const QuestionsManager = ({
       navigate({
         pathname: `/${currentLanguage}/articles/new/edit`,
         search: search.toString()
+      }, {
+        state: playerNavState
       });
     }
-  }, [articleStatuses, currentLanguage, navigate, questions, duration, transcriptUtterances, episodeSlug]);
+  }, [articleStatuses, currentLanguage, navigate, questions, duration, transcriptUtterances, episodeSlug, location.pathname, location.search, location.hash]);
 
   const displayableQuestions = useMemo(() => {
     if (!Array.isArray(questions)) return [];

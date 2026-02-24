@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { getLocaleString, getPluralizedLocaleString } from '@/lib/locales';
 import { supabase } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
@@ -34,7 +34,7 @@ const getCategoryColor = (cat) => {
 // ═══════════════════════════════════════════════════════════════════════════════
 // SEGMENT AUDIO PLAYER – shows only the question's time range
 // ═══════════════════════════════════════════════════════════════════════════════
-const ArticleSegmentPlayer = ({ audioUrl, questionTime, questionEndTime, episodeSlug, lang, articleId, isAuthenticated, navigate }) => {
+const ArticleSegmentPlayer = ({ audioUrl, questionTime, questionEndTime, episodeSlug, lang, articleId, isAuthenticated, onEditArticle }) => {
   const audioRef = useRef(null);
   const progressRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -170,7 +170,7 @@ const ArticleSegmentPlayer = ({ audioUrl, questionTime, questionEndTime, episode
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => navigate(`/${lang}/articles/${articleId}/edit`)}
+            onClick={onEditArticle}
             className="text-purple-500 hover:text-purple-700 h-7 px-2 text-xs"
           >
             <Edit className="h-3.5 w-3.5 mr-1" />
@@ -185,6 +185,7 @@ const ArticleSegmentPlayer = ({ audioUrl, questionTime, questionEndTime, episode
 const ArticleDetailPage = () => {
   const { lang, articleId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [article, setArticle] = useState(null);
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(true);
@@ -193,6 +194,26 @@ const ArticleDetailPage = () => {
   // Question audio player state
   const [questionAudioUrl, setQuestionAudioUrl] = useState(null);
   const [questionData, setQuestionData] = useState(null); // { episodeSlug, questionTime, questionEndTime }
+  const backToPlayer = location.state?.fromPlayer && typeof location.state?.returnTo === 'string'
+    ? location.state.returnTo
+    : null;
+
+  const navigateToEditor = useCallback(() => {
+    const to = `/${lang}/articles/${articleId}/edit`;
+    if (backToPlayer) {
+      navigate(to, { state: { fromPlayer: true, returnTo: backToPlayer } });
+      return;
+    }
+    navigate(to);
+  }, [navigate, lang, articleId, backToPlayer]);
+
+  const handleBack = useCallback(() => {
+    if (backToPlayer) {
+      navigate(backToPlayer);
+      return;
+    }
+    navigate(`/${lang}/articles`);
+  }, [navigate, backToPlayer, lang]);
 
   // Scroll to top when article or language changes
   useEffect(() => {
@@ -431,12 +452,14 @@ const ArticleDetailPage = () => {
   return (
     <div className="min-h-screen bg-[#fdfbf7] text-slate-900 font-serif">
       <div className="container mx-auto px-4 py-12 max-w-3xl">
-        <Link to={`/${lang}/articles`}>
-          <Button variant="ghost" className="text-slate-500 mb-8 gap-2 pl-0 hover:text-slate-900 hover:bg-transparent transition-colors group font-sans">
-            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-            {getLocaleString('back_to_articles', lang)}
-          </Button>
-        </Link>
+        <Button
+          variant="ghost"
+          onClick={handleBack}
+          className="text-slate-500 mb-8 gap-2 pl-0 hover:text-slate-900 hover:bg-transparent transition-colors group font-sans"
+        >
+          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+          {getLocaleString('back_to_articles', lang)}
+        </Button>
 
         <article className="animate-in fade-in slide-in-from-bottom-4 duration-700">
           <header className="mb-10 text-center">
@@ -513,7 +536,7 @@ const ArticleDetailPage = () => {
               lang={lang}
               articleId={articleId}
               isAuthenticated={isAuthenticated}
-              navigate={navigate}
+              onEditArticle={navigateToEditor}
             />
           )}
 
@@ -523,7 +546,7 @@ const ArticleDetailPage = () => {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => navigate(`/${lang}/articles/${articleId}/edit`)}
+                onClick={navigateToEditor}
                 className="text-purple-600 border-purple-200 hover:bg-purple-50 font-sans"
               >
                 <Edit className="h-4 w-4 mr-1" />
@@ -628,7 +651,7 @@ const ArticleDetailPage = () => {
               <div className="flex gap-4">
                 <Button
                   variant="outline"
-                  onClick={() => navigate(`/${lang}/articles/${articleId}/edit`)}
+                  onClick={navigateToEditor}
                   className="text-purple-600 border-purple-200 hover:bg-purple-50"
                 >
                   <Edit className="w-4 h-4 mr-2" />

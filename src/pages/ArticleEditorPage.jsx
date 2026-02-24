@@ -1,5 +1,5 @@
  import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, useLocation, Link } from 'react-router-dom';
 import { useEditor, EditorContent } from '@tiptap/react';
 import { DOMSerializer } from '@tiptap/pm/model';
 import StarterKit from '@tiptap/starter-kit';
@@ -879,6 +879,7 @@ const ArticleEditorPage = () => {
   const { lang, articleId } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const { editor: editorAuth, isAuthenticated, isLoading: authLoading, openAuthModal } = useEditorAuth();
 
@@ -909,6 +910,9 @@ const ArticleEditorPage = () => {
   const [articleDate, setArticleDate] = useState('');
 
   const isNew = articleId === 'new';
+  const backToPlayer = location.state?.fromPlayer && typeof location.state?.returnTo === 'string'
+    ? location.state.returnTo
+    : null;
   const editorRef = useRef(null);
   const pendingContentRef = useRef(null);
   const articleAudioRef = useRef(null);
@@ -1292,7 +1296,7 @@ const ArticleEditorPage = () => {
         }
 
         // Navigate to edit URL with real slug
-        navigate(`/${lang}/articles/${result.data.slug}/edit`, { replace: true });
+        navigate(`/${lang}/articles/${result.data.slug}/edit`, { replace: true, state: location.state });
       } else {
         // Update existing
         const slug = articleSlug || articleId;
@@ -1323,7 +1327,7 @@ const ArticleEditorPage = () => {
     } finally {
       setSaving(false);
     }
-  }, [editor, title, summary, youtubeUrl, imageUrl, selectedCategories, status, articleSlug, articleId, isNew, questionInfo, lang, editorAuth, navigate, toast, canPublish]);
+  }, [editor, title, summary, youtubeUrl, imageUrl, selectedCategories, status, articleSlug, articleId, isNew, questionInfo, lang, editorAuth, navigate, toast, canPublish, location.state]);
 
   // ─── Delete handler ───────────────────────────────────────────────
   const handleDelete = useCallback(async () => {
@@ -1363,12 +1367,12 @@ const ArticleEditorPage = () => {
     if (result.success) {
       setArticleSlug(result.slug);
       localStorage.removeItem(`article_draft_${oldSlug}`);
-      navigate(`/${lang}/articles/${result.slug}/edit`, { replace: true });
+      navigate(`/${lang}/articles/${result.slug}/edit`, { replace: true, state: location.state });
       toast({ title: getLocaleString('url_updated', lang) });
     } else {
       toast({ title: result.error || 'Error updating slug', variant: 'destructive' });
     }
-  }, [articleSlug, articleId, lang, navigate, toast]);
+  }, [articleSlug, articleId, lang, navigate, toast, location.state]);
 
   // ─── Handle time change from player ───────────────────────────────
   const handleTimeChange = useCallback((which, newSec) => {
@@ -1638,6 +1642,10 @@ const ArticleEditorPage = () => {
           <button
             onClick={() => {
               if (hasUnsaved && !window.confirm(getLocaleString('unsaved_changes', lang))) return;
+              if (backToPlayer) {
+                navigate(backToPlayer);
+                return;
+              }
               navigate(`/${lang}/articles`);
             }}
             className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-all shrink-0"
