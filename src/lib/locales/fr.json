@@ -920,5 +920,16 @@
   "auth_required_for_editing": "Connexion requise pour modifier",
   "login": "Se connecter",
   "preview": "Aperçu",
-  "all": "Tous"
+  "all": "Tous",
+  "delete": "Supprimer",
+  "delete_article": "Supprimer l'article",
+  "delete_article_confirm": "Êtes-vous sûr de vouloir supprimer cet article ? Cette action est irréversible.",
+  "article_deleted": "Article supprimé",
+  "login_as_editor": "Se connecter comme éditeur",
+  "edit_article": "Modifier",
+  "manage_drafts": "Brouillons",
+  "drafts_title": "Brouillons & En attente",
+  "drafts_subtitle": "Gérer les articles non publiés",
+  "drafts_empty": "Aucun brouillon ou article en attente",
+  "login_required_drafts": "Connectez-vous pour gérer les brouillons"
 }

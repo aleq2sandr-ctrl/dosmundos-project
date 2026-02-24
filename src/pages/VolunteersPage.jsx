@@ -449,57 +449,58 @@ const VolunteersPage = () => {
         </div>
 
         {/* Photo Gallery */}
-        <div className="space-y-8">
-          <div className="flex flex-col gap-6">
+        <div className="space-y-6">
+          <h2 className="text-2xl font-bold text-white text-center">Галерея</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0, scale: 0.95 }}
+              whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true }}
-              className="overflow-hidden rounded-2xl border border-white/10"
+              className="overflow-hidden rounded-xl border border-white/10 aspect-square bg-slate-800/30"
             >
               <img 
                 src="/images/volunteers/volunteer1.png" 
                 alt="Центр Дос Мундос" 
-                className="w-full h-auto max-h-[500px] object-contain rounded-2xl hover:scale-105 transition-transform duration-300"
+                className="w-full h-full object-cover"
               />
             </motion.div>
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0, scale: 0.95 }}
+              whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true }}
               transition={{ delay: 0.1 }}
-              className="overflow-hidden rounded-2xl border border-white/10"
+              className="overflow-hidden rounded-xl border border-white/10 aspect-square bg-slate-800/30"
             >
               <img 
                 src="/images/volunteers/volunteer2.jpg" 
                 alt="Ферма и животные" 
-                className="w-full h-auto max-h-[500px] object-contain rounded-2xl hover:scale-105 transition-transform duration-300"
+                className="w-full h-full object-cover"
               />
             </motion.div>
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0, scale: 0.95 }}
+              whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true }}
               transition={{ delay: 0.2 }}
-              className="overflow-hidden rounded-2xl border border-white/10"
+              className="overflow-hidden rounded-xl border border-white/10 aspect-square bg-slate-800/30"
             >
               <img 
                 src="/images/volunteers/volunteer3.jpg" 
                 alt="Природа Амазонии" 
-                className="w-full h-auto max-h-[500px] object-contain rounded-2xl hover:scale-105 transition-transform duration-300"
+                className="w-full h-full object-cover"
               />
             </motion.div>
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0, scale: 0.95 }}
+              whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true }}
               transition={{ delay: 0.3 }}
-              className="overflow-hidden rounded-2xl border border-white/10"
+              className="overflow-hidden rounded-xl border border-white/10 aspect-square bg-slate-800/30"
             >
               <img 
                 src="/images/volunteers/volunteer4.jpg" 
                 alt="Сообщество волонтеров" 
-                className="w-full h-auto max-h-[500px] object-contain rounded-2xl hover:scale-105 transition-transform duration-300"
+                className="w-full h-full object-cover"
               />
             </motion.div>
           </div>

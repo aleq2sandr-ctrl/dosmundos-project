@@ -920,5 +920,16 @@
   "auth_required_for_editing": "Zum Bearbeiten ist eine Anmeldung erforderlich",
   "login": "Anmelden",
   "preview": "Vorschau",
-  "all": "Alle"
+  "all": "Alle",
+  "delete": "Löschen",
+  "delete_article": "Artikel löschen",
+  "delete_article_confirm": "Sind Sie sicher, dass Sie diesen Artikel löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.",
+  "article_deleted": "Artikel gelöscht",
+  "login_as_editor": "Als Redakteur anmelden",
+  "edit_article": "Bearbeiten",
+  "manage_drafts": "Entwürfe",
+  "drafts_title": "Entwürfe & Ausstehend",
+  "drafts_subtitle": "Unveröffentlichte Artikel verwalten",
+  "drafts_empty": "Keine Entwürfe oder ausstehende Artikel",
+  "login_required_drafts": "Melden Sie sich an, um Entwürfe zu verwalten"
 }

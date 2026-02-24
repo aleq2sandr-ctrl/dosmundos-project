@@ -130,7 +130,6 @@ export const EditorAuthProvider = ({ children }) => {
         id: data.id,
         email: data.email,
         name: data.name,
-        role: data.role || 'editor',
         loginTime: new Date().toISOString()
       };
 
@@ -173,7 +172,6 @@ export const EditorAuthProvider = ({ children }) => {
           id: data.id,
           email: data.email,
           name: data.name,
-          role: data.role || 'editor',
           loginTime: editor.loginTime,
           isActive: data.is_active,
           lastLogin: data.last_login
@@ -187,7 +185,6 @@ export const EditorAuthProvider = ({ children }) => {
   const value = {
     editor,
     isAuthenticated: !!editor,
-    isAdmin: editor?.role === 'admin',
     isLoading,
     login,
     logout,

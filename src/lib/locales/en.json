@@ -969,5 +969,16 @@
   "auth_required_for_editing": "Authorization required for editing",
   "login": "Log in",
   "preview": "Preview",
-  "all": "All"
+  "all": "All",
+  "delete": "Delete",
+  "delete_article": "Delete article",
+  "delete_article_confirm": "Are you sure you want to delete this article? This action cannot be undone.",
+  "article_deleted": "Article deleted",
+  "login_as_editor": "Login as editor",
+  "edit_article": "Edit",
+  "manage_drafts": "Drafts",
+  "drafts_title": "Drafts & Pending Review",
+  "drafts_subtitle": "Manage unpublished articles",
+  "drafts_empty": "No drafts or pending articles",
+  "login_required_drafts": "Log in to manage drafts"
 }

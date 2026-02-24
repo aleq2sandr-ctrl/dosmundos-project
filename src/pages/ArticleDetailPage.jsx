@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { getLocaleString, getPluralizedLocaleString } from '@/lib/locales';
 import { supabase } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, User, Youtube, Clock, Calendar, Radio, Play, Pause, Edit } from 'lucide-react';
-import { calculateReadingTime, formatArticleDate } from '@/lib/utils';
+import { ArrowLeft, User, Youtube, Clock, Calendar, Radio, Play, Pause, Edit, RotateCcw, RotateCw } from 'lucide-react';
+import { calculateReadingTime, formatArticleDate, formatTime } from '@/lib/utils';
 import { updateMetaTags, resetMetaTags } from '@/lib/updateMetaTags';
 import { useEditorAuth } from '@/contexts/EditorAuthContext';
 import { getEpisodeAudioUrl } from '@/services/articleService';
@@ -31,19 +31,168 @@ const getCategoryColor = (cat) => {
   return categoryColorsBySlug.default;
 };
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// SEGMENT AUDIO PLAYER – shows only the question's time range
+// ═══════════════════════════════════════════════════════════════════════════════
+const ArticleSegmentPlayer = ({ audioUrl, questionTime, questionEndTime, episodeSlug, lang, articleId, isAuthenticated, navigate }) => {
+  const audioRef = useRef(null);
+  const progressRef = useRef(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+
+  const startSec = questionTime || 0;
+  const endSec = questionEndTime || duration || 0;
+  const segmentDuration = Math.max(0, endSec - startSec);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const onTime = () => {
+      const rel = audio.currentTime - startSec;
+      setCurrentTime(rel);
+      if (questionEndTime && audio.currentTime >= questionEndTime) {
+        audio.pause();
+        setIsPlaying(false);
+      }
+    };
+    const onMeta = () => setDuration(audio.duration);
+    const onEnd = () => setIsPlaying(false);
+    const onPause = () => setIsPlaying(false);
+    const onPlay = () => setIsPlaying(true);
+    audio.addEventListener('timeupdate', onTime);
+    audio.addEventListener('loadedmetadata', onMeta);
+    audio.addEventListener('ended', onEnd);
+    audio.addEventListener('pause', onPause);
+    audio.addEventListener('play', onPlay);
+    return () => {
+      audio.removeEventListener('timeupdate', onTime);
+      audio.removeEventListener('loadedmetadata', onMeta);
+      audio.removeEventListener('ended', onEnd);
+      audio.removeEventListener('pause', onPause);
+      audio.removeEventListener('play', onPlay);
+    };
+  }, [startSec, questionEndTime]);
+
+  const togglePlay = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (isPlaying) {
+      audio.pause();
+    } else {
+      // If before segment or after segment, seek to start
+      if (audio.currentTime < startSec || (questionEndTime && audio.currentTime >= questionEndTime)) {
+        audio.currentTime = startSec;
+      }
+      audio.play().catch(() => {});
+    }
+  }, [isPlaying, startSec, questionEndTime]);
+
+  const skip = useCallback((sec) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.currentTime = Math.max(startSec, Math.min(audio.currentTime + sec, endSec || audio.duration));
+  }, [startSec, endSec]);
+
+  const handleProgressClick = useCallback((e) => {
+    if (!progressRef.current || !audioRef.current) return;
+    const rect = progressRef.current.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    audioRef.current.currentTime = startSec + ratio * segmentDuration;
+  }, [startSec, segmentDuration]);
+
+  const progress = segmentDuration > 0 ? Math.max(0, Math.min(100, (currentTime / segmentDuration) * 100)) : 0;
+
+  return (
+    <div className="mb-8 rounded-xl border border-purple-200/60 bg-purple-50/60 overflow-hidden font-sans">
+      <audio ref={audioRef} src={audioUrl} preload="metadata" />
+
+      {/* Controls row */}
+      <div className="flex items-center gap-2.5 px-4 py-3">
+        {/* Skip back */}
+        <button onClick={() => skip(-10)} className="p-1 rounded-lg text-purple-400 hover:text-purple-700 transition-colors" title="-10s">
+          <RotateCcw className="w-4 h-4" />
+        </button>
+
+        {/* Play / Pause */}
+        <button
+          onClick={togglePlay}
+          className="shrink-0 h-9 w-9 rounded-full bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center transition-colors active:scale-95"
+        >
+          {isPlaying ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5 ml-0.5" />}
+        </button>
+
+        {/* Skip forward */}
+        <button onClick={() => skip(10)} className="p-1 rounded-lg text-purple-400 hover:text-purple-700 transition-colors" title="+10s">
+          <RotateCw className="w-4 h-4" />
+        </button>
+
+        {/* Time current */}
+        <span className="text-xs font-mono text-purple-600 tabular-nums min-w-[36px] text-right">
+          {formatTime(Math.max(0, currentTime))}
+        </span>
+
+        {/* Progress bar */}
+        <div
+          ref={progressRef}
+          onClick={handleProgressClick}
+          className="flex-1 h-1.5 bg-purple-200/80 rounded-full cursor-pointer group relative"
+        >
+          <div
+            className="h-full bg-purple-500 rounded-full transition-[width] duration-100 relative"
+            style={{ width: `${progress}%` }}
+          >
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-white rounded-full shadow-sm border-2 border-purple-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+          </div>
+        </div>
+
+        {/* Time total */}
+        <span className="text-xs font-mono text-purple-400 tabular-nums min-w-[36px]">
+          {formatTime(Math.max(0, segmentDuration))}
+        </span>
+      </div>
+
+      {/* Bottom links row */}
+      <div className="flex items-center gap-3 px-4 pb-3 -mt-0.5">
+        <Link
+          to={`/${lang}/${episodeSlug}`}
+          className="flex items-center gap-1.5 text-xs text-purple-600 hover:text-purple-800 transition-colors"
+        >
+          <Radio className="h-3.5 w-3.5" />
+          <span className="border-b border-transparent hover:border-purple-400">
+            {getLocaleString('listen_answer_on_air', lang)}
+          </span>
+        </Link>
+
+        <span className="flex-1" />
+
+        {isAuthenticated && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate(`/${lang}/articles/${articleId}/edit`)}
+            className="text-purple-500 hover:text-purple-700 h-7 px-2 text-xs"
+          >
+            <Edit className="h-3.5 w-3.5 mr-1" />
+            {getLocaleString('edit', lang)}
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const ArticleDetailPage = () => {
   const { lang, articleId } = useParams();
   const navigate = useNavigate();
   const [article, setArticle] = useState(null);
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(true);
-  const { isAuthenticated } = useEditorAuth();
+  const { isAuthenticated, openAuthModal } = useEditorAuth();
   
   // Question audio player state
   const [questionAudioUrl, setQuestionAudioUrl] = useState(null);
   const [questionData, setQuestionData] = useState(null); // { episodeSlug, questionTime, questionEndTime }
-  const [isPlaying, setIsPlaying] = useState(false);
-  const audioRef = useRef(null);
 
   // Scroll to top when article or language changes
   useEffect(() => {
@@ -112,9 +261,7 @@ const ArticleDetailPage = () => {
             });
             const audioUrl = await getEpisodeAudioUrl(newArticleData.episode_slug, lang);
             if (audioUrl) {
-              const startT = newArticleData.question_time;
-              const endT = newArticleData.question_end_time;
-              setQuestionAudioUrl(endT ? `${audioUrl}#t=${startT},${endT}` : `${audioUrl}#t=${startT}`);
+              setQuestionAudioUrl(audioUrl);
             }
           }
 
@@ -358,56 +505,16 @@ const ArticleDetailPage = () => {
 
           {/* Question audio player & link to episode */}
           {questionData && questionAudioUrl && (
-            <div className="mb-8 p-4 bg-purple-50/80 border border-purple-200/50 rounded-xl">
-              <div className="flex items-center gap-3 mb-2">
-                <button
-                  onClick={() => {
-                    if (!audioRef.current) return;
-                    if (isPlaying) audioRef.current.pause();
-                    else audioRef.current.play();
-                    setIsPlaying(!isPlaying);
-                  }}
-                  className="shrink-0 h-10 w-10 rounded-full bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center transition-colors"
-                >
-                  {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 ml-0.5" />}
-                </button>
-                
-                <div className="flex-1">
-                  <Link
-                    to={`/${lang}/${questionData.episodeSlug}`}
-                    className="flex items-center gap-2 text-sm text-purple-700 hover:text-purple-900 transition-colors font-sans"
-                  >
-                    <Radio className="h-4 w-4" />
-                    <span className="border-b border-transparent hover:border-purple-500">
-                      {getLocaleString('listen_answer_on_air', lang)}
-                    </span>
-                    <span className="text-xs text-purple-500">({questionData.episodeSlug})</span>
-                  </Link>
-                </div>
-
-                {isAuthenticated && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => navigate(`/${lang}/articles/${articleId}/edit`)}
-                    className="text-purple-600 hover:text-purple-800 font-sans"
-                  >
-                    <Edit className="h-4 w-4 mr-1" />
-                    {getLocaleString('edit', lang)}
-                  </Button>
-                )}
-              </div>
-              
-              <audio
-                ref={audioRef}
-                src={questionAudioUrl}
-                onEnded={() => setIsPlaying(false)}
-                onPause={() => setIsPlaying(false)}
-                onPlay={() => setIsPlaying(true)}
-                className="w-full h-8"
-                controls
-              />
-            </div>
+            <ArticleSegmentPlayer
+              audioUrl={questionAudioUrl}
+              questionTime={questionData.questionTime}
+              questionEndTime={questionData.questionEndTime}
+              episodeSlug={questionData.episodeSlug}
+              lang={lang}
+              articleId={articleId}
+              isAuthenticated={isAuthenticated}
+              navigate={navigate}
+            />
           )}
 
           {/* Edit button for authenticated editors (articles without question link) */}
@@ -433,16 +540,87 @@ const ArticleDetailPage = () => {
               <div className="h-4 bg-slate-200 rounded w-2/3 mb-4"></div>
             </div>
           }>
-            <div className="prose prose-xl max-w-none text-justify
+            <style>{`
+              .article-body p {
+                margin: 0;
+                text-indent: 1.8em;
+              }
+              .article-body p + p {
+                margin-top: 1.05em;
+              }
+              .question-block {
+                position: relative;
+                margin: 1.8em 0;
+                padding: 1.4em 1.6em 1.4em 1.8em;
+                background: #fffbeb;
+                border: 1px solid #fde68a;
+                border-radius: 12px;
+                color: #78350f;
+              }
+              .question-block::before {
+                content: '?';
+                position: absolute;
+                top: -0.15em;
+                left: 0.15em;
+                font-size: 3em;
+                line-height: 1;
+                color: rgba(217, 119, 6, 0.15);
+                font-family: Georgia, serif;
+                font-weight: 700;
+                pointer-events: none;
+              }
+              .question-block p {
+                margin: 0.2em 0;
+                color: #78350f;
+                font-weight: 500;
+                font-size: 1.1em;
+                line-height: 1.6;
+                font-style: italic;
+                text-indent: 0;
+              }
+            `}</style>
+            <div className="article-body prose prose-xl max-w-none text-justify
               prose-headings:font-serif prose-headings:text-slate-900 prose-headings:font-bold
               prose-p:text-slate-800 prose-p:leading-loose prose-p:font-serif prose-p:indent-8 prose-p:mb-4
               prose-a:text-purple-700 prose-a:no-underline hover:prose-a:text-purple-900 hover:prose-a:underline
               prose-strong:text-slate-900 prose-strong:font-semibold
               prose-ul:text-slate-800 prose-ol:text-slate-800
-              prose-blockquote:border-l-slate-900 prose-blockquote:bg-slate-50 prose-blockquote:py-2 prose-blockquote:px-6 prose-blockquote:rounded-r-lg prose-blockquote:not-italic prose-blockquote:text-slate-700">
+              prose-blockquote:border-l-4 prose-blockquote:border-l-purple-500 prose-blockquote:bg-gradient-to-br prose-blockquote:from-purple-50 prose-blockquote:to-purple-100/50 prose-blockquote:py-4 prose-blockquote:px-6 prose-blockquote:rounded-r-xl prose-blockquote:not-italic prose-blockquote:text-purple-900 prose-blockquote:font-medium prose-blockquote:shadow-sm">
               <LazyArticleContent htmlContent={content} />
             </div>
           </Suspense>
+
+          {/* Editor Actions (Bottom) */}
+          <div className="mt-12 pt-8 border-t border-slate-200 flex justify-center font-sans">
+            {!isAuthenticated ? (
+              <Button
+                variant="ghost"
+                onClick={openAuthModal}
+                className="text-slate-400 hover:text-slate-600 text-sm"
+              >
+                <User className="w-4 h-4 mr-2" />
+                {getLocaleString('login_as_editor', lang) || 'Login as editor'}
+              </Button>
+            ) : (
+              <div className="flex gap-4">
+                <Button
+                  variant="outline"
+                  onClick={() => navigate(`/${lang}/articles/${articleId}/edit`)}
+                  className="text-purple-600 border-purple-200 hover:bg-purple-50"
+                >
+                  <Edit className="w-4 h-4 mr-2" />
+                  {getLocaleString('edit_article', lang) || 'Edit Article'}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => navigate(`/${lang}/drafts`)}
+                  className="text-slate-600 border-slate-200 hover:bg-slate-50"
+                >
+                  {getLocaleString('manage_drafts', lang) || 'Manage Drafts'}
+                </Button>
+              </div>
+            )}
+          </div>
 
         </article>
       </div>

@@ -30,6 +30,7 @@ import LivePage from '@/pages/LivePage';
 import ArticlesPage from '@/pages/ArticlesPage';
 import ArticleDetailPage from '@/pages/ArticleDetailPage';
 import ArticleEditorPage from '@/pages/ArticleEditorPage';
+import DraftsPage from '@/pages/DraftsPage';
 import { initGA4, trackPageView } from '@/lib/analyticsService';
 import PlayerDiagnostics from '@/components/debug/PlayerDiagnostics';
 
@@ -107,8 +108,9 @@ const LanguageRouteWrapper = ({ children }) => {
   useEffect(() => {
     if (lang && !SUPPORTED_LANGUAGES.includes(lang)) {
       const pathWithoutLang = location.pathname.replace(/^\/[^/]+/, '') || '/episodes';
-      console.log('[LanguageRouteWrapper] Invalid lang, redirecting to:', `/ru${pathWithoutLang}`);
-      navigate(`/ru${pathWithoutLang}`, { replace: true });
+      const target = `/ru${pathWithoutLang}${location.search}`;
+      console.log('[LanguageRouteWrapper] Invalid lang, redirecting to:', target);
+      navigate(target, { replace: true });
     }
   }, [lang, location, navigate]);
   
@@ -229,6 +231,11 @@ const AppLayout = ({ user }) => {
           <Route path="/:lang/articles" element={
             <LanguageRouteWrapper>
               <ArticlesPage />
+            </LanguageRouteWrapper>
+          } />
+          <Route path="/:lang/drafts" element={
+            <LanguageRouteWrapper>
+              <DraftsPage />
             </LanguageRouteWrapper>
           } />
           <Route path="/:lang/articles/:articleId/edit" element={

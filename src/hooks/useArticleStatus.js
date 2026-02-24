@@ -1,40 +1,78 @@
-import { useState, useEffect } from 'react';
-import { getArticleStatusesByEpisode } from '@/services/articleService';
+import { useState, useEffect, useCallback } from 'react';
+import { getArticlesByEpisode } from '@/services/articleService';
+import { supabase } from '@/lib/supabaseClient';
 
 /**
- * Hook to batch-load article statuses for all questions of an episode.
- * Returns a map: { [question_id]: { articleId, slug, status } }
+ * Hook to get article statuses for all questions in an episode.
+ * Maps timecode IDs to article statuses for showing icons on QuestionBlock.
+ * 
+ * @param {string} episodeSlug
+ * @param {string} lang - Language code to filter timecodes (must match the questions displayed)
+ * @returns {{ articleStatuses: Object, refreshStatuses: Function }}
+ *   articleStatuses: { [timecodeId]: { status: 'draft'|'pending'|'published', slug: string } }
  */
-const useArticleStatus = (episodeSlug) => {
+const useArticleStatus = (episodeSlug, lang) => {
   const [articleStatuses, setArticleStatuses] = useState({});
-  const [loading, setLoading] = useState(false);
+
+  const refreshStatuses = useCallback(async () => {
+    if (!episodeSlug) {
+      setArticleStatuses({});
+      return;
+    }
+
+    try {
+      // 1. Get all articles for this episode
+      const { data: articles } = await getArticlesByEpisode(episodeSlug);
+      if (!articles || articles.length === 0) {
+        setArticleStatuses({});
+        return;
+      }
+
+      // 2. Get timecodes for this episode filtered by lang
+      //    so IDs match the question IDs displayed in QuestionsManager
+      let query = supabase
+        .from('timecodes')
+        .select('id, time')
+        .eq('episode_slug', episodeSlug);
+      
+      if (lang) {
+        query = query.eq('lang', lang);
+      }
+
+      const { data: timecodes, error } = await query;
+
+      if (error) {
+        console.error('[useArticleStatus] Error fetching timecodes:', error);
+        setArticleStatuses({});
+        return;
+      }
+
+      // 3. Match articles to timecodes by question_time === time
+      const statusMap = {};
+      for (const article of articles) {
+        if (article.question_time == null) continue;
+        // Use loose equality (==) to handle int vs float type mismatches
+        const matchingTimecodes = timecodes?.filter(tc => Number(tc.time) === Number(article.question_time)) || [];
+        for (const tc of matchingTimecodes) {
+          statusMap[tc.id] = {
+            status: article.status || 'draft',
+            slug: article.slug
+          };
+        }
+      }
+
+      setArticleStatuses(statusMap);
+    } catch (err) {
+      console.error('[useArticleStatus] Error:', err);
+      setArticleStatuses({});
+    }
+  }, [episodeSlug, lang]);
 
   useEffect(() => {
-    if (!episodeSlug) return;
+    refreshStatuses();
+  }, [refreshStatuses]);
 
-    let cancelled = false;
-
-    const fetchStatuses = async () => {
-      setLoading(true);
-      const statuses = await getArticleStatusesByEpisode(episodeSlug);
-      if (!cancelled) {
-        setArticleStatuses(statuses);
-        setLoading(false);
-      }
-    };
-
-    fetchStatuses();
-
-    return () => { cancelled = true; };
-  }, [episodeSlug]);
-
-  const refreshStatuses = async () => {
-    if (!episodeSlug) return;
-    const statuses = await getArticleStatusesByEpisode(episodeSlug);
-    setArticleStatuses(statuses);
-  };
-
-  return { articleStatuses, loading, refreshStatuses };
+  return { articleStatuses, refreshStatuses };
 };
 
 export default useArticleStatus;

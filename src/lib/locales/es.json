@@ -931,5 +931,16 @@
   "auth_required_for_editing": "Se requiere autorización para editar",
   "login": "Iniciar sesión",
   "preview": "Vista previa",
-  "all": "Todos"
+  "all": "Todos",
+  "delete": "Eliminar",
+  "delete_article": "Eliminar artículo",
+  "delete_article_confirm": "¿Estás seguro de que quieres eliminar este artículo? Esta acción no se puede deshacer.",
+  "article_deleted": "Artículo eliminado",
+  "login_as_editor": "Iniciar sesión como editor",
+  "edit_article": "Editar",
+  "manage_drafts": "Borradores",
+  "drafts_title": "Borradores y en revisión",
+  "drafts_subtitle": "Gestionar artículos no publicados",
+  "drafts_empty": "No hay borradores ni artículos en revisión",
+  "login_required_drafts": "Inicia sesión para gestionar borradores"
 }

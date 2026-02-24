@@ -762,3 +762,167 @@ export const translateTranscriptBalanced = async (transcriptData, targetLanguage
   logger.info(`⚖️ Starting BALANCED translation with batch size ${balancedOptions.batchSize}`);
   return translateTranscriptOpenAI(transcriptData, targetLanguage, currentInterfaceLanguage, onProgress, balancedOptions);
 };
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ARTICLE AI HELPERS (DeepSeek)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Generate a short summary from article HTML content.
+ */
+export const aiGenerateSummary = async (htmlContent, lang = 'ru') => {
+  const client = await initializeOpenAI();
+  const plain = htmlContent.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  const truncated = plain.substring(0, 6000);
+
+  const langMap = { ru: 'Russian', es: 'Spanish', en: 'English', de: 'German', fr: 'French', pl: 'Polish' };
+  const langName = langMap[lang] || 'Russian';
+
+  const completion = await client.chat.completions.create({
+    model: 'deepseek-chat',
+    messages: [
+      { role: 'system', content: `You are a skilled editor. Write a concise summary (2-3 sentences, max 300 characters) of the article in ${langName}. Return ONLY the summary text, no quotes or labels.` },
+      { role: 'user', content: truncated }
+    ],
+    temperature: 0.4,
+    max_tokens: 200,
+  });
+  return completion.choices[0].message.content.trim();
+};
+
+/**
+ * Clean text from filler words and speech artifacts.
+ */
+export const aiCleanText = async (htmlContent, lang = 'ru') => {
+  const client = await initializeOpenAI();
+  const langMap = { ru: 'Russian', es: 'Spanish', en: 'English', de: 'German', fr: 'French', pl: 'Polish' };
+  const langName = langMap[lang] || 'Russian';
+
+  const completion = await client.chat.completions.create({
+    model: 'deepseek-chat',
+    messages: [
+      { role: 'system', content: `You are a text editor specializing in cleaning up spoken transcripts in ${langName}.
+Remove filler words (um, uh, well, like, you know, ну, вот, как бы, то есть, значит, типа, короче, pues, este, o sea, etc.), false starts, repeated phrases and stutters.
+Keep the HTML structure intact — preserve all tags (<p>, <strong>, <em>, <br>, <h2>, <h3>, <blockquote>, etc.) and their attributes exactly as they are.
+Do NOT remove or modify any <strong class="tc-link"> timecode elements.
+Return ONLY the cleaned HTML, nothing else.` },
+      { role: 'user', content: htmlContent }
+    ],
+    temperature: 0.2,
+    max_tokens: 8000,
+  });
+  return completion.choices[0].message.content.trim();
+};
+
+/**
+ * Split text into logical paragraphs.
+ */
+export const aiSplitParagraphs = async (htmlContent, lang = 'ru') => {
+  const client = await initializeOpenAI();
+  const langMap = { ru: 'Russian', es: 'Spanish', en: 'English', de: 'German', fr: 'French', pl: 'Polish' };
+  const langName = langMap[lang] || 'Russian';
+
+  const completion = await client.chat.completions.create({
+    model: 'deepseek-chat',
+    messages: [
+      { role: 'system', content: `You are a text editor working in ${langName}.
+Split the given HTML text into logical paragraphs using only <p> blocks for paragraph separation.
+Keep the HTML structure intact — preserve all tags and attributes exactly as they are.
+Do NOT remove or modify any <strong class="tc-link"> timecode elements.
+If text already has paragraphs, optimize them — merge too-short ones, split too-long ones.
+Do NOT add empty paragraphs, spacer lines, repeated <br> tags, or visual separators.
+Output should contain clean paragraph structure only.
+Return ONLY the restructured HTML, nothing else.` },
+      { role: 'user', content: htmlContent }
+    ],
+    temperature: 0.3,
+    max_tokens: 8000,
+  });
+  const raw = completion.choices[0].message.content.trim();
+
+  return raw
+    .replace(/<p>\s*(?:<br\s*\/?\s*>\s*)+<\/p>/gi, '')
+    .replace(/<p>(?:\s|&nbsp;)*<\/p>/gi, '')
+    .replace(/(?:<br\s*\/?\s*>\s*){2,}/gi, '<br>')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+};
+
+/**
+ * Custom AI prompt on article content.
+ */
+export const aiCustomPrompt = async (htmlContent, userPrompt, lang = 'ru') => {
+  const client = await initializeOpenAI();
+  const langMap = { ru: 'Russian', es: 'Spanish', en: 'English', de: 'German', fr: 'French', pl: 'Polish' };
+  const langName = langMap[lang] || 'Russian';
+
+  const completion = await client.chat.completions.create({
+    model: 'deepseek-chat',
+    messages: [
+      { role: 'system', content: `You are a helpful AI editor working with article content in ${langName}.
+Apply the user's instruction to the provided HTML article content.
+Keep the HTML structure intact — preserve all tags and attributes.
+Do NOT remove or modify any <strong class="tc-link"> timecode elements.
+Return ONLY the modified HTML, nothing else.` },
+      { role: 'user', content: `Instruction: ${userPrompt}\n\nArticle HTML:\n${htmlContent}` }
+    ],
+    temperature: 0.4,
+    max_tokens: 8000,
+  });
+  return completion.choices[0].message.content.trim();
+};
+
+/**
+ * Translate article title/summary/content to target language and return JSON payload.
+ */
+export const aiTranslateArticle = async ({ title, summary, content, sourceLang = 'ru', targetLang = 'en' }) => {
+  const client = await initializeOpenAI();
+  const langMap = { ru: 'Russian', es: 'Spanish', en: 'English', de: 'German', fr: 'French', pl: 'Polish' };
+  const sourceLangName = langMap[sourceLang] || sourceLang;
+  const targetLangName = langMap[targetLang] || targetLang;
+
+  const completion = await client.chat.completions.create({
+    model: 'deepseek-chat',
+    messages: [
+      {
+        role: 'system',
+        content: `You are a professional editor-translator.
+Translate article fields from ${sourceLangName} to ${targetLangName}.
+Rules:
+- Keep meaning accurate and natural in ${targetLangName}.
+- Preserve HTML in content exactly (tags/attributes/structure).
+- Preserve all timecodes like [12:34] and all <strong class="tc-link"> elements unchanged in semantics.
+- Do not add explanations.
+- Return ONLY valid JSON object with keys: title, summary, content.`
+      },
+      {
+        role: 'user',
+        content: JSON.stringify({ title: title || '', summary: summary || '', content: content || '' })
+      }
+    ],
+    temperature: 0.2,
+    max_tokens: 9000,
+  });
+
+  const raw = completion.choices[0].message.content.trim();
+  const cleaned = raw
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/```$/i, '')
+    .trim();
+
+  let parsed;
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch {
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('AI translation returned invalid JSON');
+    parsed = JSON.parse(jsonMatch[0]);
+  }
+
+  return {
+    title: parsed?.title || '',
+    summary: parsed?.summary || '',
+    content: parsed?.content || ''
+  };
+};

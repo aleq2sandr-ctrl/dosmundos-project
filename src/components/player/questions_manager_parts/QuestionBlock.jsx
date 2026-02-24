@@ -39,76 +39,98 @@ const QuestionBlockHeader = ({
     tabIndex={isReadingMode ? undefined : 0}
     onKeyPress={(e) => { if(e.key === 'Enter' && !isReadingMode) { onActivate() } }}
   >
-    <div className="flex items-center gap-2 overflow-hidden">
+    <div className="flex items-center gap-2 overflow-hidden flex-1 min-w-0">
         {!isReadingMode && (
-          <div className={`text-white text-xs px-1.5 py-0.5 rounded tabular-nums ${isActiveQuestion ? 'bg-purple-500' : 'bg-blue-500/70'}`}>
+          <div className={`text-white text-xs px-1.5 py-0.5 rounded tabular-nums shrink-0 ${isActiveQuestion ? 'bg-purple-500' : 'bg-blue-500/70'}`}>
             {formatFullTime(question.time, true)}
           </div>
         )}
-      <span className={`font-medium line-clamp-1 flex-grow min-w-0 ${isReadingMode ? 'text-xl font-semibold text-slate-900' : 'text-sm text-slate-100'}`}>
+      <span className={`font-medium line-clamp-1 min-w-0 ${isReadingMode ? 'text-xl font-semibold text-slate-900' : 'text-sm text-slate-100'}`}>
         {question.title || ''}
       </span>
       
-      {/* Article status icon — visible to everyone for published, editors for draft/pending */}
-      {articleStatus?.status === 'published' && (
+      {/* Edit question — after text, editors only */}
+      {!isReadingMode && !editingSegment && isEditMode && (
         <Tooltip>
           <TooltipTrigger asChild>
             <button
-              onClick={(e) => { e.stopPropagation(); onArticleAction?.('view'); }}
-              className="shrink-0 text-green-400 hover:text-green-300 transition-colors"
-              aria-label={getLocaleString('article_published', currentLanguage)}
+              onClick={(e) => {
+                e.stopPropagation();
+                if(onEditQuestion) onEditQuestion(question);
+              }}
+              className="shrink-0 text-slate-400 hover:text-white transition-colors"
+              aria-label={`${getLocaleString('editQuestion', currentLanguage)} ${question.title}`}
             >
-              <FileCheck className="h-4 w-4" />
+              <Edit className="h-3.5 w-3.5" />
             </button>
           </TooltipTrigger>
-          <TooltipContent side="top">{getLocaleString('article_published', currentLanguage)}</TooltipContent>
-        </Tooltip>
-      )}
-      {isAuthenticated && articleStatus?.status === 'pending' && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={(e) => { e.stopPropagation(); onArticleAction?.('edit'); }}
-              className="shrink-0 text-orange-400 hover:text-orange-300 transition-colors"
-              aria-label={getLocaleString('article_pending', currentLanguage)}
-            >
-              <FileSearch className="h-4 w-4" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="top">{getLocaleString('article_pending', currentLanguage)}</TooltipContent>
-        </Tooltip>
-      )}
-      {isAuthenticated && articleStatus?.status === 'draft' && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={(e) => { e.stopPropagation(); onArticleAction?.('edit'); }}
-              className="shrink-0 text-yellow-400 hover:text-yellow-300 transition-colors"
-              aria-label={getLocaleString('article_in_progress', currentLanguage)}
-            >
-              <FileEdit className="h-4 w-4" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="top">{getLocaleString('article_in_progress', currentLanguage)}</TooltipContent>
-        </Tooltip>
-      )}
-      {isAuthenticated && isEditMode && !articleStatus && !question.is_full_transcript && !question.is_intro && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={(e) => { e.stopPropagation(); onArticleAction?.('create'); }}
-              className="shrink-0 text-slate-500 hover:text-slate-300 transition-colors opacity-50 hover:opacity-100"
-              aria-label={getLocaleString('create_article', currentLanguage)}
-            >
-              <FilePlus className="h-3.5 w-3.5" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="top">{getLocaleString('create_article', currentLanguage)}</TooltipContent>
+          <TooltipContent side="top">{getLocaleString('editQuestion', currentLanguage)}</TooltipContent>
         </Tooltip>
       )}
     </div>
     {!isReadingMode && (
-      <div className="flex items-center shrink-0">
+      <div className="flex items-center shrink-0 gap-0.5">
+        {/* Published article — visible to everyone */}
+        {articleStatus?.status === 'published' && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={(e) => { e.stopPropagation(); onArticleAction?.('view'); }}
+                className="shrink-0 text-green-400 hover:text-green-300 transition-colors p-1"
+                aria-label={getLocaleString('article_published', currentLanguage)}
+              >
+                <FileCheck className="h-4 w-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">{getLocaleString('article_published', currentLanguage)}</TooltipContent>
+          </Tooltip>
+        )}
+        {/* Pending article — editors only */}
+        {isAuthenticated && articleStatus?.status === 'pending' && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={(e) => { e.stopPropagation(); onArticleAction?.('edit'); }}
+                className="shrink-0 text-orange-400 hover:text-orange-300 transition-colors p-1"
+                aria-label={getLocaleString('article_pending', currentLanguage)}
+              >
+                <FileSearch className="h-4 w-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">{getLocaleString('article_pending', currentLanguage)}</TooltipContent>
+          </Tooltip>
+        )}
+        {/* Draft article — editors only */}
+        {isAuthenticated && articleStatus?.status === 'draft' && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={(e) => { e.stopPropagation(); onArticleAction?.('edit'); }}
+                className="shrink-0 text-yellow-400 hover:text-yellow-300 transition-colors p-1"
+                aria-label={getLocaleString('article_in_progress', currentLanguage)}
+              >
+                <FileEdit className="h-4 w-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">{getLocaleString('article_in_progress', currentLanguage)}</TooltipContent>
+          </Tooltip>
+        )}
+        {/* Create article — editors only */}
+        {isAuthenticated && !articleStatus && !question.is_full_transcript && !question.is_intro && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={(e) => { e.stopPropagation(); onArticleAction?.('create'); }}
+                className="shrink-0 text-slate-500 hover:text-slate-300 transition-colors opacity-50 hover:opacity-100 p-1"
+                aria-label={getLocaleString('create_article', currentLanguage)}
+              >
+                <FilePlus className="h-3.5 w-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">{getLocaleString('create_article', currentLanguage)}</TooltipContent>
+          </Tooltip>
+        )}
+        {/* Expand/collapse */}
         {!editingSegment && segmentsAvailable && (
             <Button 
                 variant="ghost" 
@@ -119,20 +141,6 @@ const QuestionBlockHeader = ({
             >
                 {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
             </Button>
-        )}
-        {!editingSegment && isEditMode && (
-          <Button 
-            variant="ghost" 
-            size="icon_sm" 
-            onClick={(e) => {
-              e.stopPropagation();
-              if(onEditQuestion) onEditQuestion(question);
-            }}
-            className="text-slate-300 hover:text-white hover:bg-white/15 h-7 w-7"
-            aria-label={`${getLocaleString('editQuestion', currentLanguage)} ${question.title}`}
-          >
-            <Edit className="h-3.5 w-3.5" />
-          </Button>
         )}
       </div>
     )}

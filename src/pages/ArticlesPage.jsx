@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom';
 import { getLocaleString } from '@/lib/locales';
 import { supabase } from '@/lib/supabaseClient';
-import { Search, Loader2, Plus, FileEdit, FileSearch, FileCheck } from 'lucide-react';
+import { Search, Loader2, Plus, FileEdit, LogOut } from 'lucide-react';
 import { calculateReadingTime } from '@/lib/utils';
 import ArticleCardSkeleton from '@/components/ArticleCardSkeleton';
 import ArticleCard from '@/components/ArticleCard';
@@ -21,8 +21,7 @@ const ArticlesPage = () => {
   const [visibleCount, setVisibleCount] = useState(6);
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('published');
-  const { isAuthenticated, isAdmin } = useEditorAuth();
+  const { isAuthenticated, logout } = useEditorAuth();
 
   // Track current lang to prevent stale fetches from corrupting state
   const currentLangRef = useRef(lang);
@@ -96,12 +95,8 @@ const ArticlesPage = () => {
             `, { count: 'est' })
             .eq('article_translations.language_code', lang);
 
-          // Apply status filter: non-authenticated users always see only published
-          if (!isAuthenticated || statusFilter === 'published') {
-            query = query.eq('status', 'published');
-          } else if (statusFilter !== 'all') {
-            query = query.eq('status', statusFilter);
-          }
+          // Always show only published articles on this page
+          query = query.eq('status', 'published');
 
           const result = await query
             .order('published_at', { ascending: false })
@@ -254,7 +249,7 @@ const ArticlesPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [offset, lang, statusFilter, isAuthenticated]);
+  }, [offset, lang, isAuthenticated]);
 
   // Load more articles when reaching the end
   useEffect(() => {
@@ -329,6 +324,38 @@ const ArticlesPage = () => {
   return (
     <div className="min-h-screen bg-[#fdfbf7] text-slate-900 font-serif">
       <div className="container mx-auto px-4 py-12">
+        {/* Editor controls: Drafts, New Article, Logout */}
+        {isAuthenticated && (
+          <div className="flex items-center justify-end gap-2 mb-8 font-sans">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate(`/${lang}/drafts`)}
+              className="text-slate-600 border-slate-200 hover:bg-slate-50"
+            >
+              <FileEdit className="h-4 w-4 mr-1" />
+              {getLocaleString('manage_drafts', lang)}
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => navigate(`/${lang}/articles/new/edit`)}
+              className="bg-purple-600 hover:bg-purple-700 text-white"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              {getLocaleString('new_article', lang)}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={logout}
+              className="text-slate-400 hover:text-slate-600"
+            >
+              <LogOut className="h-4 w-4 mr-1" />
+              {getLocaleString('logout', lang)}
+            </Button>
+          </div>
+        )}
+
         <div className="flex flex-col items-center mb-12 text-center">
           <h1 className="text-4xl md:text-5xl font-bold text-slate-900 mb-4 tracking-tight">
             {getLocaleString('blog_title', lang)}
@@ -337,47 +364,6 @@ const ArticlesPage = () => {
             {getLocaleString('blog_subtitle', lang)}
           </p>
         </div>
-
-        {/* Editor controls: Status filter tabs + New Article button */}
-        {isAuthenticated && (
-          <div className="flex items-center justify-between mb-6 max-w-2xl mx-auto">
-            <div className="flex gap-1 bg-slate-100 rounded-lg p-1 font-sans">
-              {[
-                { key: 'all', label: getLocaleString('all', lang), icon: null },
-                { key: 'published', label: getLocaleString('status_published', lang), icon: <FileCheck className="h-3.5 w-3.5" /> },
-                { key: 'pending', label: getLocaleString('status_pending', lang), icon: <FileSearch className="h-3.5 w-3.5" /> },
-                { key: 'draft', label: getLocaleString('status_draft', lang), icon: <FileEdit className="h-3.5 w-3.5" /> },
-              ].map(tab => (
-                <button
-                  key={tab.key}
-                  onClick={() => {
-                    setStatusFilter(tab.key);
-                    setOffset(0);
-                    setHasMore(true);
-                    setVisibleCount(6);
-                  }}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                    statusFilter === tab.key
-                      ? 'bg-white text-slate-900 shadow-sm'
-                      : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                >
-                  {tab.icon}
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-
-            <Button
-              size="sm"
-              onClick={() => navigate(`/${lang}/articles/new/edit`)}
-              className="bg-purple-600 hover:bg-purple-700 text-white font-sans"
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              {getLocaleString('new_article', lang)}
-            </Button>
-          </div>
-        )}
 
         {/* Search Bar */}
         <div className="max-w-md mx-auto mb-8 relative">

@@ -42,11 +42,11 @@ const QuestionsManager = ({
   const navigate = useNavigate();
   const { editor: editorAuth, isAuthenticated } = useEditorAuth();
 
-  // Batch-load article statuses for all questions in this episode
-  const { articleStatuses, refreshStatuses } = useArticleStatus(episodeSlug);
-
   const langForContent = episodeLang === 'all' ? currentLanguage : episodeLang;
   const utterances = transcriptUtterances || [];
+
+  // Batch-load article statuses for all questions in this episode
+  const { articleStatuses, refreshStatuses } = useArticleStatus(episodeSlug, langForContent);
 
   const questionSegmentsMap = useMemo(() => {
     if (!showTranscript || utterances.length === 0) return {};
@@ -138,23 +138,34 @@ const QuestionsManager = ({
       const nextQ = sorted[qIdx + 1];
       const endTime = nextQ ? nextQ.time : (duration ? Math.floor(duration) : null);
 
-      // Build segments HTML for initial content
-      const qSegments = transcriptUtterances?.filter(u => {
-        const startMs = question.time * 1000;
-        const endMs = endTime ? endTime * 1000 : Infinity;
-        return u.start >= startMs && u.start < endMs;
-      }) || [];
-      const transcriptHtml = qSegments.map(s => `<p>${s.text || ''}</p>`).join('\n');
-
-      // Navigate to new article editor with question params
-      const params = new URLSearchParams({
-        questionId: question.id,
+      // Store question data in sessionStorage as reliable transport
+      const questionData = {
+        questionId: String(question.id),
         episode: episodeSlug,
         title: question.title || '',
         time: question.time,
-        ...(endTime ? { endTime } : {})
+        endTime: endTime ?? null,
+        ts: Date.now()
+      };
+      try {
+        sessionStorage.setItem('newArticleFromQuestion', JSON.stringify(questionData));
+      } catch (e) {
+        console.warn('[QuestionsManager] Failed to write sessionStorage:', e);
+      }
+
+      // Navigate with query params as well (belt + suspenders)
+      const search = new URLSearchParams({
+        questionId: String(question.id),
+        episode: episodeSlug,
+        title: question.title || '',
+        time: String(question.time),
+        ...(endTime != null ? { endTime: String(endTime) } : {})
       });
-      navigate(`/${currentLanguage}/articles/new/edit?${params.toString()}`);
+      console.log('[QuestionsManager] Navigating to new article editor:', `/${currentLanguage}/articles/new/edit?${search.toString()}`);
+      navigate({
+        pathname: `/${currentLanguage}/articles/new/edit`,
+        search: search.toString()
+      });
     }
   }, [articleStatuses, currentLanguage, navigate, questions, duration, transcriptUtterances, episodeSlug]);
 

@@ -921,5 +921,16 @@
   "auth_required_for_editing": "Do edycji wymagane jest logowanie",
   "login": "Zaloguj się",
   "preview": "Podgląd",
-  "all": "Wszystkie"
+  "all": "Wszystkie",
+  "delete": "Usuń",
+  "delete_article": "Usuń artykuł",
+  "delete_article_confirm": "Czy na pewno chcesz usunąć ten artykuł? Tej czynności nie można cofnąć.",
+  "article_deleted": "Artykuł usunięty",
+  "login_as_editor": "Zaloguj się jako redaktor",
+  "edit_article": "Edytuj",
+  "manage_drafts": "Szkice",
+  "drafts_title": "Szkice i oczekujące",
+  "drafts_subtitle": "Zarządzaj nieopublikowanymi artykułami",
+  "drafts_empty": "Brak szkiców lub artykułów oczekujących",
+  "login_required_drafts": "Zaloguj się, aby zarządzać szkicami"
 }
