@@ -91,11 +91,12 @@ app.get('/preview/:lang/:episodeSlug', handleTelegramPreview);
 // SEO Bot middleware — serve pre-rendered HTML to search engines & AI crawlers
 app.use((req, res, next) => {
   const userAgent = req.headers['user-agent'] || '';
+  const staticFileExtRegex = /\.(?:js|mjs|css|map|png|jpe?g|gif|webp|svg|ico|woff2?|ttf|eot|pdf|xml|txt|webmanifest|mp3|mp4|webm|ogg)$/i;
   
   // Skip API routes, static assets, and preview routes
   if (req.path.startsWith('/api/') || req.path.startsWith('/preview/') || 
       req.path.startsWith('/assets/') || req.path.startsWith('/img/') ||
-      req.path.match(/\.\w+$/)) {
+      staticFileExtRegex.test(req.path)) {
     return next();
   }
 

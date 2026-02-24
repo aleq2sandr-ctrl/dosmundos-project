@@ -971,10 +971,16 @@ export async function handleSEORender(req, res, next) {
   const SUPPORTED_LANGS = ['ru', 'es', 'en', 'de', 'fr', 'pl'];
 
   try {
-    // Match /:lang/articles/:articleId
-    const articleDetailMatch = path.match(/^\/(ru|es|en|de|fr|pl)\/articles\/([a-z0-9][\w-]+)\/?$/);
+    // Match /:lang/articles/:articleId (allow full slug charset, except '/')
+    const articleDetailMatch = path.match(/^\/(ru|es|en|de|fr|pl)\/articles\/([^/]+)\/?$/);
     if (articleDetailMatch) {
-      const html = await renderArticleDetailSEO(articleDetailMatch[1], articleDetailMatch[2]);
+      let articleSlug = articleDetailMatch[2];
+      try {
+        articleSlug = decodeURIComponent(articleSlug);
+      } catch {
+        // keep original slug if malformed encoding
+      }
+      const html = await renderArticleDetailSEO(articleDetailMatch[1], articleSlug);
       if (html) {
         res.setHeader('Content-Type', 'text/html; charset=utf-8');
         res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400');
