@@ -77,37 +77,29 @@ export const getEpisodeDate = async (episodeSlug) => {
 };
 
 /**
- * Get the audio URL for an episode in a given language.
- * Fallback chain: requested lang → mixed → ru → any available.
+ * Get the audio URL for an episode in a given language
  */
 export const getEpisodeAudioUrl = async (episodeSlug, lang) => {
   try {
-    // Build fallback chain
-    const langChain = [lang];
-    if (lang !== 'mixed') langChain.push('mixed');
-    if (lang !== 'ru' && !langChain.includes('ru')) langChain.push('ru');
-
-    for (const tryLang of langChain) {
-      const { data, error } = await supabase
-        .from('episode_audios')
-        .select('audio_url')
-        .eq('episode_slug', episodeSlug)
-        .eq('lang', tryLang)
-        .maybeSingle();
-
-      if (error) throw error;
-      if (data?.audio_url) return data.audio_url;
-    }
-
-    // Last resort: any available audio for this episode
-    const { data: any } = await supabase
+    const { data, error } = await supabase
       .from('episode_audios')
       .select('audio_url')
       .eq('episode_slug', episodeSlug)
-      .limit(1)
+      .eq('lang', lang)
       .maybeSingle();
 
-    return any?.audio_url || null;
+    if (error) throw error;
+    if (data?.audio_url) return data.audio_url;
+
+    // Fallback: try 'mixed' lang
+    const { data: mixed } = await supabase
+      .from('episode_audios')
+      .select('audio_url')
+      .eq('episode_slug', episodeSlug)
+      .eq('lang', 'mixed')
+      .maybeSingle();
+
+    return mixed?.audio_url || null;
   } catch (error) {
     console.error('[articleService] Error fetching episode audio URL:', error);
     return null;
@@ -215,10 +207,8 @@ export const getArticle = async (slug, lang) => {
     if (error) throw error;
 
     const translations = data.article_translations || [];
-    const exactTranslation = translations.find(t => t.language_code === lang);
-    const translation = exactTranslation ||
+    const translation = translations.find(t => t.language_code === lang) ||
                         translations.find(t => t.language_code === 'ru') || {};
-    const isFallbackTranslation = !exactTranslation && !!translation.language_code;
 
     const categories = (data.article_categories || []).map(ac => {
       const catTrans = ac.categories?.category_translations || [];
@@ -249,8 +239,6 @@ export const getArticle = async (slug, lang) => {
         summary: translation.summary || '',
         content: translation.content || '',
         lang: translation.language_code || lang,
-        isFallbackTranslation,
-        fallbackLang: isFallbackTranslation ? translation.language_code : null,
         categories,
         allTranslations: translations
       }
@@ -602,59 +590,38 @@ export const deleteArticle = async (slug) => {
 
 /**
  * Get transcript utterances for a question's time range.
- * Falls back through: edited_transcript_data → transcript_data,
- * and through languages: requested lang → mixed → ru → any available.
+ * Falls back to transcript_data if edited_transcript_data is empty,
+ * and tries 'mixed' lang if the requested lang has no transcript.
  */
 export const getQuestionTranscript = async (episodeSlug, lang, startTime, endTime) => {
   try {
     const queryLang = lang || 'mixed';
     console.log('[articleService] getQuestionTranscript:', { episodeSlug, queryLang, startTime, endTime });
 
-    // Build fallback chain: requested lang → mixed → ru → any
-    const langChain = [queryLang];
-    if (queryLang !== 'mixed') langChain.push('mixed');
-    if (queryLang !== 'ru' && !langChain.includes('ru')) langChain.push('ru');
+    // Try requested lang first
+    let { data, error } = await supabase
+      .from('transcripts')
+      .select('edited_transcript_data')
+      .eq('episode_slug', episodeSlug)
+      .eq('lang', queryLang)
+      .maybeSingle();
 
-    let data = null;
+    if (error) throw error;
 
-    // Try each language in the fallback chain
-    for (const tryLang of langChain) {
-      const { data: result, error } = await supabase
+    // If no transcript for this lang, try 'mixed'
+    if (!data && queryLang !== 'mixed') {
+      const { data: mixed, error: mixedErr } = await supabase
         .from('transcripts')
-        .select('edited_transcript_data, transcript_data')
+        .select('edited_transcript_data')
         .eq('episode_slug', episodeSlug)
-        .eq('lang', tryLang)
+        .eq('lang', 'mixed')
         .maybeSingle();
 
-      if (error) throw error;
-      if (result) {
-        data = result;
-        if (tryLang !== queryLang) {
-          console.log(`[articleService] getQuestionTranscript: using fallback lang '${tryLang}' (requested '${queryLang}')`);
-        }
-        break;
-      }
+      if (mixedErr) throw mixedErr;
+      data = mixed;
     }
 
-    // Last resort: try any available transcript for this episode
-    if (!data) {
-      const { data: any, error: anyErr } = await supabase
-        .from('transcripts')
-        .select('edited_transcript_data, transcript_data, lang')
-        .eq('episode_slug', episodeSlug)
-        .limit(1)
-        .maybeSingle();
-
-      if (anyErr) throw anyErr;
-      if (any) {
-        data = any;
-        console.log(`[articleService] getQuestionTranscript: using any available lang '${any.lang}' (requested '${queryLang}')`);
-      }
-    }
-
-    // Prefer edited_transcript_data, fall back to transcript_data
-    const utterances = data?.edited_transcript_data?.utterances
-      || data?.transcript_data?.utterances;
+    const utterances = data?.edited_transcript_data?.utterances;
 
     if (!utterances || !Array.isArray(utterances)) return { success: true, data: [] };
 

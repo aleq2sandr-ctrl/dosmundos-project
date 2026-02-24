@@ -134,9 +134,6 @@ const QuestionsManager = ({
       navigate(`/${currentLanguage}/articles/${status.slug}`, { state: playerNavState });
     } else if (action === 'edit' && status?.slug) {
       navigate(`/${currentLanguage}/articles/${status.slug}/edit`, { state: playerNavState });
-    } else if (action === 'translate' && status?.slug) {
-      // Article exists but no translation in current language — open editor to create translation
-      navigate(`/${currentLanguage}/articles/${status.slug}/edit`, { state: playerNavState });
     } else if (action === 'create') {
       // Get time range for this question
       const sorted = [...questions].sort((a, b) => a.time - b.time);
