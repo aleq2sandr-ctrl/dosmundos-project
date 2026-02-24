@@ -913,6 +913,7 @@ const ArticleEditorPage = () => {
   const pendingContentRef = useRef(null);
   const articleAudioRef = useRef(null);
   const ensuredTranslationRef = useRef(new Set());
+  const suppressUnsavedRef = useRef(false);
   const canPublish = (editorAuth?.email || '').toLowerCase() === PUBLISHER_EMAIL;
 
   // ─── TipTap editor ────────────────────────────────────────────────
@@ -939,7 +940,11 @@ const ArticleEditorPage = () => {
         class: 'prose prose-base sm:prose-xl max-w-none font-serif focus:outline-none min-h-[50vh] px-3 py-4 sm:px-6 sm:py-8 md:px-10 md:py-10 text-slate-800 dark:text-slate-200 prose-headings:font-serif prose-headings:text-slate-900 dark:prose-headings:text-slate-100 prose-p:leading-relaxed sm:prose-p:leading-loose prose-p:indent-0 sm:prose-p:indent-8 prose-p:mb-3 sm:prose-p:mb-5 prose-p:mt-0 prose-a:text-purple-700 dark:prose-a:text-purple-400 prose-blockquote:border-l-purple-400 prose-blockquote:bg-purple-50/50 dark:prose-blockquote:bg-purple-500/5 prose-blockquote:rounded-r-xl prose-blockquote:py-2 prose-blockquote:px-3 sm:prose-blockquote:px-6 prose-img:rounded-xl prose-img:shadow-lg',
       },
     },
-    onUpdate: () => setHasUnsaved(true),
+    onUpdate: () => {
+      if (!suppressUnsavedRef.current) {
+        setHasUnsaved(true);
+      }
+    },
     onError: (error) => {
       console.error('[ArticleEditorPage] TipTap editor error:', error);
       toast({ 
@@ -971,7 +976,11 @@ const ArticleEditorPage = () => {
   useEffect(() => {
     if (editor && pendingContentRef.current != null) {
       console.log('[ArticleEditorPage] Applying pending content to editor');
+      suppressUnsavedRef.current = true;
       editor.commands.setContent(pendingContentRef.current);
+      setTimeout(() => {
+        suppressUnsavedRef.current = false;
+      }, 0);
       pendingContentRef.current = null;
     }
   }, [editor]);
@@ -1000,7 +1009,11 @@ const ArticleEditorPage = () => {
     const ed = editorRef.current;
     if (ed && !ed.isDestroyed) {
       console.log('[ArticleEditorPage] Setting content directly, length:', html.length);
+      suppressUnsavedRef.current = true;
       ed.commands.setContent(html);
+      setTimeout(() => {
+        suppressUnsavedRef.current = false;
+      }, 0);
     } else {
       console.log('[ArticleEditorPage] Editor not ready, storing pending content, length:', html.length);
       pendingContentRef.current = html;
@@ -1060,6 +1073,7 @@ const ArticleEditorPage = () => {
     let cancelled = false;
     const load = async () => {
       setLoading(true);
+      setHasUnsaved(false);
       try {
         if (isNew) {
           const { episode, questionTitle, time, endTime, questionId } = getQuestionParams();
