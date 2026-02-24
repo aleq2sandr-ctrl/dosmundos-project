@@ -32,7 +32,7 @@ import {
 import {
   ArrowLeft, Save, Send, Globe, Eye,
   Bold, Italic, Underline as UnderlineIcon,
-  Link as LinkIcon, Undo2, Redo2, Quote,
+  Link as LinkIcon, Undo2, Redo2,
   Play, Pause, RotateCcw, RotateCw,
   FileEdit, FileCheck, FileSearch, Radio, Calendar, User,
   X, Loader2, Code, Trash2, Languages,
@@ -253,7 +253,6 @@ const EditorToolbar = ({ editor, onAiAction, aiLoading, lang }) => {
     { type: 'divider' },
     { type: 'highlight' },
     { icon: HelpCircle, action: () => editor.chain().focus().toggleQuestionBlock().run(), active: editor.isActive('questionBlock'), title: 'Question' },
-    { icon: Quote, action: () => editor.chain().focus().toggleBlockquote().run(), active: editor.isActive('blockquote'), title: 'Quote' },
     { type: 'divider' },
     { icon: Undo2, action: () => editor.chain().focus().undo().run(), active: false, disabled: !editor.can().undo(), title: 'Undo' },
     { icon: Redo2, action: () => editor.chain().focus().redo().run(), active: false, disabled: !editor.can().redo(), title: 'Redo' },
