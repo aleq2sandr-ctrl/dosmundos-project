@@ -30,12 +30,12 @@ import {
 } from '@/services/articleService';
 import {
   ArrowLeft, Save, Send, Globe, Eye,
-  Bold, Italic, Underline as UnderlineIcon, Heading2, Heading3,
+  Bold, Italic, Underline as UnderlineIcon,
   Link as LinkIcon, Undo2, Redo2, Quote,
   Play, Pause, RotateCcw, RotateCw,
   FileEdit, FileCheck, FileSearch, Radio, Calendar, User,
   X, Loader2, Code, Trash2, Languages,
-  Sparkles, Wand2, MessageSquare, AlignLeft, HelpCircle, Highlighter
+  Sparkles, Wand2, MessageSquare, AlignLeft, HelpCircle, Highlighter, Edit, Check
 } from 'lucide-react';
 import {
   aiCleanText, aiSplitParagraphs, aiCustomPrompt, aiGenerateSummary, aiTranslateArticle
@@ -250,21 +250,20 @@ const EditorToolbar = ({ editor, onAiAction, aiLoading, lang }) => {
     { icon: Italic, action: () => editor.chain().focus().toggleItalic().run(), active: editor.isActive('italic'), title: 'Italic' },
     { icon: UnderlineIcon, action: () => editor.chain().focus().toggleUnderline().run(), active: editor.isActive('underline'), title: 'Underline' },
     { type: 'divider' },
-    { icon: Heading2, action: () => editor.chain().focus().toggleHeading({ level: 2 }).run(), active: editor.isActive('heading', { level: 2 }), title: 'H2' },
-    { icon: Heading3, action: () => editor.chain().focus().toggleHeading({ level: 3 }).run(), active: editor.isActive('heading', { level: 3 }), title: 'H3' },
-    { type: 'divider' },
-    { icon: Quote, action: () => editor.chain().focus().toggleBlockquote().run(), active: editor.isActive('blockquote'), title: 'Quote' },
+    { type: 'highlight' },
     { icon: HelpCircle, action: () => editor.chain().focus().toggleQuestionBlock().run(), active: editor.isActive('questionBlock'), title: 'Question' },
+    { icon: Quote, action: () => editor.chain().focus().toggleBlockquote().run(), active: editor.isActive('blockquote'), title: 'Quote' },
     { type: 'divider' },
     { icon: Undo2, action: () => editor.chain().focus().undo().run(), active: false, disabled: !editor.can().undo(), title: 'Undo' },
     { icon: Redo2, action: () => editor.chain().focus().redo().run(), active: false, disabled: !editor.can().redo(), title: 'Redo' },
   ];
 
   return (
-    <div className="mx-auto max-w-6xl px-2 py-1 border-t border-slate-200/60 dark:border-slate-700/40">
-      <div className="flex items-center gap-0.5 flex-wrap px-2">
+    <div className="mx-auto max-w-4xl px-6 py-1 border-t border-slate-200/60 dark:border-slate-700/40">
+      <div className="flex items-center gap-0.5 flex-wrap">
         {tools.map((tool, i) => {
           if (tool.type === 'divider') return <div key={i} className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1" />;
+          if (tool.type === 'highlight') return <HighlightColorPicker key={i} editor={editor} />;
           const Icon = tool.icon;
           return (
             <button
@@ -285,7 +284,6 @@ const EditorToolbar = ({ editor, onAiAction, aiLoading, lang }) => {
             </button>
           );
         })}
-        <HighlightColorPicker editor={editor} />
         <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1" />
         <AIDropdown onAction={onAiAction} loading={aiLoading} lang={lang} />
       </div>
@@ -357,22 +355,30 @@ const MiniPlayer = ({ audioUrl, episodeSlug, questionTime, questionEndTime, lang
     const audio = audioRef.current;
     if (!audio) return;
     audio.playbackRate = playbackRate;
+    
     const onTime = () => {
-      setCurrentTime(audio.currentTime - startSec);
+      // Update currentTime relative to segment start
+      const relativeTime = Math.max(0, audio.currentTime - startSec);
+      setCurrentTime(relativeTime);
+      
+      // Stop if reached end
       if (questionEndTime && audio.currentTime >= questionEndTime) {
         audio.pause();
         setIsPlaying(false);
       }
     };
+    
     const onMeta = () => setDuration(audio.duration);
     const onEnd = () => setIsPlaying(false);
     const onPause = () => setIsPlaying(false);
     const onPlay = () => setIsPlaying(true);
+    
     audio.addEventListener('timeupdate', onTime);
     audio.addEventListener('loadedmetadata', onMeta);
     audio.addEventListener('ended', onEnd);
     audio.addEventListener('pause', onPause);
     audio.addEventListener('play', onPlay);
+    
     return () => {
       audio.removeEventListener('timeupdate', onTime);
       audio.removeEventListener('loadedmetadata', onMeta);
@@ -389,11 +395,19 @@ const MiniPlayer = ({ audioUrl, episodeSlug, questionTime, questionEndTime, lang
       audio.pause();
     } else {
       // Reset speed to 1x when pressing play
-      if (playbackRate !== 1) {
-        setPlaybackRate(1);
-        audio.playbackRate = 1;
+      audio.playbackRate = 1;
+      setPlaybackRate(1);
+      
+      // Set currentTime to start of segment if not already playing
+      if (audio.currentTime < startSec) {
+        audio.currentTime = startSec;
       }
-      audio.play();
+      
+      // Ensure audio is ready
+      if (audio.readyState >= 2) {
+        // HAVE_CURRENT_DATA or better
+        audio.play().catch(err => console.error('Play error:', err));
+      }
     }
   };
 
@@ -416,7 +430,7 @@ const MiniPlayer = ({ audioUrl, episodeSlug, questionTime, questionEndTime, lang
 
   return (
     <div className="bg-slate-50/80 dark:bg-slate-800/40 border-t border-slate-200/60 dark:border-slate-700/30">
-      <div className="mx-auto max-w-4xl flex items-center gap-1.5 px-3 py-1">
+      <div className="mx-auto max-w-4xl flex items-center gap-1.5 px-6 py-1">
         <audio ref={audioRef} src={audioUrl} preload="metadata" />
 
         {/* Controls */}
@@ -432,7 +446,7 @@ const MiniPlayer = ({ audioUrl, episodeSlug, questionTime, questionEndTime, lang
           </button>
         </div>
 
-        {/* Speed */}
+        {/* Speed - Desktop version */}
         <div className="hidden sm:flex items-center gap-0.5 shrink-0 ml-1">
           {[1.5, 2, 3].map(rate => (
             <button
@@ -458,6 +472,22 @@ const MiniPlayer = ({ audioUrl, episodeSlug, questionTime, questionEndTime, lang
             </button>
           ))}
         </div>
+
+        {/* Speed - Mobile version */}
+        <select
+          value={playbackRate}
+          onChange={(e) => {
+            const rate = parseFloat(e.target.value);
+            setPlaybackRate(rate);
+            if (audioRef.current) audioRef.current.playbackRate = rate;
+          }}
+          className="sm:hidden px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600 focus:outline-none"
+        >
+          <option value="1">1x</option>
+          <option value="1.5">1.5x</option>
+          <option value="2">2x</option>
+          <option value="3">3x</option>
+        </select>
 
         {/* Progress */}
         <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400 tabular-nums shrink-0">
@@ -519,7 +549,7 @@ const BottomSettingsPanel = ({
   onDelete
 }) => {
   return (
-    <div className="mx-auto max-w-4xl px-2 mt-4">
+    <div className="mx-auto max-w-4xl px-6 mt-4">
       <div className="w-full flex items-center justify-between px-4 py-3 bg-white dark:bg-slate-800/80 rounded-2xl border border-slate-200/80 dark:border-slate-700/50 shadow-sm">
         <div className="flex items-center gap-3">
           <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
@@ -857,6 +887,8 @@ const ArticleEditorPage = () => {
   const [articleSlug, setArticleSlug] = useState(articleId !== 'new' ? articleId : null);
   const [status, setStatus] = useState('draft');
   const [title, setTitle] = useState('');
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleInput, setTitleInput] = useState('');
   const [summary, setSummary] = useState('');
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [imageUrl, setImageUrl] = useState('');
@@ -1488,13 +1520,26 @@ const ArticleEditorPage = () => {
     );
   }
 
+  // ─── Protected route: show nothing if not authenticated ───────────
+  if (!isAuthenticated) {
+    return (
+      <div className="fixed inset-0 z-[100] bg-[#fafaf9] dark:bg-slate-950 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-slate-600 dark:text-slate-400 mb-4">
+            {getLocaleString('loading', lang)}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-[100] bg-[#fafaf9] dark:bg-slate-950 overflow-y-auto">
       {/* ────────────────────────────────────────────────────────────── */}
       {/* TOP BAR                                                       */}
       {/* ────────────────────────────────────────────────────────────── */}
       <div className="sticky top-0 z-[110] bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-200/80 dark:border-slate-800">
-        <div className="max-w-6xl mx-auto flex items-center gap-3 px-4 py-2.5">
+        <div className="max-w-4xl mx-auto flex items-center gap-2 px-6 py-2.5">
           {/* Back */}
           <button
             onClick={() => {
@@ -1506,29 +1551,86 @@ const ArticleEditorPage = () => {
             <ArrowLeft className="w-5 h-5" />
           </button>
 
-          {/* Title input */}
-          <div className="flex-1 min-w-0">
-            <input
-              value={title}
-              onChange={e => { setTitle(e.target.value); setHasUnsaved(true); }}
-              placeholder={getLocaleString('article_title_placeholder', lang)}
-              className="w-full bg-transparent text-sm font-medium text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none"
-            />
-          </div>
+          {/* Title - Display or Edit mode */}
+          {!editingTitle ? (
+            <div className="flex-1 min-w-0 flex items-center gap-0.5">
+              <h1 className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">
+                {title || getLocaleString('article_title_placeholder', lang)}
+              </h1>
+              <button
+                onClick={() => {
+                  setTitleInput(title);
+                  setEditingTitle(true);
+                }}
+                className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-all shrink-0"
+                title="Edit title"
+              >
+                <Edit className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex-1 min-w-0 flex items-center gap-1">
+              <input
+                autoFocus
+                value={titleInput}
+                onChange={(e) => setTitleInput(e.target.value)}
+                placeholder={getLocaleString('article_title_placeholder', lang)}
+                className="flex-1 min-w-0 px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400 transition-all"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    setTitle(titleInput);
+                    setEditingTitle(false);
+                    setHasUnsaved(true);
+                  } else if (e.key === 'Escape') {
+                    setEditingTitle(false);
+                  }
+                }}
+              />
+              <button
+                onClick={() => {
+                  setTitle(titleInput);
+                  setEditingTitle(false);
+                  setHasUnsaved(true);
+                }}
+                className="p-1.5 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 transition-all shrink-0"
+                title="Apply"
+              >
+                <Check className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setEditingTitle(false)}
+                className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-500/10 text-red-500 dark:text-red-400 transition-all shrink-0"
+                title="Cancel"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          {/* Preview button */}
+          {articleSlug && !editingTitle && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => window.open(`/${lang}/articles/${articleSlug}`, '_blank')}
+              className="p-2 text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+              title={getLocaleString('preview', lang)}
+            >
+              <Eye className="w-4 h-4" />
+            </Button>
+          )}
 
           {/* Save button */}
-          <div className="flex items-center gap-2 shrink-0">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleSave('draft')}
-              disabled={saving}
-              className="border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
-              title={getLocaleString('save_draft', lang)}
-            >
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            </Button>
-          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleSave('draft')}
+            disabled={saving}
+            className="border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+            title={getLocaleString('save_draft', lang)}
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          </Button>
         </div>
 
         {/* Formatting toolbar */}
@@ -1754,7 +1856,7 @@ const ArticleEditorPage = () => {
           box-shadow: 0 1px 4px rgba(167, 139, 250, 0.15);
         }
       `}</style>
-      <div className="mx-auto max-w-4xl px-2 mt-4" onClick={handleTimecodeClick}>
+      <div className="mx-auto max-w-4xl px-6 mt-4" onClick={handleTimecodeClick}>
         <div className="bg-white dark:bg-slate-800/60 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-700/50 overflow-hidden min-h-[60vh]">
           <EditorContent editor={editor} spellCheck="false" />
         </div>
