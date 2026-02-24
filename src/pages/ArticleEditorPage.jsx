@@ -21,6 +21,7 @@ import {
   createDraftFromQuestion,
   deleteArticle,
   getEpisodeAudioUrl,
+  getEpisodeDate,
   getCategories,
   getQuestionTranscript,
   ensureArticleTranslationLink,
@@ -259,7 +260,7 @@ const EditorToolbar = ({ editor, onAiAction, aiLoading, lang }) => {
   ];
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-1 border-t border-slate-200/60 dark:border-slate-700/40">
+    <div className="mx-auto max-w-4xl px-2 sm:px-6 py-1 border-t border-slate-200/60 dark:border-slate-700/40">
       <div className="flex items-center gap-0.5 flex-wrap">
         {tools.map((tool, i) => {
           if (tool.type === 'divider') return <div key={i} className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1" />;
@@ -430,7 +431,7 @@ const MiniPlayer = ({ audioUrl, episodeSlug, questionTime, questionEndTime, lang
 
   return (
     <div className="bg-slate-50/80 dark:bg-slate-800/40 border-t border-slate-200/60 dark:border-slate-700/30">
-      <div className="mx-auto max-w-4xl flex items-center gap-1.5 px-6 py-1">
+      <div className="mx-auto max-w-4xl flex items-center gap-1.5 px-2 sm:px-6 py-1">
         <audio ref={audioRef} src={audioUrl} preload="metadata" />
 
         {/* Controls */}
@@ -549,8 +550,8 @@ const BottomSettingsPanel = ({
   onDelete
 }) => {
   return (
-    <div className="mx-auto max-w-4xl px-6 mt-4">
-      <div className="w-full flex items-center justify-between px-4 py-3 bg-white dark:bg-slate-800/80 rounded-2xl border border-slate-200/80 dark:border-slate-700/50 shadow-sm">
+    <div className="mx-auto max-w-4xl px-2 sm:px-6 mt-2 sm:mt-4">
+      <div className="w-full flex items-center justify-between px-3 sm:px-4 py-3 bg-white dark:bg-slate-800/80 rounded-xl sm:rounded-2xl border border-slate-200/80 dark:border-slate-700/50 shadow-sm">
         <div className="flex items-center gap-3">
           <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
             {getLocaleString('details', lang)}
@@ -558,8 +559,8 @@ const BottomSettingsPanel = ({
         </div>
       </div>
 
-      <div className="mt-2 bg-white dark:bg-slate-800/80 rounded-2xl border border-slate-200/80 dark:border-slate-700/50 shadow-sm overflow-hidden">
-        <div className="p-5 space-y-5">
+      <div className="mt-2 bg-white dark:bg-slate-800/80 rounded-xl sm:rounded-2xl border border-slate-200/80 dark:border-slate-700/50 shadow-sm overflow-hidden">
+        <div className="p-3 sm:p-5 space-y-4 sm:space-y-5">
             {/* Editor name & date row */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -718,16 +719,16 @@ const BottomSettingsPanel = ({
                 <div className="flex items-center justify-between gap-3">
                   <label className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-300 uppercase tracking-wider">
                     <Languages className="w-3 h-3" />
-                    Переводы (DeepSeek)
+                    {getLocaleString('translations_deepseek', lang)}
                   </label>
                   <span className="text-[11px] text-emerald-700/80 dark:text-emerald-300/80">
-                    Источник: {lang.toUpperCase()}
+                    {getLocaleString('source_lang', lang, { lang: lang.toUpperCase() })}
                   </span>
                 </div>
 
                 {!articleSlug || articleSlug === 'new' ? (
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Сначала сохраните статью как черновик, затем можно переводить.
+                    {getLocaleString('save_first_then_translate', lang)}
                   </p>
                 ) : (
                   <>
@@ -761,7 +762,7 @@ const BottomSettingsPanel = ({
                                 {option.label} ({option.code.toUpperCase()})
                               </p>
                               <p className="text-xs text-slate-500 dark:text-slate-400">
-                                {translated ? 'Уже переведено' : 'Перевод отсутствует'}
+                                {translated ? getLocaleString('already_translated', lang) : getLocaleString('translation_missing', lang)}
                               </p>
                             </div>
 
@@ -772,7 +773,7 @@ const BottomSettingsPanel = ({
                                   disabled={!!translatingLang}
                                   className="px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white transition-colors"
                                 >
-                                  {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Перевести'}
+                                  {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : getLocaleString('translate', lang)}
                                 </button>
                               ) : (
                                 <button
@@ -780,7 +781,7 @@ const BottomSettingsPanel = ({
                                   disabled={!!translatingLang}
                                   className="px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-500 hover:bg-amber-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white transition-colors"
                                 >
-                                  {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Перевести с заменой'}
+                                  {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : getLocaleString('translate_overwrite', lang)}
                                 </button>
                               )}
                             </div>
@@ -795,8 +796,8 @@ const BottomSettingsPanel = ({
         </div>
 
         {/* Status selection panel */}
-        <div className="mt-4 bg-white dark:bg-slate-800/80 rounded-2xl border border-slate-200/80 dark:border-slate-700/50 shadow-sm overflow-hidden">
-          <div className="p-5">
+        <div className="mt-3 sm:mt-4 bg-white dark:bg-slate-800/80 rounded-xl sm:rounded-2xl border border-slate-200/80 dark:border-slate-700/50 shadow-sm overflow-hidden">
+          <div className="p-3 sm:p-5">
             <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-4">
               {getLocaleString('article_status', lang) || 'Article Status'}
             </label>
@@ -905,7 +906,7 @@ const ArticleEditorPage = () => {
   const [translatingLang, setTranslatingLang] = useState(null);
   const [translationStatusByLang, setTranslationStatusByLang] = useState({});
   const [editorName, setEditorName] = useState('');
-  const [articleDate, setArticleDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [articleDate, setArticleDate] = useState('');
 
   const isNew = articleId === 'new';
   const editorRef = useRef(null);
@@ -934,7 +935,7 @@ const ArticleEditorPage = () => {
     content: '',
     editorProps: {
       attributes: {
-        class: 'prose prose-xl max-w-none font-serif focus:outline-none min-h-[50vh] px-6 py-8 md:px-10 md:py-10 text-slate-800 dark:text-slate-200 prose-headings:font-serif prose-headings:text-slate-900 dark:prose-headings:text-slate-100 prose-p:leading-loose prose-p:indent-8 prose-p:mb-5 prose-p:mt-0 prose-a:text-purple-700 dark:prose-a:text-purple-400 prose-blockquote:border-l-purple-400 prose-blockquote:bg-purple-50/50 dark:prose-blockquote:bg-purple-500/5 prose-blockquote:rounded-r-xl prose-blockquote:py-2 prose-blockquote:px-6 prose-img:rounded-xl prose-img:shadow-lg',
+        class: 'prose prose-base sm:prose-xl max-w-none font-serif focus:outline-none min-h-[50vh] px-3 py-4 sm:px-6 sm:py-8 md:px-10 md:py-10 text-slate-800 dark:text-slate-200 prose-headings:font-serif prose-headings:text-slate-900 dark:prose-headings:text-slate-100 prose-p:leading-relaxed sm:prose-p:leading-loose prose-p:indent-0 sm:prose-p:indent-8 prose-p:mb-3 sm:prose-p:mb-5 prose-p:mt-0 prose-a:text-purple-700 dark:prose-a:text-purple-400 prose-blockquote:border-l-purple-400 prose-blockquote:bg-purple-50/50 dark:prose-blockquote:bg-purple-500/5 prose-blockquote:rounded-r-xl prose-blockquote:py-2 prose-blockquote:px-3 sm:prose-blockquote:px-6 prose-img:rounded-xl prose-img:shadow-lg',
       },
     },
     onUpdate: () => setHasUnsaved(true),
@@ -1059,6 +1060,10 @@ const ArticleEditorPage = () => {
             const url = await getEpisodeAudioUrl(episode, lang);
             if (url && !cancelled) setAudioUrl(url);
 
+            // Load episode date
+            const epDate = await getEpisodeDate(episode);
+            if (epDate && !cancelled) setArticleDate(epDate);
+
             // Load transcript for this question's time range
             if (qTime != null) {
               console.log('[ArticleEditorPage] Loading transcript:', { episode, lang, qTime, qEnd });
@@ -1112,12 +1117,16 @@ const ArticleEditorPage = () => {
               });
               const url = await getEpisodeAudioUrl(d.episodeSlug, lang);
               if (url) setAudioUrl(url);
+
+              // Load episode date
+              const epDate = await getEpisodeDate(d.episodeSlug);
+              if (epDate && !cancelled) setArticleDate(epDate);
             }
           }
         }
       } catch (err) {
         console.error('[ArticleEditorPage] Load error:', err);
-        if (!cancelled) toast({ title: 'Error loading article', variant: 'destructive' });
+        if (!cancelled) toast({ title: getLocaleString('error_loading_article', lang), variant: 'destructive' });
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -1294,7 +1303,7 @@ const ArticleEditorPage = () => {
       setArticleSlug(result.slug);
       localStorage.removeItem(`article_draft_${oldSlug}`);
       navigate(`/${lang}/articles/${result.slug}/edit`, { replace: true });
-      toast({ title: 'URL updated' });
+      toast({ title: getLocaleString('url_updated', lang) });
     } else {
       toast({ title: result.error || 'Error updating slug', variant: 'destructive' });
     }
@@ -1446,7 +1455,7 @@ const ArticleEditorPage = () => {
   const handleTranslateLanguage = useCallback(async (targetLang, overwrite = false) => {
     if (!canPublish) return;
     if (!editor || !articleSlug || articleSlug === 'new') {
-      toast({ title: 'Сначала сохраните статью как черновик' });
+      toast({ title: getLocaleString('save_draft_first', lang) });
       return;
     }
     if (targetLang === lang) return;
@@ -1473,7 +1482,7 @@ const ArticleEditorPage = () => {
 
       if (!saveResult.success) {
         if (saveResult.exists) {
-          toast({ title: `${targetLang.toUpperCase()} уже переведен. Используйте «Перевести с заменой».` });
+          toast({ title: getLocaleString('already_translated_use_overwrite', lang, { lang: targetLang.toUpperCase() }) });
           return;
         }
         throw new Error(saveResult.error || 'Translation save failed');
@@ -1482,12 +1491,12 @@ const ArticleEditorPage = () => {
       await refreshTranslationStatuses();
       toast({
         title: overwrite
-          ? `Перевод ${targetLang.toUpperCase()} обновлен`
-          : `Перевод ${targetLang.toUpperCase()} создан`
+          ? getLocaleString('translation_updated', lang, { lang: targetLang.toUpperCase() })
+          : getLocaleString('translation_created', lang, { lang: targetLang.toUpperCase() })
       });
     } catch (err) {
       console.error('[Article Translation] Error:', err);
-      toast({ title: err.message || 'Ошибка перевода', variant: 'destructive' });
+      toast({ title: err.message || getLocaleString('translation_error', lang), variant: 'destructive' });
     } finally {
       setTranslatingLang(null);
     }
@@ -1511,7 +1520,7 @@ const ArticleEditorPage = () => {
       <div className="fixed inset-0 z-[100] bg-white dark:bg-slate-900 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
-          <p className="text-sm text-slate-500">Loading editor...</p>
+          <p className="text-sm text-slate-500">{getLocaleString('loading', lang)}</p>
         </div>
       </div>
     );
@@ -1529,26 +1538,13 @@ const ArticleEditorPage = () => {
     );
   }
 
-  // ─── Protected route: show nothing if not authenticated ───────────
-  if (!isAuthenticated) {
-    return (
-      <div className="fixed inset-0 z-[100] bg-[#fafaf9] dark:bg-slate-950 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-slate-600 dark:text-slate-400 mb-4">
-            {getLocaleString('loading', lang)}
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="fixed inset-0 z-[100] bg-[#fafaf9] dark:bg-slate-950 overflow-y-auto">
       {/* ────────────────────────────────────────────────────────────── */}
       {/* TOP BAR                                                       */}
       {/* ────────────────────────────────────────────────────────────── */}
       <div className="sticky top-0 z-[110] bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-200/80 dark:border-slate-800">
-        <div className="max-w-4xl mx-auto flex items-center gap-2 px-6 py-2.5">
+        <div className="max-w-4xl mx-auto flex items-center gap-1.5 sm:gap-2 px-2 sm:px-6 py-2">
           {/* Back */}
           <button
             onClick={() => {
@@ -1713,8 +1709,14 @@ const ArticleEditorPage = () => {
         .ProseMirror p {
           margin-top: 0;
           margin-bottom: 0.75em;
-          text-indent: 1em;
-          line-height: 1.72;
+          text-indent: 0;
+          line-height: 1.6;
+        }
+        @media (min-width: 640px) {
+          .ProseMirror p {
+            text-indent: 1em;
+            line-height: 1.72;
+          }
         }
 
         /* ── Highlight (text background colors) ── */
@@ -1865,8 +1867,8 @@ const ArticleEditorPage = () => {
           box-shadow: 0 1px 4px rgba(167, 139, 250, 0.15);
         }
       `}</style>
-      <div className="mx-auto max-w-4xl px-6 mt-4" onClick={handleTimecodeClick}>
-        <div className="bg-white dark:bg-slate-800/60 rounded-2xl shadow-sm border border-slate-200/80 dark:border-slate-700/50 overflow-hidden min-h-[60vh]">
+      <div className="mx-auto max-w-4xl px-0 sm:px-6 mt-0 sm:mt-4" onClick={handleTimecodeClick}>
+        <div className="bg-white dark:bg-slate-800/60 sm:rounded-2xl shadow-sm sm:border border-slate-200/80 dark:border-slate-700/50 overflow-hidden min-h-[60vh]">
           <EditorContent editor={editor} spellCheck="false" />
         </div>
       </div>

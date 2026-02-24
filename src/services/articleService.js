@@ -58,6 +58,25 @@ export const sanitizeSlug = (input) =>
     .substring(0, 80);
 
 /**
+ * Get the date of an episode by slug
+ */
+export const getEpisodeDate = async (episodeSlug) => {
+  try {
+    const { data, error } = await supabase
+      .from('episodes')
+      .select('date')
+      .eq('slug', episodeSlug)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data?.date || null;
+  } catch (error) {
+    console.error('[articleService] Error fetching episode date:', error);
+    return null;
+  }
+};
+
+/**
  * Get the audio URL for an episode in a given language
  */
 export const getEpisodeAudioUrl = async (episodeSlug, lang) => {
